@@ -13,3 +13,6 @@
 
 # GoLand dirs
 .idea/
+
+# Local
+*.db
