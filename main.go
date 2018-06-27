@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/YuriyLisovskiy/BlockChainGo/src/cli"
-	"github.com/YuriyLisovskiy/BlockChainGo/src/blockchain"
+	"github.com/YuriyLisovskiy/blockchain-go/src/cli"
+	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"flag"
 	"strconv"
-	chain "github.com/YuriyLisovskiy/BlockChainGo/src/blockchain"
+	chain "github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 )
 
 type CLI struct {

@@ -2,7 +2,7 @@ package blockchain
 
 import (
 	"github.com/boltdb/bolt"
-	"github.com/YuriyLisovskiy/BlockChainGo/src/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type Iterator struct {
