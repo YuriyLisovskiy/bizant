@@ -15,7 +15,6 @@ func (bc *BlockChain) AddBlock(data string) {
 	err := bc.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
 		lastHash = b.Get([]byte("l"))
-
 		return nil
 	})
 	if err != nil {

@@ -1,11 +1,11 @@
 package cli
 
 import (
-	chain "github.com/YuriyLisovskiy/BlockChainGo/src/blockchain"
-	"flag"
 	"os"
 	"fmt"
+	"flag"
 	"strconv"
+	chain "github.com/YuriyLisovskiy/BlockChainGo/src/blockchain"
 )
 
 type CLI struct {
