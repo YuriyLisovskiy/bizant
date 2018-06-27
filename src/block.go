@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"strconv"
 	"crypto/sha256"
+	"encoding/gob"
 )
 
 type Block struct {
@@ -12,6 +13,7 @@ type Block struct {
 	Data          []byte
 	PrevBlockHash []byte
 	Hash          []byte
+	Nonce         int
 }
 
 func (block *Block) CalcHash() {
@@ -22,7 +24,30 @@ func (block *Block) CalcHash() {
 }
 
 func NewBlock(data string, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}}
-	block.CalcHash()
+	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}, 0}
+	pow := NewProofOfWork(block)
+	nonce, hash := pow.Run()
+	block.Hash = hash[:]
+	block.Nonce = nonce
 	return block
+}
+
+func (block *Block) Serialize() []byte {
+	var result bytes.Buffer
+	encoder := gob.NewEncoder(&result)
+	err := encoder.Encode(block)
+	if err != nil {
+		panic(err)
+	}
+	return result.Bytes()
+}
+
+func DeserializeBlock(byteData []byte) *Block {
+	var block Block
+	decoder := gob.NewDecoder(bytes.NewReader(byteData))
+	err := decoder.Decode(&block)
+	if err != nil {
+		panic(err)
+	}
+	return &block
 }
