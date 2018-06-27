@@ -1,8 +1,9 @@
-package src
+package blockchain
 
-import "github.com/boltdb/bolt"
-
-const blocksBucket = "blocks"
+import (
+	"github.com/boltdb/bolt"
+	"github.com/YuriyLisovskiy/BlockChainGo/src/utils"
+)
 
 type BlockChain struct {
 	tip []byte
@@ -12,7 +13,7 @@ type BlockChain struct {
 func (bc *BlockChain) AddBlock(data string) {
 	var lastHash []byte
 	err := bc.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(blocksBucket))
+		b := tx.Bucket([]byte(utils.BlocksBucket))
 		lastHash = b.Get([]byte("l"))
 
 		return nil
@@ -22,7 +23,7 @@ func (bc *BlockChain) AddBlock(data string) {
 	}
 	newBlock := NewBlock(data, lastHash)
 	err = bc.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(blocksBucket))
+		b := tx.Bucket([]byte(utils.BlocksBucket))
 		err := b.Put(newBlock.Hash, newBlock.Serialize())
 		if err != nil {
 			panic(err)
@@ -47,11 +48,11 @@ func NewBlockChain(dbFile string) *BlockChain {
 		panic(err)
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(blocksBucket))
+		b := tx.Bucket([]byte(utils.BlocksBucket))
 
 		if b == nil {
 			genesis := NewGenesisBlock()
-			b, err := tx.CreateBucket([]byte(blocksBucket))
+			b, err := tx.CreateBucket([]byte(utils.BlocksBucket))
 			if err != nil {
 				panic(err)
 			}
