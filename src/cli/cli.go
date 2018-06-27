@@ -3,8 +3,8 @@ package cli
 import (
 	"os"
 	"fmt"
-	"flag"
 	"strconv"
+	cliVars "github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	chain "github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 )
 
@@ -17,38 +17,37 @@ func NewCLI(bc *chain.BlockChain) CLI {
 }
 
 func (cli *CLI) Run() {
-//	cli.validateArgs()
 
-	addBlockCmd := flag.NewFlagSet("mine", flag.ExitOnError)
-	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
+//	TODO: validate args
 
-	addBlockData := addBlockCmd.String("data", "", "Block data")
-
+	addBlockData := cliVars.AddBlockCmd.String("data", "", "Block data")
+	if len(os.Args) == 1 {
+		cliVars.AddBlockCmd.Usage()
+		return
+	}
 	switch os.Args[1] {
 	case "mine":
-		err := addBlockCmd.Parse(os.Args[2:])
+		err := cliVars.AddBlockCmd.Parse(os.Args[2:])
 		if err != nil {
 			panic(err)
 		}
 	case "printchain":
-		err := printChainCmd.Parse(os.Args[2:])
+		err := cliVars.PrintChainCmd.Parse(os.Args[2:])
 		if err != nil {
 			panic(err)
 		}
 	default:
-//		cli.printUsage()
-		os.Exit(1)
+		cli.printUsage()
+		return
 	}
-
-	if addBlockCmd.Parsed() {
+	if cliVars.AddBlockCmd.Parsed() {
 		if *addBlockData == "" {
-			addBlockCmd.Usage()
-			os.Exit(1)
+			cliVars.AddBlockCmd.Usage()
+			return
 		}
 		cli.addBlock(*addBlockData)
 	}
-
-	if printChainCmd.Parsed() {
+	if cliVars.PrintChainCmd.Parsed() {
 		cli.printChain()
 	}
 }
@@ -58,18 +57,21 @@ func (cli *CLI) addBlock(data string) {
 	fmt.Println("Success!")
 }
 
+func (cli *CLI) printUsage() {
+	cliVars.AddBlockCmd.Usage()
+	cliVars.PrintChainCmd.Usage()
+}
+
 func (cli *CLI) printChain() {
 	bci := cli.bc.Iterator()
 	for {
 		block := bci.Next()
-
 		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
 		fmt.Printf("Data: %s\n", block.Data)
 		fmt.Printf("Hash: %x\n", block.Hash)
 		pow := chain.NewProofOfWork(block)
 		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
 		fmt.Println()
-
 		if len(block.PrevBlockHash) == 0 {
 			break
 		}

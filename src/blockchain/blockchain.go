@@ -36,6 +36,10 @@ func (bc *BlockChain) AddBlock(data string) {
 	})
 }
 
+func (bc *BlockChain) CloseDB() {
+	defer bc.db.Close()
+}
+
 func NewGenesisBlock() *Block {
 	return NewBlock("Genesis Block", []byte{})
 }
@@ -66,5 +70,3 @@ func NewBlockChain(dbFile string) *BlockChain {
 	bc := BlockChain{tip, db}
 	return &bc
 }
-
-

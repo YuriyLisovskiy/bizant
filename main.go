@@ -7,7 +7,7 @@ import (
 
 func main() {
 	bc := blockchain.NewBlockChain("BlockChain.db")
-//	defer bc.db.Close()
+	bc.CloseDB()
 
 	newCli := cli.NewCLI(bc)
 	newCli.Run()
