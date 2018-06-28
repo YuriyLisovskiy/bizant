@@ -1,31 +1,27 @@
 package blockchain
 
 import (
+	"log"
 	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
-type Iterator struct {
+type BlockChainIterator struct {
 	currentHash []byte
 	db          *bolt.DB
 }
 
-func (bc *BlockChain) Iterator() *Iterator {
-	bci := &Iterator{bc.tip, bc.db}
-	return bci
-}
-
-func (iterator *Iterator) Next() *Block {
+func (i *BlockChainIterator) Next() *Block {
 	var block *Block
-	err := iterator.db.View(func(tx *bolt.Tx) error {
+	err := i.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
-		encodedBlock := b.Get(iterator.currentHash)
+		encodedBlock := b.Get(i.currentHash)
 		block = DeserializeBlock(encodedBlock)
 		return nil
 	})
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
-	iterator.currentHash = block.PrevBlockHash
+	i.currentHash = block.PrevBlockHash
 	return block
 }

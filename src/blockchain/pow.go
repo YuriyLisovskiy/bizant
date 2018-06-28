@@ -2,14 +2,11 @@ package blockchain
 
 import (
 	"fmt"
-	"math"
 	"bytes"
-	"strconv"
 	"math/big"
 	"crypto/sha256"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
-
-const targetBits = 12
 
 type ProofOfWork struct {
 	block  *Block
@@ -28,9 +25,9 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 		[][]byte{
 			pow.block.PrevBlockHash,
 			pow.block.HashTransactions(),
-			IntToHex(pow.block.Timestamp),
-			IntToHex(int64(targetBits)),
-			IntToHex(int64(nonce)),
+			utils.IntToHex(pow.block.Timestamp),
+			utils.IntToHex(int64(targetBits)),
+			utils.IntToHex(int64(nonce)),
 		},
 		[]byte{},
 	)
@@ -41,7 +38,6 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	var hashInt big.Int
 	var hash [32]byte
 	nonce := 0
-	maxNonce := math.MaxInt32
 	fmt.Printf("Mining a new block")
 	for nonce < maxNonce {
 		data := pow.prepareData(nonce)
@@ -65,8 +61,4 @@ func (pow *ProofOfWork) Validate() bool {
 	hashInt.SetBytes(hash[:])
 	isValid := hashInt.Cmp(pow.target) == -1
 	return isValid
-}
-
-func IntToHex(n int64) []byte {
-	return []byte(strconv.FormatInt(n, 16))
 }

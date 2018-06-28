@@ -1,10 +1,11 @@
 package blockchain
 
 import (
+	"log"
 	"time"
 	"bytes"
-	"crypto/sha256"
 	"encoding/gob"
+	"crypto/sha256"
 )
 
 type Block struct {
@@ -13,16 +14,6 @@ type Block struct {
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
-}
-
-func (block *Block) HashTransactions() []byte {
-	var txHashes [][]byte
-	var txHash [32]byte
-	for _, transaction := range block.Transactions {
-		txHashes = append(txHashes, transaction.ID)
-	}
-	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
-	return txHash[:]
 }
 
 func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
@@ -34,22 +25,36 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	return block
 }
 
-func (block *Block) Serialize() []byte {
+func NewGenesisBlock(coinBase *Transaction) *Block {
+	return NewBlock([]*Transaction{coinBase}, []byte{})
+}
+
+func (b *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	var txHash [32]byte
+	for _, tx := range b.Transactions {
+		txHashes = append(txHashes, tx.Hash())
+	}
+	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+	return txHash[:]
+}
+
+func (b *Block) Serialize() []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(block)
+	err := encoder.Encode(b)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return result.Bytes()
 }
 
-func DeserializeBlock(byteData []byte) *Block {
+func DeserializeBlock(d []byte) *Block {
 	var block Block
-	decoder := gob.NewDecoder(bytes.NewReader(byteData))
+	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&block)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return &block
 }
