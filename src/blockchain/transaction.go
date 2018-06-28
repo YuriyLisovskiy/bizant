@@ -137,7 +137,12 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 
 func NewCoinBaseTX(to, data string) *Transaction {
 	if data == "" {
-		data = fmt.Sprintf("Reward to '%s'", to)
+		randData := make([]byte, 20)
+		_, err := rand.Read(randData)
+		if err != nil {
+			log.Panic(err)
+		}
+		data = fmt.Sprintf("%x", randData)
 	}
 	txIn := txPkg.TXInput{[]byte{}, -1, nil, []byte(data)}
 	txOut := txPkg.NewTXOutput(subsidy, to)
@@ -146,7 +151,7 @@ func NewCoinBaseTX(to, data string) *Transaction {
 	return &tx
 }
 
-func NewUTXOTransaction(from, to string, amount int, bc *BlockChain) *Transaction {
+func NewUTXOTransaction(from, to string, amount int, UTXOSet *UTXOSet) *Transaction {
 	var inputs []txPkg.TXInput
 	var outputs []txPkg.TXOutput
 	wallets, err := w.NewWallets()
@@ -155,7 +160,7 @@ func NewUTXOTransaction(from, to string, amount int, bc *BlockChain) *Transactio
 	}
 	wallet := wallets.GetWallet(from)
 	pubKeyHash := w.HashPubKey(wallet.PublicKey)
-	acc, validOutputs := bc.FindSpendableOutputs(pubKeyHash, amount)
+	acc, validOutputs := UTXOSet.FindSpendableOutputs(pubKeyHash, amount)
 	if acc < amount {
 		log.Panic("ERROR: Not enough funds")
 	}
@@ -175,6 +180,6 @@ func NewUTXOTransaction(from, to string, amount int, bc *BlockChain) *Transactio
 	}
 	tx := Transaction{nil, inputs, outputs}
 	tx.ID = tx.Hash()
-	bc.SignTransaction(&tx, wallet.PrivateKey)
+	UTXOSet.BlockChain.SignTransaction(&tx, wallet.PrivateKey)
 	return &tx
 }

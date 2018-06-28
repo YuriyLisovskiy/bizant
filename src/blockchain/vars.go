@@ -7,5 +7,6 @@ var (
 )
 const (
 	subsidy = 10
-	targetBits = 24
+	targetBits = 16
+	utxoBucket = "chainstate"
 )

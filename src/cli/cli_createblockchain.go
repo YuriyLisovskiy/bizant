@@ -12,6 +12,8 @@ func (cli *CLI) createBlockChain(address string) {
 		log.Panic("ERROR: Address is not valid")
 	}
 	bc := blockchain.CreateBlockChain(address)
-	bc.CloseDB(false)
+	bc.CloseDB(true)
+	UTXOSet := blockchain.UTXOSet{bc}
+	UTXOSet.Reindex()
 	fmt.Println("Done!")
 }

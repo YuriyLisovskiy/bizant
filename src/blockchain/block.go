@@ -5,7 +5,7 @@ import (
 	"time"
 	"bytes"
 	"encoding/gob"
-	"crypto/sha256"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type Block struct {
@@ -30,13 +30,12 @@ func NewGenesisBlock(coinBase *Transaction) *Block {
 }
 
 func (b *Block) HashTransactions() []byte {
-	var txHashes [][]byte
-	var txHash [32]byte
+	var transactions [][]byte
 	for _, tx := range b.Transactions {
-		txHashes = append(txHashes, tx.Hash())
+		transactions = append(transactions, tx.Serialize())
 	}
-	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
-	return txHash[:]
+	merkleTree := utils.NewMerkleTree(transactions)
+	return merkleTree.RootNode.Data
 }
 
 func (b *Block) Serialize() []byte {
