@@ -16,4 +16,5 @@
 
 # Local
 *.db
+*.dat
 bin/
