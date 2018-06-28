@@ -14,10 +14,11 @@ type Block struct {
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
+	Height        int
 }
 
-func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0}
+func NewBlock(transactions []*Transaction, prevBlockHash []byte, height int) *Block {
+	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0, height}
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
 	block.Hash = hash[:]
@@ -26,7 +27,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 }
 
 func NewGenesisBlock(coinBase *Transaction) *Block {
-	return NewBlock([]*Transaction{coinBase}, []byte{})
+	return NewBlock([]*Transaction{coinBase}, []byte{}, 0)
 }
 
 func (b *Block) HashTransactions() []byte {

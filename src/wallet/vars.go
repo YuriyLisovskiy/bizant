@@ -1,7 +1,8 @@
 package wallet
 
+var walletFile = "wallet_%s.dat"
+
 const (
 	version = byte(0x00)
-	walletFile = "wallet.dat"
 	addressChecksumLen = 4
 )

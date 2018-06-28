@@ -5,8 +5,8 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 )
 
-func (cli *CLI) reindexUTXO() {
-	bc := blockchain.NewBlockChain()
+func (cli *CLI) reindexUTXO(nodeID string) {
+	bc := blockchain.NewBlockChain(nodeID)
 	UTXOSet := blockchain.UTXOSet{bc}
 	UTXOSet.Reindex()
 	count := UTXOSet.CountTransactions()

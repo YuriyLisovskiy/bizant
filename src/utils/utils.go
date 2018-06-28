@@ -7,8 +7,8 @@ import (
 	"encoding/binary"
 )
 
-func DBExists() bool {
-	if _, err := os.Stat(DBFile); os.IsNotExist(err) {
+func DBExists(dbFile string) bool {
+	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
 		return false
 	}
 	return true
