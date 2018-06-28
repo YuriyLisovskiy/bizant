@@ -1,14 +1,8 @@
 package main
 
-import (
-	"github.com/YuriyLisovskiy/blockchain-go/src/cli"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-)
+import "github.com/YuriyLisovskiy/blockchain-go/src/cli"
 
 func main() {
-	bc := blockchain.NewBlockChain("BlockChain.db")
-	bc.CloseDB()
-
-	newCli := cli.NewCLI(bc)
+	newCli := cli.CLI{}
 	newCli.Run()
 }

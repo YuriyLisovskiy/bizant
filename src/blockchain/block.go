@@ -3,28 +3,30 @@ package blockchain
 import (
 	"time"
 	"bytes"
-	"strconv"
 	"crypto/sha256"
 	"encoding/gob"
 )
 
 type Block struct {
 	Timestamp     int64
-	Data          []byte
+	Transactions  []*Transaction
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
 }
 
-func (block *Block) CalcHash() {
-	timestamp := []byte(strconv.FormatInt(block.Timestamp, 10))
-	headers := bytes.Join([][]byte{block.PrevBlockHash, block.Data, timestamp}, []byte{})
-	hash := sha256.Sum256(headers)
-	block.Hash = hash[:]
+func (block *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	var txHash [32]byte
+	for _, transaction := range block.Transactions {
+		txHashes = append(txHashes, transaction.ID)
+	}
+	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+	return txHash[:]
 }
 
-func NewBlock(data string, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}, 0}
+func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
+	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0}
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
 	block.Hash = hash[:]

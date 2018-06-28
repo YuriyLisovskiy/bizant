@@ -24,7 +24,7 @@ func (iterator *Iterator) Next() *Block {
 		return nil
 	})
 	if err != nil {
-		return nil
+		panic(err)
 	}
 	iterator.currentHash = block.PrevBlockHash
 	return block
