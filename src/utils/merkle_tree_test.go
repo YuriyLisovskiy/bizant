@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"testing"
 	"encoding/hex"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestNewMerkleNode(t *testing.T) {
+func TestNewMerkleNode(test *testing.T) {
 	data := [][]byte{
 		[]byte("node1"),
 		[]byte("node2"),
@@ -27,27 +26,18 @@ func TestNewMerkleNode(t *testing.T) {
 	// Level 3
 	n7 := NewMerkleNode(n5, n6, nil)
 
-	assert.Equal(
-		t,
-		"64b04b718d8b7c5b6fd17f7ec221945c034cfce3be4118da33244966150c4bd4",
-		hex.EncodeToString(n5.Data),
-		"Level 1 hash 1 is correct",
-	)
-	assert.Equal(
-		t,
-		"08bd0d1426f87a78bfc2f0b13eccdf6f5b58dac6b37a7b9441c1a2fab415d76c",
-		hex.EncodeToString(n6.Data),
-		"Level 1 hash 2 is correct",
-	)
-	assert.Equal(
-		t,
-		"4e3e44e55926330ab6c31892f980f8bfd1a6e910ff1ebc3f778211377f35227e",
-		hex.EncodeToString(n7.Data),
-		"Root hash is correct",
-	)
+	if "64b04b718d8b7c5b6fd17f7ec221945c034cfce3be4118da33244966150c4bd4" != hex.EncodeToString(n5.Data) {
+		test.Error("Level 1 hash 1 is incorrect")
+	}
+	if "08bd0d1426f87a78bfc2f0b13eccdf6f5b58dac6b37a7b9441c1a2fab415d76c" != hex.EncodeToString(n6.Data) {
+		test.Error("Level 1 hash 2 is incorrect")
+	}
+	if "4e3e44e55926330ab6c31892f980f8bfd1a6e910ff1ebc3f778211377f35227e" != hex.EncodeToString(n7.Data) {
+		test.Error("Root hash is incorrect")
+	}
 }
 
-func TestNewMerkleTree(t *testing.T) {
+func TestNewMerkleTree(test *testing.T) {
 	data := [][]byte{
 		[]byte("node1"),
 		[]byte("node2"),
@@ -69,5 +59,7 @@ func TestNewMerkleTree(t *testing.T) {
 
 	rootHash := fmt.Sprintf("%x", n7.Data)
 	mTree := NewMerkleTree(data)
-	assert.Equal(t, rootHash, fmt.Sprintf("%x", mTree.RootNode.Data), "Merkle tree root hash is correct")
+	if rootHash != fmt.Sprintf("%x", mTree.RootNode.Data) {
+		test.Error("Merkle tree root hash is incorrect")
+	}
 }
