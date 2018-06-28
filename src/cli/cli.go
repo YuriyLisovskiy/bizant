@@ -10,13 +10,13 @@ type CLI struct{}
 
 func (cli *CLI) printUsage() {
 	fmt.Println("Usage:")
-	fmt.Print("\tcreateblockchain -address ADDRESS (Create a blockchain and send genesis block reward to ADDRESS)\n\n")
-	fmt.Print("\tcreatewallet (Generates a new key-pair and saves it into the wallet file)\n\n")
-	fmt.Print("\tgetbalance -address ADDRESS (Get balance of ADDRESS)\n\n")
-	fmt.Print("\tlistaddresses (Lists all addresses from the wallet file)\n\n")
-	fmt.Print("\tprintchain (Print all the blocks of the blockchain)\n\n")
-	fmt.Print("\treindexutxo (Rebuilds the UTXO set)\n\n")
-	fmt.Print("\tsend  -from FROM_ADDRESS -to TO_ADDRESS -amount AMOUNT (Send AMOUNT of coins from FROM_ADDRESS address to TO_ADDRESS)\n")
+	fmt.Print("  createblockchain\n    -address string\n\tThe address to send genesis block reward to\n\n")
+	fmt.Print("  createwallet\n\tGenerates a new key-pair and saves it into the wallet file\n\n")
+	fmt.Print("  getbalance\n    -address string\n\tThe address to get balance for\n\n")
+	fmt.Print("  listaddresses\n\tLists all addresses from the wallet file\n\n")
+	fmt.Print("  printchain\n\tPrint all the blocks of the blockchain\n\n")
+	fmt.Print("  reindexutxo\n\tRebuilds the UTXO set\n\n")
+	fmt.Print("  send\n    -from string\n\tSource wallet address\n    -to string\n\tDestination wallet address\n    -amount int\n\tAmount to send\n\n")
 }
 
 func (cli *CLI) validateArgs() {
