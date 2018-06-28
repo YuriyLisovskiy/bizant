@@ -7,7 +7,7 @@ import (
 	chain "github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 	"log"
 	"flag"
-	cliVars "github.com/YuriyLisovskiy/blockchain-go/src/utils"
+//	cliVars "github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type CLI struct{}
@@ -20,12 +20,12 @@ func (cli *CLI) createBlockChain(address string) {
 
 func (cli *CLI) getBalance(address string) {
 	bc := chain.NewBlockChain(address)
-	bc.CloseDB()
 	balance := 0
 	UTXOs := bc.FindUTXO(address)
 	for _, out := range UTXOs {
 		balance += out.Value
 	}
+	bc.CloseDB()
 	fmt.Printf("Balance of '%s': %d\n", address, balance)
 }
 
@@ -46,11 +46,9 @@ func (cli *CLI) validateArgs() {
 
 func (cli *CLI) printChain() {
 	bc := chain.NewBlockChain("")
-	bc.CloseDB()
 	bci := bc.Iterator()
 	for {
 		block := bci.Next()
-
 		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
 		fmt.Printf("Hash: %x\n", block.Hash)
 		pow := chain.NewProofOfWork(block)
@@ -60,17 +58,17 @@ func (cli *CLI) printChain() {
 			break
 		}
 	}
+	bc.CloseDB()
 }
 func (cli *CLI) send(from, to string, amount int) {
 	bc := chain.NewBlockChain(from)
-//	bc.CloseDB()
 	bc.MineBlock([]*chain.Transaction{chain.NewUTXOTransaction(from, to, amount, bc)})
+	bc.CloseDB()
 	fmt.Println("Success!")
 }
 
 func (cli *CLI) Run() {
 	cli.validateArgs()
-
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
 	createBlockChainCmd := flag.NewFlagSet("createblockchain", flag.ExitOnError)
 	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
@@ -83,12 +81,6 @@ func (cli *CLI) Run() {
 	sendAmount := sendCmd.Int("amount", 0, "Amount to send")
 
 	switch os.Args[1] {
-	case "mine":
-		err := cliVars.AddBlockCmd.Parse(os.Args[2:])
-		if err != nil {
-			panic(err)
-		}
-
 	case "getbalance":
 		err := getBalanceCmd.Parse(os.Args[2:])
 		if err != nil {
