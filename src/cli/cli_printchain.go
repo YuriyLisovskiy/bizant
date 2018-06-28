@@ -8,7 +8,6 @@ import (
 
 func (cli *CLI) printChain() {
 	bc := blockchain.NewBlockChain()
-	bc.CloseDB(true)
 	bci := bc.Iterator()
 	for {
 		block := bci.Next()
@@ -24,4 +23,5 @@ func (cli *CLI) printChain() {
 			break
 		}
 	}
+	bc.CloseDB(true)
 }

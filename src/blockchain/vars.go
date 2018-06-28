@@ -6,7 +6,7 @@ var (
 	maxNonce = math.MaxInt32
 )
 const (
-	subsidy = 10
+	subsidy = 50
 	targetBits = 16
 	utxoBucket = "chainstate"
 )

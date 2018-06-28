@@ -16,11 +16,11 @@ func (cli *CLI) send(from, to string, amount int) {
 	}
 	bc := blockchain.NewBlockChain()
 	UTXOSet := blockchain.UTXOSet{bc}
-	bc.CloseDB(true)
 	tx := blockchain.NewUTXOTransaction(from, to, amount, &UTXOSet)
 	cbTx := blockchain.NewCoinBaseTX(from, "")
 	txs := []*blockchain.Transaction{cbTx, tx}
 	newBlock := bc.MineBlock(txs)
 	UTXOSet.Update(newBlock)
+	bc.CloseDB(true)
 	fmt.Println("Success!")
 }
