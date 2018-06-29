@@ -259,18 +259,15 @@ func handleGetData(request []byte, bc *blockchain.BlockChain) {
 func handleTx(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload tx
-
 	buff.Write(request[commandLength:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-
 	txData := payload.Transaction
 	tx := blockchain.DeserializeTransaction(txData)
 	mempool[hex.EncodeToString(tx.ID)] = tx
-
 	if nodeAddress == KnownNodes[0] {
 		for _, node := range KnownNodes {
 			if node != nodeAddress && node != payload.AddFrom {
@@ -330,7 +327,8 @@ func handleVersion(request []byte, bc *blockchain.BlockChain) {
 		sendVersion(payload.AddrFrom, bc)
 	}
 
-	// sendAddr(payload.AddrFrom)
+//	sendAddr(payload.AddrFrom)
+
 	if !nodeIsKnown(payload.AddrFrom) {
 		KnownNodes = append(KnownNodes, payload.AddrFrom)
 	}
