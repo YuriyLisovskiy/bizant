@@ -53,6 +53,9 @@ func DeserializeBlock(d []byte) *Block {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&block)
+	
+	// TODO: check if not EOF
+	
 	if err != nil {
 		log.Panic(err)
 	}
