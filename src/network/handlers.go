@@ -195,7 +195,7 @@ func handleVersion(request []byte, bc *blockchain.BlockChain) {
 
 	//	sendAddr(payload.AddrFrom)
 
-	if !nodeIsKnown(payload.AddrFrom) {
+	if !utils.NodeIsKnown(payload.AddrFrom, KnownNodes) {
 		KnownNodes = append(KnownNodes, payload.AddrFrom)
 	}
 }
@@ -223,7 +223,7 @@ func handlePong(request []byte) {
 	if err != nil {
 		log.Panic(err)
 	}
-	if !nodeIsKnown(data.AddrFrom) {
+	if !utils.NodeIsKnown(data.AddrFrom, KnownNodes) {
 		KnownNodes = append(KnownNodes, data.AddrFrom)
 	}
 	fmt.Printf("Peers %d\n", len(KnownNodes))

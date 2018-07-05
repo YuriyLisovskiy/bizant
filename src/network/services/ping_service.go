@@ -7,7 +7,7 @@ import (
 
 type PingService struct {}
 
-func (ps *PingService) Run(nodeAddress string, knownNodes *[]string) {
+func (ps *PingService) Start(nodeAddress string, knownNodes *[]string) {
 	go func() {
 		ticker := time.NewTicker(2 * time.Minute)
 		for {

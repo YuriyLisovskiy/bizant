@@ -54,8 +54,8 @@ func StartServer(nodeID, minerAddress string) {
 	if nodeAddress != KnownNodes[0] {
 		sendVersion(KnownNodes[0], bc)
 	}
-	pingService := services.PingService{}
-	pingService.Run(nodeAddress, &KnownNodes)
+	pingService := &services.PingService{}
+	pingService.Start(nodeAddress, &KnownNodes)
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -63,13 +63,4 @@ func StartServer(nodeID, minerAddress string) {
 		}
 		go handleConnection(conn, bc)
 	}
-}
-
-func nodeIsKnown(addr string) bool {
-	for _, node := range KnownNodes {
-		if node == addr {
-			return true
-		}
-	}
-	return false
 }
