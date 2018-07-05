@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"fmt"
-	"strconv"
+	"encoding/json"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	"fmt"
 )
 
 func (cli *CLI) printChain(nodeID string) {
@@ -11,15 +11,11 @@ func (cli *CLI) printChain(nodeID string) {
 	bci := bc.Iterator()
 	for {
 		block := bci.Next()
-		fmt.Printf("============ Block %x ============\n", block.Hash)
-		fmt.Printf("Height: %d\n", block.Height)
-		fmt.Printf("Prev. block: %x\n", block.PrevBlockHash)
-		pow := blockchain.NewProofOfWork(block)
-		fmt.Printf("PoW: %s\n\n", strconv.FormatBool(pow.Validate()))
-		for _, tx := range block.Transactions {
-			fmt.Println(tx)
+		data, err := json.MarshalIndent(block, "", "  ")
+		if err != nil {
+			panic(err)
 		}
-		fmt.Printf("\n\n")
+		fmt.Println(string(data))
 		if len(block.PrevBlockHash) == 0 {
 			break
 		}

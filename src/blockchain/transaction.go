@@ -3,6 +3,7 @@ package blockchain
 import (
 	"fmt"
 	"log"
+	"time"
 	"bytes"
 	"strings"
 	"math/big"
@@ -17,9 +18,10 @@ import (
 )
 
 type Transaction struct {
-	ID   []byte
-	VIn  []txPkg.TXInput
-	VOut []txPkg.TXOutput
+	ID        []byte
+	VIn       []txPkg.TXInput
+	VOut      []txPkg.TXOutput
+	Timestamp int64
 }
 
 func (tx Transaction) IsCoinBase() bool {
@@ -72,6 +74,7 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 func (tx Transaction) String() string {
 	var lines []string
 	lines = append(lines, fmt.Sprintf("--- Transaction %x:", tx.ID))
+	lines = append(lines, fmt.Sprintf("     Timestamp %d", tx.Timestamp))
 	for i, input := range tx.VIn {
 		lines = append(lines, fmt.Sprintf("     Input %d:", i))
 		lines = append(lines, fmt.Sprintf("       TXID:      %x", input.TxId))
@@ -96,7 +99,7 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 	for _, vOut := range tx.VOut {
 		outputs = append(outputs, txPkg.TXOutput{vOut.Value, vOut.PubKeyHash})
 	}
-	txCopy := Transaction{tx.ID, inputs, outputs}
+	txCopy := Transaction{tx.ID, inputs, outputs, tx.Timestamp}
 	return txCopy
 }
 
@@ -146,7 +149,7 @@ func NewCoinBaseTX(to, data string) *Transaction {
 	}
 	txIn := txPkg.TXInput{[]byte{}, -1, nil, []byte(data)}
 	txOut := txPkg.NewTXOutput(subsidy, to)
-	tx := Transaction{nil, []txPkg.TXInput{txIn}, []txPkg.TXOutput{*txOut}}
+	tx := Transaction{nil, []txPkg.TXInput{txIn}, []txPkg.TXOutput{*txOut}, time.Now().Unix()}
 	tx.ID = tx.Hash()
 	return &tx
 }
@@ -174,7 +177,7 @@ func NewUTXOTransaction(wallet *w.Wallet, to string, amount int, UTXOSet *UTXOSe
 	if acc > amount {
 		outputs = append(outputs, *txPkg.NewTXOutput(acc-amount, from)) // a change
 	}
-	tx := Transaction{nil, inputs, outputs}
+	tx := Transaction{nil, inputs, outputs, time.Now().Unix()}
 	tx.ID = tx.Hash()
 	UTXOSet.BlockChain.SignTransaction(&tx, wallet.PrivateKey)
 	return &tx

@@ -276,8 +276,8 @@ func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
 	return tx.Verify(prevTXs)
 }
 
-func (bc *BlockChain) CloseDB(isDefer bool) {
-	if isDefer {
+func (bc *BlockChain) CloseDB(Defer bool) {
+	if Defer {
 		defer bc.db.Close()
 	}
 	bc.db.Close()
