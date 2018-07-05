@@ -202,16 +202,16 @@ func handleVersion(request []byte, bc *blockchain.BlockChain) {
 
 func handlePing(request []byte) {
 	var buff bytes.Buffer
-	var requestData utils.Ping
+	var data utils.Ping
 	buff.Write(request[utils.CommandLength:])
 	dec := gob.NewDecoder(&buff)
-	err := dec.Decode(&requestData)
+	err := dec.Decode(&data)
 	if err != nil {
 		log.Panic(err)
 	}
 	payload := utils.GobEncode(utils.Pong{AddrFrom: nodeAddress})
 	pongRequest := append(utils.CommandToBytes("pong"), payload...)
-	utils.SendData(requestData.AddrFrom, pongRequest, &KnownNodes)
+	utils.SendData(data.AddrFrom, pongRequest, &KnownNodes)
 }
 
 func handlePong(request []byte) {
