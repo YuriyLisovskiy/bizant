@@ -1,7 +1,7 @@
 package utils
 
 const (
-	Protocol = "tcp"
-	NodeVersion = 1
-	CommandLength = 12
+	PROTOCOL = "tcp"
+	NODE_VERSION = 1
+	COMMAND_LENGTH = 12
 )

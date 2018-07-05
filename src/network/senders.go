@@ -48,7 +48,7 @@ func SendTx(addr string, tnx *blockchain.Transaction) {
 
 func sendVersion(addr string, bc *blockchain.BlockChain) {
 	bestHeight := bc.GetBestHeight()
-	payload := utils.GobEncode(version{utils.NodeVersion, bestHeight, nodeAddress})
+	payload := utils.GobEncode(version{utils.NODE_VERSION, bestHeight, nodeAddress})
 	request := append(utils.CommandToBytes("version"), payload...)
 	utils.SendData(addr, request, &KnownNodes)
 }

@@ -8,11 +8,11 @@ import (
 )
 
 func ExtractCommand(request []byte) []byte {
-	return request[:CommandLength]
+	return request[:COMMAND_LENGTH]
 }
 
 func CommandToBytes(command string) []byte {
-	var b [CommandLength]byte
+	var b [COMMAND_LENGTH]byte
 	for i, c := range command {
 		b[i] = byte(c)
 	}

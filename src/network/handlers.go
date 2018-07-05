@@ -19,7 +19,7 @@ func requestBlocks() {
 func handleAddr(request []byte) {
 	var buff bytes.Buffer
 	var payload addr
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -33,7 +33,7 @@ func handleAddr(request []byte) {
 func handleBlock(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload block
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -57,7 +57,7 @@ func handleBlock(request []byte, bc *blockchain.BlockChain) {
 func handleInv(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload inv
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -79,7 +79,7 @@ func handleInv(request []byte, bc *blockchain.BlockChain) {
 	if payload.Type == "tx" {
 		txID := payload.Items[0]
 
-		if mempool[hex.EncodeToString(txID)].ID == nil {
+		if memPool[hex.EncodeToString(txID)].ID == nil {
 			sendGetData(payload.AddrFrom, "tx", txID)
 		}
 	}
@@ -88,7 +88,7 @@ func handleInv(request []byte, bc *blockchain.BlockChain) {
 func handleGetBlocks(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload getblocks
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -101,7 +101,7 @@ func handleGetBlocks(request []byte, bc *blockchain.BlockChain) {
 func handleGetData(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload getdata
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -116,7 +116,7 @@ func handleGetData(request []byte, bc *blockchain.BlockChain) {
 	}
 	if payload.Type == "tx" {
 		txID := hex.EncodeToString(payload.ID)
-		tx := mempool[txID]
+		tx := memPool[txID]
 		SendTx(payload.AddrFrom, &tx)
 		// delete(mempool, txID)
 	}
@@ -125,7 +125,7 @@ func handleGetData(request []byte, bc *blockchain.BlockChain) {
 func handleTx(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload tx
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -133,7 +133,7 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 	}
 	txData := payload.Transaction
 	tx := blockchain.DeserializeTransaction(txData)
-	mempool[hex.EncodeToString(tx.ID)] = tx
+	memPool[hex.EncodeToString(tx.ID)] = tx
 	if nodeAddress == KnownNodes[0] {
 		for _, node := range KnownNodes {
 			if node != nodeAddress && node != payload.AddFrom {
@@ -141,11 +141,11 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 			}
 		}
 	} else {
-		if len(mempool) >= 2 && len(miningAddress) > 0 {
+		if len(memPool) >= 2 && len(miningAddress) > 0 {
 		MineTransactions:
 			var txs []*blockchain.Transaction
-			for id := range mempool {
-				tx := mempool[id]
+			for id := range memPool {
+				tx := memPool[id]
 				if bc.VerifyTransaction(&tx) {
 					txs = append(txs, &tx)
 				}
@@ -162,14 +162,14 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 			fmt.Println("New block is mined!")
 			for _, tx := range txs {
 				txID := hex.EncodeToString(tx.ID)
-				delete(mempool, txID)
+				delete(memPool, txID)
 			}
 			for _, node := range KnownNodes {
 				if node != nodeAddress {
 					sendInv(node, "block", [][]byte{newBlock.Hash})
 				}
 			}
-			if len(mempool) > 0 {
+			if len(memPool) > 0 {
 				goto MineTransactions
 			}
 		}
@@ -179,7 +179,7 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 func handleVersion(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload version
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -203,7 +203,7 @@ func handleVersion(request []byte, bc *blockchain.BlockChain) {
 func handlePing(request []byte) {
 	var buff bytes.Buffer
 	var data utils.Ping
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&data)
 	if err != nil {
@@ -217,7 +217,7 @@ func handlePing(request []byte) {
 func handlePong(request []byte) {
 	var buff bytes.Buffer
 	var data utils.Pong
-	buff.Write(request[utils.CommandLength:])
+	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&data)
 	if err != nil {

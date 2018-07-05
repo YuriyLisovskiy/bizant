@@ -17,7 +17,7 @@ type Pong struct {
 }
 
 func SendData(addr string, data []byte, knownNodes *[]string) {
-	conn, err := net.Dial(Protocol, addr)
+	conn, err := net.Dial(PROTOCOL, addr)
 	if err != nil {
 		fmt.Printf("%s is not available\n", addr)
 		var updatedNodes []string

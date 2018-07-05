@@ -15,7 +15,7 @@ func handleConnection(conn net.Conn, bc *blockchain.BlockChain) {
 	if err != nil {
 		log.Panic(err)
 	}
-	command := utils.BytesToCommand(request[:utils.CommandLength])
+	command := utils.BytesToCommand(request[:utils.COMMAND_LENGTH])
 	fmt.Printf("Received %s command\n", command)
 	switch command {
 	case "addr":
@@ -45,7 +45,7 @@ func handleConnection(conn net.Conn, bc *blockchain.BlockChain) {
 func StartServer(nodeID, minerAddress string) {
 	nodeAddress = fmt.Sprintf("localhost:%s", nodeID)
 	miningAddress = minerAddress
-	ln, err := net.Listen(utils.Protocol, nodeAddress)
+	ln, err := net.Listen(utils.PROTOCOL, nodeAddress)
 	if err != nil {
 		log.Panic(err)
 	}
