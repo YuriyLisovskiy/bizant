@@ -14,7 +14,7 @@ func (cli *CLI) getBalance(address, nodeID string) {
 	}
 	bc := blockchain.NewBlockChain(nodeID)
 	UTXOSet := blockchain.UTXOSet{bc}
-	balance := 0
+	balance := 0.0
 	pubKeyHash := utils.Base58Decode([]byte(address))
 	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
 	UTXOs := UTXOSet.FindUTXO(pubKeyHash)
@@ -22,5 +22,5 @@ func (cli *CLI) getBalance(address, nodeID string) {
 		balance += out.Value
 	}
 	bc.CloseDB(true)
-	fmt.Printf("Balance of '%s': %d\n", address, balance)
+	fmt.Printf("Balance of '%s': %.6f\n", address, balance)
 }

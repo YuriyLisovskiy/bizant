@@ -8,7 +8,7 @@ import (
 )
 
 type TXOutput struct {
-	Value      int
+	Value      float64
 	PubKeyHash []byte
 }
 
@@ -22,7 +22,7 @@ func (out *TXOutput) IsLockedWithKey(pubKeyHash []byte) bool {
 	return bytes.Compare(out.PubKeyHash, pubKeyHash) == 0
 }
 
-func NewTXOutput(value int, address string) *TXOutput {
+func NewTXOutput(value float64, address string) *TXOutput {
 	txo := &TXOutput{value, nil}
 	txo.Lock([]byte(address))
 	return txo

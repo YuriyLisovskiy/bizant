@@ -154,9 +154,9 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 				fmt.Println("All transactions are invalid! Waiting for new ones...")
 				return
 			}
-			cbTx := blockchain.NewCoinBaseTX(miningAddress, "")
-			txs = append(txs, cbTx)
-			newBlock := bc.MineBlock(txs)
+		//	cbTx := blockchain.NewCoinBaseTX(miningAddress, 0, "")
+		//	txs = append(txs, cbTx)
+			newBlock := bc.MineBlock(miningAddress, txs)
 			UTXOSet := blockchain.UTXOSet{bc}
 			UTXOSet.Reindex()
 			fmt.Println("New block is mined!")

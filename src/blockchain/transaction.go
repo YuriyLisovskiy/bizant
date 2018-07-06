@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 	"bytes"
-	"strings"
 	"math/big"
 	"crypto/rand"
 	"crypto/ecdsa"
@@ -22,6 +21,7 @@ type Transaction struct {
 	VIn       []txPkg.TXInput
 	VOut      []txPkg.TXOutput
 	Timestamp int64
+	Fee       float64
 }
 
 func (tx Transaction) IsCoinBase() bool {
@@ -60,8 +60,8 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 		prevTx := prevTXs[hex.EncodeToString(vin.TxId)]
 		txCopy.VIn[inID].Signature = nil
 		txCopy.VIn[inID].PubKey = prevTx.VOut[vin.VOut].PubKeyHash
-		dataToSign := fmt.Sprintf("%x\n", txCopy)
-		r, s, err := ecdsa.Sign(rand.Reader, &privateKey, []byte(dataToSign))
+		dataToSign := txCopy.Serialize()
+		r, s, err := ecdsa.Sign(rand.Reader, &privateKey, dataToSign)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -69,25 +69,6 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 		tx.VIn[inID].Signature = signature
 		txCopy.VIn[inID].PubKey = nil
 	}
-}
-
-func (tx Transaction) String() string {
-	var lines []string
-	lines = append(lines, fmt.Sprintf("--- Transaction %x:", tx.ID))
-	lines = append(lines, fmt.Sprintf("     Timestamp %d", tx.Timestamp))
-	for i, input := range tx.VIn {
-		lines = append(lines, fmt.Sprintf("     Input %d:", i))
-		lines = append(lines, fmt.Sprintf("       TXID:      %x", input.TxId))
-		lines = append(lines, fmt.Sprintf("       Out:       %d", input.VOut))
-		lines = append(lines, fmt.Sprintf("       Signature: %x", input.Signature))
-		lines = append(lines, fmt.Sprintf("       PubKey:    %x", input.PubKey))
-	}
-	for i, output := range tx.VOut {
-		lines = append(lines, fmt.Sprintf("     Output %d:", i))
-		lines = append(lines, fmt.Sprintf("       Value:  %d", output.Value))
-		lines = append(lines, fmt.Sprintf("       Script: %x", output.PubKeyHash))
-	}
-	return strings.Join(lines, "\n")
 }
 
 func (tx *Transaction) TrimmedCopy() Transaction {
@@ -99,7 +80,7 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 	for _, vOut := range tx.VOut {
 		outputs = append(outputs, txPkg.TXOutput{vOut.Value, vOut.PubKeyHash})
 	}
-	txCopy := Transaction{tx.ID, inputs, outputs, tx.Timestamp}
+	txCopy := Transaction{tx.ID, inputs, outputs, tx.Timestamp, tx.Fee}
 	return txCopy
 }
 
@@ -128,9 +109,9 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 		keyLen := len(vin.PubKey)
 		x.SetBytes(vin.PubKey[:(keyLen / 2)])
 		y.SetBytes(vin.PubKey[(keyLen / 2):])
-		dataToVerify := fmt.Sprintf("%x\n", txCopy)
+		dataToVerify := txCopy.Serialize()
 		rawPubKey := ecdsa.PublicKey{curve, &x, &y}
-		if ecdsa.Verify(&rawPubKey, []byte(dataToVerify), &r, &s) == false {
+		if ecdsa.Verify(&rawPubKey, dataToVerify, &r, &s) == false {
 			return false
 		}
 		txCopy.VIn[inID].PubKey = nil
@@ -138,7 +119,7 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 	return true
 }
 
-func NewCoinBaseTX(to, data string) *Transaction {
+func NewCoinBaseTX(to string, fees float64, data string) *Transaction {
 	if data == "" {
 		randData := make([]byte, 20)
 		_, err := rand.Read(randData)
@@ -148,13 +129,13 @@ func NewCoinBaseTX(to, data string) *Transaction {
 		data = fmt.Sprintf("%x", randData)
 	}
 	txIn := txPkg.TXInput{[]byte{}, -1, nil, []byte(data)}
-	txOut := txPkg.NewTXOutput(subsidy, to)
-	tx := Transaction{nil, []txPkg.TXInput{txIn}, []txPkg.TXOutput{*txOut}, time.Now().Unix()}
+	txOut := txPkg.NewTXOutput(MINING_REWARD + fees, to)
+	tx := Transaction{nil, []txPkg.TXInput{txIn}, []txPkg.TXOutput{*txOut}, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
 	return &tx
 }
 
-func NewUTXOTransaction(wallet *w.Wallet, to string, amount int, UTXOSet *UTXOSet) *Transaction {
+func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, UTXOSet *UTXOSet) *Transaction {
 	var inputs []txPkg.TXInput
 	var outputs []txPkg.TXOutput
 	pubKeyHash := w.HashPubKey(wallet.PublicKey)
@@ -177,10 +158,21 @@ func NewUTXOTransaction(wallet *w.Wallet, to string, amount int, UTXOSet *UTXOSe
 	if acc > amount {
 		outputs = append(outputs, *txPkg.NewTXOutput(acc-amount, from)) // a change
 	}
-	tx := Transaction{nil, inputs, outputs, time.Now().Unix()}
+	tx := Transaction{nil, inputs, outputs, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
+	tx.Fee = tx.CalculateFee(fee)
 	UTXOSet.BlockChain.SignTransaction(&tx, wallet.PrivateKey)
 	return &tx
+}
+
+func (tx *Transaction) CalculateFee(feePerByte float64) float64 {
+	if tx.IsCoinBase() {
+		return 0.0
+	}
+	if feePerByte < MIN_FEE_PER_BYTE {
+		feePerByte = MIN_FEE_PER_BYTE
+	}
+	return float64(len(tx.VIn)*148+len(tx.VOut)*34+10) * MIN_FEE_PER_BYTE
 }
 
 func DeserializeTransaction(data []byte) Transaction {

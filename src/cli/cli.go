@@ -4,6 +4,7 @@ import (
 	"os"
 	"fmt"
 	"log"
+	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 )
 
 type CLI struct{}
@@ -40,8 +41,9 @@ func (cli *CLI) Run() {
 	createBlockChainAddress := createBlockChainCmd.String("address", "", "The address to send genesis block reward to")
 	sendFrom := sendCmd.String("from", "", "Source wallet address")
 	sendTo := sendCmd.String("to", "", "Destination wallet address")
-	sendAmount := sendCmd.Int("amount", 0, "Amount to send")
-	sendMine := sendCmd.Bool("mine", false, "Mine immediately on the same node")
+	sendAmount := sendCmd.Float64("amount", 0, "Amount to send")
+//	sendMine := sendCmd.Bool("mine", false, "Mine immediately on the same node")
+	sendFee := sendCmd.Float64("fee", blockchain.MIN_FEE_PER_BYTE, "Mine immediately on the same node")
 	startNodeMiner := startNodeCmd.String("miner", "", "Enable mining mode and send reward to ADDRESS")
 
 	switch os.Args[1] {
@@ -120,7 +122,7 @@ func (cli *CLI) Run() {
 			sendCmd.Usage()
 			os.Exit(1)
 		}
-		cli.send(*sendFrom, *sendTo, *sendAmount, nodeID, *sendMine)
+		cli.send(*sendFrom, *sendTo, *sendAmount, *sendFee, nodeID)
 	}
 	if startNodeCmd.Parsed() {
 		nodeID := os.Getenv("NODE_ID")

@@ -25,7 +25,7 @@ func CreateBlockChain(address, nodeID string) *BlockChain {
 		os.Exit(1)
 	}
 	var tip []byte
-	cbTx := NewCoinBaseTX(address, utils.GenesisCoinbaseData)
+	cbTx := NewCoinBaseTX(address, 0, utils.GenesisCoinbaseData)
 	genesis := NewGenesisBlock(cbTx)
 	db, err := bolt.Open(utils.DBFile, 0600, nil)
 	if err != nil {
@@ -207,15 +207,18 @@ func (bc *BlockChain) Iterator() *BlockChainIterator {
 	return bci
 }
 
-func (bc *BlockChain) MineBlock(transactions []*Transaction) *Block {
+func (bc *BlockChain) MineBlock(minerAddress string, transactions []*Transaction) *Block {
 	var lastHash []byte
 	var lastHeight int
+	fees := 0.0
 	for _, tx := range transactions {
 
 		// TODO: ignore transaction if it's not valid
 
 		if bc.VerifyTransaction(tx) != true {
-			log.Panic("ERROR: Invalid transaction")
+			fmt.Print("ERROR: Invalid transaction")
+		} else {
+			fees += tx.Fee
 		}
 	}
 	err := bc.db.View(func(tx *bolt.Tx) error {
@@ -229,6 +232,7 @@ func (bc *BlockChain) MineBlock(transactions []*Transaction) *Block {
 	if err != nil {
 		log.Panic(err)
 	}
+	transactions = append(transactions, NewCoinBaseTX(minerAddress, fees, ""))
 	newBlock := NewBlock(transactions, lastHash, lastHeight+1)
 	err = bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))

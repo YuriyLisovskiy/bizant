@@ -11,9 +11,9 @@ type UTXOSet struct {
 	BlockChain *BlockChain
 }
 
-func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount int) (int, map[string][]int) {
+func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount float64) (float64, map[string][]int) {
 	unspentOutputs := make(map[string][]int)
-	accumulated := 0
+	accumulated := float64(0)
 	db := u.BlockChain.db
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utxoBucket))

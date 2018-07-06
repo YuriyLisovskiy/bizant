@@ -8,7 +8,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/network"
 )
 
-func (cli *CLI) send(from, to string, amount int, nodeID string, mineNow bool) {
+func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) {
 	if !w.ValidateAddress(from) {
 		log.Panic("ERROR: Sender address is not valid")
 	}
@@ -22,18 +22,8 @@ func (cli *CLI) send(from, to string, amount int, nodeID string, mineNow bool) {
 		log.Panic(err)
 	}
 	wallet := wallets.GetWallet(from)
-
-	tx := blockchain.NewUTXOTransaction(&wallet, to, amount, &UTXOSet)
-
-	if mineNow {
-		cbTx := blockchain.NewCoinBaseTX(from, "")
-		txs := []*blockchain.Transaction{cbTx, tx}
-
-		newBlock := bc.MineBlock(txs)
-		UTXOSet.Update(newBlock)
-	} else {
-		network.SendTx(network.KnownNodes[0], tx)
-	}
+	tx := blockchain.NewUTXOTransaction(&wallet, to, amount, fee, &UTXOSet)
+	network.SendTx(network.KnownNodes[0], tx)
 	bc.CloseDB(true)
 	fmt.Println("Success!")
 }
