@@ -7,13 +7,13 @@ import (
 
 type PingService struct {}
 
-func (ps *PingService) Start(nodeAddress string, knownNodes *[]string) {
+func (ps *PingService) Start(nodeAddress string, knownNodes *map[string]bool) {
 	go func() {
-		ticker := time.NewTicker(2 * time.Minute)
+		ticker := time.NewTicker(1 * time.Minute)
 		for {
 			select {
 			case <-ticker.C:
-				for _, addr := range *knownNodes {
+				for addr := range *knownNodes {
 					if addr != nodeAddress {
 						utils.SendPing(nodeAddress, addr, knownNodes)
 					}

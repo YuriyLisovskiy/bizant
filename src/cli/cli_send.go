@@ -3,9 +3,9 @@ package cli
 import (
 	"log"
 	"fmt"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-//	"github.com/YuriyLisovskiy/blockchain-go/src/network"
 )
 
 func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) {
@@ -24,10 +24,14 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) {
 	wallet := wallets.GetWallet(from)
 	tx := blockchain.NewUTXOTransaction(&wallet, to, amount, fee, &UTXOSet)
 
-	newBlock := bc.MineBlock(from, []*blockchain.Transaction{tx})
-	UTXOSet.Update(newBlock)
-//	network.SendTx(network.KnownNodes[0], tx)
+//	newBlock := bc.MineBlock(from, []*blockchain.Transaction{tx})
+//	UTXOSet.Update(newBlock)
 
+	for nodeAddr := range network.KnownNodes {
+		if nodeAddr != from {
+			network.SendTx(nodeAddr, tx)
+		}
+	}
 	bc.CloseDB(true)
 	fmt.Println("Success!")
 }

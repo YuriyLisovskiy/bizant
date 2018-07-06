@@ -10,12 +10,6 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 )
 
-func requestBlocks() {
-	for _, node := range KnownNodes {
-		sendGetBlocks(node)
-	}
-}
-
 func handleAddr(request []byte) {
 	var buff bytes.Buffer
 	var payload addr
@@ -25,9 +19,12 @@ func handleAddr(request []byte) {
 	if err != nil {
 		log.Panic(err)
 	}
-	KnownNodes = append(KnownNodes, payload.AddrList...)
-	fmt.Printf("There are %d known nodes now!\n", len(KnownNodes))
-	requestBlocks()
+	for _, newNode := range payload.AddrList {
+		if newNode != selfNodeAddress {
+			KnownNodes[newNode] = true
+		}
+	}
+	fmt.Printf("Peers %d\n", len(KnownNodes))
 }
 
 func handleBlock(request []byte, bc *blockchain.BlockChain) {
@@ -134,9 +131,10 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 	txData := payload.Transaction
 	tx := blockchain.DeserializeTransaction(txData)
 	memPool[hex.EncodeToString(tx.ID)] = tx
-	if nodeAddress == KnownNodes[0] {
+/*
+	if selfNodeAddress == KnownNodes[0] {
 		for _, node := range KnownNodes {
-			if node != nodeAddress && node != payload.AddFrom {
+			if node != selfNodeAddress && node != payload.AddFrom {
 				sendInv(node, "tx", [][]byte{tx.ID})
 			}
 		}
@@ -154,9 +152,7 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 				fmt.Println("All transactions are invalid! Waiting for new ones...")
 				return
 			}
-		//	cbTx := blockchain.NewCoinBaseTX(miningAddress, 0, "")
-		//	txs = append(txs, cbTx)
-			newBlock := bc.MineBlock(miningAddress, txs)
+		//	newBlock := bc.MineBlock(miningAddress, txs)
 			UTXOSet := blockchain.UTXOSet{bc}
 			UTXOSet.Reindex()
 			fmt.Println("New block is mined!")
@@ -164,16 +160,17 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 				txID := hex.EncodeToString(tx.ID)
 				delete(memPool, txID)
 			}
-			for _, node := range KnownNodes {
-				if node != nodeAddress {
-					sendInv(node, "block", [][]byte{newBlock.Hash})
-				}
-			}
+		//	for _, node := range KnownNodes {
+		//		if node != selfNodeAddress {
+		//			sendInv(node, "block", [][]byte{newBlock.Hash})
+		//		}
+		//	}
 			if len(memPool) > 0 {
 				goto MineTransactions
 			}
 		}
 	}
+*/
 }
 
 func handleVersion(request []byte, bc *blockchain.BlockChain) {
@@ -192,15 +189,18 @@ func handleVersion(request []byte, bc *blockchain.BlockChain) {
 	} else if myBestHeight > foreignerBestHeight {
 		sendVersion(payload.AddrFrom, bc)
 	}
-
-	//	sendAddr(payload.AddrFrom)
-
-	if !utils.NodeIsKnown(payload.AddrFrom, KnownNodes) {
-		KnownNodes = append(KnownNodes, payload.AddrFrom)
+	KnownNodes[payload.AddrFrom] = true
+//	if !utils.NodeIsKnown(payload.AddrFrom, KnownNodes) {
+//		KnownNodes = append([]string{payload.AddrFrom}, KnownNodes...)
+//	}
+	for address := range KnownNodes {
+		if address != selfNodeAddress {
+			sendAddr(address)
+		}
 	}
 }
 
-func handlePing(request []byte) {
+func handlePing(request []byte) bool {
 	var buff bytes.Buffer
 	var data utils.Ping
 	buff.Write(request[utils.COMMAND_LENGTH:])
@@ -209,9 +209,9 @@ func handlePing(request []byte) {
 	if err != nil {
 		log.Panic(err)
 	}
-	payload := utils.GobEncode(utils.Pong{AddrFrom: nodeAddress})
+	payload := utils.GobEncode(utils.Pong{AddrFrom: selfNodeAddress})
 	pongRequest := append(utils.CommandToBytes("pong"), payload...)
-	utils.SendData(data.AddrFrom, pongRequest, &KnownNodes)
+	return utils.SendData(data.AddrFrom, pongRequest, &KnownNodes)
 }
 
 func handlePong(request []byte) {
@@ -223,8 +223,8 @@ func handlePong(request []byte) {
 	if err != nil {
 		log.Panic(err)
 	}
-	if !utils.NodeIsKnown(data.AddrFrom, KnownNodes) {
-		KnownNodes = append(KnownNodes, data.AddrFrom)
+	if data.AddrFrom != selfNodeAddress {
+		KnownNodes[data.AddrFrom] = true
 	}
 	fmt.Printf("Peers %d\n", len(KnownNodes))
 }

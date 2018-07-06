@@ -43,19 +43,24 @@ func handleConnection(conn net.Conn, bc *blockchain.BlockChain) {
 }
 
 func StartServer(nodeID, minerAddress string) {
-	nodeAddress = fmt.Sprintf("localhost:%s", nodeID)
-	miningAddress = minerAddress
-	ln, err := net.Listen(utils.PROTOCOL, nodeAddress)
+	selfNodeAddress = fmt.Sprintf("localhost:%s", nodeID)
+	ln, err := net.Listen(utils.PROTOCOL, selfNodeAddress)
 	if err != nil {
 		log.Panic(err)
 	}
 	defer ln.Close()
 	bc := blockchain.NewBlockChain(nodeID)
-	if nodeAddress != KnownNodes[0] {
-		sendVersion(KnownNodes[0], bc)
-	}
 	pingService := &services.PingService{}
-	pingService.Start(nodeAddress, &KnownNodes)
+	pingService.Start(selfNodeAddress, &KnownNodes)
+	go func() {
+		for nodeAddr := range KnownNodes {
+			if nodeAddr != selfNodeAddress {
+				if sendVersion(nodeAddr, bc) {
+					break
+				}
+			}
+		}
+	}()
 	for {
 		conn, err := ln.Accept()
 		if err != nil {

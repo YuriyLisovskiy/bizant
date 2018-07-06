@@ -16,29 +16,25 @@ type Pong struct {
 	AddrFrom string
 }
 
-func SendData(addr string, data []byte, knownNodes *[]string) {
+func SendData(addr string, data []byte, knownNodes *map[string]bool) bool {
 	conn, err := net.Dial(PROTOCOL, addr)
+	success := true
 	if err != nil {
-		fmt.Printf("%s is not available\n", addr)
-		var updatedNodes []string
-		for _, node := range *knownNodes {
-			if node != addr {
-				updatedNodes = append(updatedNodes, node)
-			}
-		}
-		knownNodes = &updatedNodes
+		success = false
+		delete(*knownNodes, addr)
 		fmt.Printf("Peers %d\n", len(*knownNodes))
-		return
+		return success
 	}
 	defer conn.Close()
 	_, err = io.Copy(conn, bytes.NewReader(data))
 	if err != nil {
 		log.Panic(err)
 	}
+	return success
 }
 
-func SendPing(addrFrom, addrTo string, knownNodes *[]string) {
+func SendPing(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
 	data := GobEncode(Ping{AddrFrom: addrFrom})
 	request := append(CommandToBytes("ping"), data...)
-	SendData(addrTo, request, knownNodes)
+	return SendData(addrTo, request, knownNodes)
 }
