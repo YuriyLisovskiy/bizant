@@ -14,7 +14,9 @@ func (ps *PingService) Start(nodeAddress string, knownNodes *[]string) {
 			select {
 			case <-ticker.C:
 				for _, addr := range *knownNodes {
-					utils.SendPing(nodeAddress, addr, knownNodes)
+					if addr != nodeAddress {
+						utils.SendPing(nodeAddress, addr, knownNodes)
+					}
 				}
 			}
 		}
