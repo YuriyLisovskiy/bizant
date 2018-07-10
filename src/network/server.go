@@ -6,6 +6,7 @@ import (
 	"net"
 	"io/ioutil"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	gUtils "github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
 )
@@ -16,7 +17,7 @@ func handleConnection(conn net.Conn, bc *blockchain.BlockChain) {
 		log.Panic(err)
 	}
 	command := utils.BytesToCommand(request[:utils.COMMAND_LENGTH])
-	fmt.Printf("Received %s command\n", command)
+	gUtils.PrintLog(fmt.Sprintf("Received %s command\n", command))
 	switch command {
 	case "addr":
 		handleAddr(request)
@@ -37,7 +38,7 @@ func handleConnection(conn net.Conn, bc *blockchain.BlockChain) {
 	case "pong":
 		handlePong(request)
 	default:
-		fmt.Println("Unknown command!")
+		gUtils.PrintLog("Unknown command!\n")
 	}
 	conn.Close()
 }
@@ -52,6 +53,10 @@ func StartServer(nodeID, minerAddress string) {
 	bc := blockchain.NewBlockChain(nodeID)
 	pingService := &services.PingService{}
 	pingService.Start(selfNodeAddress, &KnownNodes)
+	if len(minerAddress) > 0 {
+		miningService := &services.MiningService{MinerAddress: minerAddress}
+		miningService.Start(bc, &KnownNodes, &memPool)
+	}
 	go func() {
 		for nodeAddr := range KnownNodes {
 			if nodeAddr != selfNodeAddress {

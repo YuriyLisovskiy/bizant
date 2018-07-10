@@ -7,7 +7,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/network"
 )
 
-func (cli *CLI) startNode(nodeID, minerAddress string) {
+func (cli *CLI) startNode(nodeID string, minerAddress string) {
 	fmt.Printf("Starting node %s\n", nodeID)
 	if len(minerAddress) > 0 {
 		if wallet.ValidateAddress(minerAddress) {

@@ -42,9 +42,8 @@ func (cli *CLI) Run() {
 	sendFrom := sendCmd.String("from", "", "Source wallet address")
 	sendTo := sendCmd.String("to", "", "Destination wallet address")
 	sendAmount := sendCmd.Float64("amount", 0, "Amount to send")
-//	sendMine := sendCmd.Bool("mine", false, "Mine immediately on the same node")
 	sendFee := sendCmd.Float64("fee", blockchain.MIN_FEE_PER_BYTE, "Mine immediately on the same node")
-	startNodeMiner := startNodeCmd.String("miner", "", "Enable mining mode and send reward to ADDRESS")
+	startNodeMiner := startNodeCmd.String("mine", "", "Enable mining mode")
 
 	switch os.Args[1] {
 	case "getbalance":

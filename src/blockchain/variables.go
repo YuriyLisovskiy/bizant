@@ -3,7 +3,8 @@ package blockchain
 import "math"
 
 var (
-	maxNonce = math.MaxInt32
+	maxNonce        = math.MaxInt32
+	InterruptMining = false
 )
 
 const (

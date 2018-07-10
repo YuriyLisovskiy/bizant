@@ -173,6 +173,9 @@ func (bc *BlockChain) FindUTXO() map[string]txPkg.TXOutputs {
 	bci := bc.Iterator()
 	for {
 		block := bci.Next()
+
+//		println(block.Height)
+
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
 		Outputs:
@@ -233,7 +236,11 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []*Transaction
 		log.Panic(err)
 	}
 	transactions = append(transactions, NewCoinBaseTX(minerAddress, fees, ""))
-	newBlock := NewBlock(transactions, lastHash, lastHeight+1)
+	newBlock, err := NewBlock(transactions, lastHash, lastHeight+1)
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil
+	}
 	err = bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
 		err := b.Put(newBlock.Hash, newBlock.Serialize())

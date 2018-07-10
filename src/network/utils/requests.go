@@ -1,36 +1,36 @@
-package network
+package utils
 
-type addr struct {
+type Addr struct {
 	AddrList []string
 }
 
-type block struct {
+type Block struct {
 	AddrFrom string
 	Block    []byte
 }
 
-type getblocks struct {
+type Getblocks struct {
 	AddrFrom string
 }
 
-type getdata struct {
+type Getdata struct {
 	AddrFrom string
 	Type     string
 	ID       []byte
 }
 
-type inv struct {
+type Inv struct {
 	AddrFrom string
 	Type     string
 	Items    [][]byte
 }
 
-type tx struct {
+type Tx struct {
 	AddFrom     string
 	Transaction []byte
 }
 
-type version struct {
+type Version struct {
 	Version    int
 	BestHeight int
 	AddrFrom   string

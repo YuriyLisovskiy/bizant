@@ -7,12 +7,13 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	gUtils "github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 )
 
 func handleAddr(request []byte) {
 	var buff bytes.Buffer
-	var payload addr
+	var payload utils.Addr
 	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
@@ -24,12 +25,13 @@ func handleAddr(request []byte) {
 			KnownNodes[newNode] = true
 		}
 	}
-	fmt.Printf("Peers %d\n", len(KnownNodes))
+	gUtils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
 }
 
 func handleBlock(request []byte, bc *blockchain.BlockChain) {
+	blockchain.InterruptMining = true
 	var buff bytes.Buffer
-	var payload block
+	var payload utils.Block
 	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
@@ -37,30 +39,34 @@ func handleBlock(request []byte, bc *blockchain.BlockChain) {
 		log.Panic(err)
 	}
 	blockData := payload.Block
+
+//	println(blockData)
+
 	block := blockchain.DeserializeBlock(blockData)
-	fmt.Println("Recevied a new block!")
+	gUtils.PrintLog("Recevied a new block!\n")
 	bc.AddBlock(block)
-	fmt.Printf("Added block %x\n", block.Hash)
+	gUtils.PrintLog(fmt.Sprintf("Added block %x\n", block.Hash))
 	if len(blocksInTransit) > 0 {
 		blockHash := blocksInTransit[0]
 		sendGetData(payload.AddrFrom, "block", blockHash)
 		blocksInTransit = blocksInTransit[1:]
 	} else {
-		UTXOSet := blockchain.UTXOSet{bc}
+		UTXOSet := blockchain.UTXOSet{BlockChain: bc}
 		UTXOSet.Reindex()
 	}
+	blockchain.InterruptMining = false
 }
 
 func handleInv(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload inv
+	var payload utils.Inv
 	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	fmt.Printf("Recevied inventory with %d %s\n", len(payload.Items), payload.Type)
+	gUtils.PrintLog(fmt.Sprintf("Recevied inventory with %d %s\n", len(payload.Items), payload.Type))
 	if payload.Type == "block" {
 		blocksInTransit = payload.Items
 		blockHash := payload.Items[0]
@@ -84,7 +90,7 @@ func handleInv(request []byte, bc *blockchain.BlockChain) {
 
 func handleGetBlocks(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload getblocks
+	var payload utils.Getblocks
 	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
@@ -92,12 +98,12 @@ func handleGetBlocks(request []byte, bc *blockchain.BlockChain) {
 		log.Panic(err)
 	}
 	blocks := bc.GetBlockHashes()
-	sendInv(payload.AddrFrom, "block", blocks)
+	utils.SendInv(selfNodeAddress, payload.AddrFrom, "block", blocks, &KnownNodes)
 }
 
 func handleGetData(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload getdata
+	var payload utils.Getdata
 	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
@@ -109,7 +115,7 @@ func handleGetData(request []byte, bc *blockchain.BlockChain) {
 		if err != nil {
 			return
 		}
-		sendBlock(payload.AddrFrom, &block)
+		utils.SendBlock(selfNodeAddress, payload.AddrFrom, block, &KnownNodes)
 	}
 	if payload.Type == "tx" {
 		txID := hex.EncodeToString(payload.ID)
@@ -121,7 +127,7 @@ func handleGetData(request []byte, bc *blockchain.BlockChain) {
 
 func handleTx(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload tx
+	var payload utils.Tx
 	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
@@ -175,7 +181,7 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 
 func handleVersion(request []byte, bc *blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload version
+	var payload utils.Version
 	buff.Write(request[utils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
@@ -226,5 +232,5 @@ func handlePong(request []byte) {
 	if data.AddrFrom != selfNodeAddress {
 		KnownNodes[data.AddrFrom] = true
 	}
-	fmt.Printf("Peers %d\n", len(KnownNodes))
+	gUtils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
 }

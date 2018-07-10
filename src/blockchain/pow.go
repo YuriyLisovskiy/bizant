@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"crypto/sha256"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"errors"
 )
 
 type ProofOfWork struct {
@@ -34,15 +35,17 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	return data
 }
 
-func (pow *ProofOfWork) Run() (int, []byte) {
+func (pow *ProofOfWork) Run() (int, []byte, error) {
 	var hashInt big.Int
 	var hash [32]byte
 	nonce := 0
-	fmt.Printf("Mining a new block")
 	for nonce < maxNonce {
+		if InterruptMining {
+			return 0, []byte{}, errors.New("mining interrupt")
+		}
 		data := pow.prepareData(nonce)
 		hash = sha256.Sum256(data)
-		fmt.Printf("\r%x", hash)
+		utils.PrintLog(fmt.Sprintf("Mining a new block: %x", hash))
 		hashInt.SetBytes(hash[:])
 		if hashInt.Cmp(pow.target) == -1 {
 			break
@@ -50,8 +53,8 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 			nonce++
 		}
 	}
-	fmt.Print("\n\n")
-	return nonce, hash[:]
+	fmt.Print("\n")
+	return nonce, hash[:], nil
 }
 
 func (pow *ProofOfWork) Validate() bool {
