@@ -8,7 +8,7 @@ import (
 )
 
 type UTXOSet struct {
-	BlockChain *BlockChain
+	BlockChain BlockChain
 }
 
 func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount float64) (float64, map[string][]int) {
@@ -109,7 +109,7 @@ func (u UTXOSet) Reindex() {
 	})
 }
 
-func (u UTXOSet) Update(block *Block) {
+func (u UTXOSet) Update(block Block) {
 	db := u.BlockChain.db
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utxoBucket))

@@ -119,7 +119,7 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 	return true
 }
 
-func NewCoinBaseTX(to string, fees float64, data string) *Transaction {
+func NewCoinBaseTX(to string, fees float64, data string) Transaction {
 	if data == "" {
 		randData := make([]byte, 20)
 		_, err := rand.Read(randData)
@@ -132,10 +132,10 @@ func NewCoinBaseTX(to string, fees float64, data string) *Transaction {
 	txOut := txPkg.NewTXOutput(MINING_REWARD + fees, to)
 	tx := Transaction{nil, []txPkg.TXInput{txIn}, []txPkg.TXOutput{*txOut}, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
-	return &tx
+	return tx
 }
 
-func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, UTXOSet *UTXOSet) *Transaction {
+func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, UTXOSet *UTXOSet) Transaction {
 	var inputs []txPkg.TXInput
 	var outputs []txPkg.TXOutput
 	pubKeyHash := w.HashPubKey(wallet.PublicKey)
@@ -161,8 +161,8 @@ func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, UTXOSe
 	tx := Transaction{nil, inputs, outputs, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
 	tx.Fee = tx.CalculateFee(fee)
-	UTXOSet.BlockChain.SignTransaction(&tx, wallet.PrivateKey)
-	return &tx
+	tx = UTXOSet.BlockChain.SignTransaction(tx, wallet.PrivateKey)
+	return tx
 }
 
 func (tx *Transaction) CalculateFee(feePerByte float64) float64 {

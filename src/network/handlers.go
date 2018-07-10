@@ -28,7 +28,7 @@ func handleAddr(request []byte) {
 	gUtils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
 }
 
-func handleBlock(request []byte, bc *blockchain.BlockChain) {
+func handleBlock(request []byte, bc blockchain.BlockChain) {
 	blockchain.InterruptMining = true
 	var buff bytes.Buffer
 	var payload utils.Block
@@ -57,7 +57,7 @@ func handleBlock(request []byte, bc *blockchain.BlockChain) {
 	blockchain.InterruptMining = false
 }
 
-func handleInv(request []byte, bc *blockchain.BlockChain) {
+func handleInv(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload utils.Inv
 	buff.Write(request[utils.COMMAND_LENGTH:])
@@ -88,7 +88,7 @@ func handleInv(request []byte, bc *blockchain.BlockChain) {
 	}
 }
 
-func handleGetBlocks(request []byte, bc *blockchain.BlockChain) {
+func handleGetBlocks(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload utils.Getblocks
 	buff.Write(request[utils.COMMAND_LENGTH:])
@@ -101,7 +101,7 @@ func handleGetBlocks(request []byte, bc *blockchain.BlockChain) {
 	utils.SendInv(selfNodeAddress, payload.AddrFrom, "block", blocks, &KnownNodes)
 }
 
-func handleGetData(request []byte, bc *blockchain.BlockChain) {
+func handleGetData(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload utils.Getdata
 	buff.Write(request[utils.COMMAND_LENGTH:])
@@ -115,17 +115,17 @@ func handleGetData(request []byte, bc *blockchain.BlockChain) {
 		if err != nil {
 			return
 		}
-		utils.SendBlock(selfNodeAddress, payload.AddrFrom, &block, &KnownNodes)
+		utils.SendBlock(selfNodeAddress, payload.AddrFrom, block, &KnownNodes)
 	}
 	if payload.Type == "tx" {
 		txID := hex.EncodeToString(payload.ID)
 		tx := memPool[txID]
-		SendTx(payload.AddrFrom, &tx)
+		SendTx(payload.AddrFrom, tx)
 		// delete(mempool, txID)
 	}
 }
 
-func handleTx(request []byte, bc *blockchain.BlockChain) {
+func handleTx(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload utils.Tx
 	buff.Write(request[utils.COMMAND_LENGTH:])
@@ -179,7 +179,7 @@ func handleTx(request []byte, bc *blockchain.BlockChain) {
 */
 }
 
-func handleVersion(request []byte, bc *blockchain.BlockChain) {
+func handleVersion(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	var payload utils.Version
 	buff.Write(request[utils.COMMAND_LENGTH:])

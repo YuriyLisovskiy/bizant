@@ -29,14 +29,14 @@ func sendGetData(address, kind string, id []byte) bool {
 	return utils.SendData(address, request, &KnownNodes)
 }
 
-func SendTx(addr string, tnx *blockchain.Transaction) bool {
+func SendTx(addr string, tnx blockchain.Transaction) bool {
 	data := utils.Tx{AddFrom: selfNodeAddress, Transaction: tnx.Serialize()}
 	payload := utils.GobEncode(data)
 	request := append(utils.CommandToBytes("tx"), payload...)
 	return utils.SendData(addr, request, &KnownNodes)
 }
 
-func sendVersion(addr string, bc *blockchain.BlockChain) bool {
+func sendVersion(addr string, bc blockchain.BlockChain) bool {
 	bestHeight := bc.GetBestHeight()
 	payload := utils.GobEncode(utils.Version{Version: utils.NODE_VERSION, BestHeight: bestHeight, AddrFrom: selfNodeAddress})
 	request := append(utils.CommandToBytes("version"), payload...)

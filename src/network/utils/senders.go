@@ -47,7 +47,7 @@ func SendInv(selfAddress, address, kind string, items [][]byte, knownNodes *map[
 	return SendData(address, request, knownNodes)
 }
 
-func SendBlock(addrFrom, addrTo string, block *blockchain.Block, knownNodes *map[string]bool) bool {
+func SendBlock(addrFrom, addrTo string, block blockchain.Block, knownNodes *map[string]bool) bool {
 
 	println("Height:", block.Height)
 

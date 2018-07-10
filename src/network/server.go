@@ -11,7 +11,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
 )
 
-func handleConnection(conn net.Conn, bc *blockchain.BlockChain) {
+func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
 	request, err := ioutil.ReadAll(conn)
 	if err != nil {
 		log.Panic(err)

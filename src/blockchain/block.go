@@ -10,15 +10,15 @@ import (
 
 type Block struct {
 	Timestamp     int64
-	Transactions  []*Transaction
+	Transactions  []Transaction
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
 	Height        int
 }
 
-func NewBlock(transactions []*Transaction, prevBlockHash []byte, height int) (*Block, error) {
-	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0, height}
+func NewBlock(transactions []Transaction, prevBlockHash []byte, height int) (Block, error) {
+	block := Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0, height}
 	pow := NewProofOfWork(block)
 	nonce, hash, err := pow.Run()
 	block.Hash = hash
@@ -26,8 +26,8 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte, height int) (*B
 	return block, err
 }
 
-func NewGenesisBlock(coinBase *Transaction) *Block {
-	block, _ := NewBlock([]*Transaction{coinBase}, []byte{}, 0)
+func NewGenesisBlock(coinBase Transaction) Block {
+	block, _ := NewBlock([]Transaction{coinBase}, []byte{}, 0)
 	return block
 }
 
@@ -50,12 +50,12 @@ func (b *Block) Serialize() []byte {
 	return result.Bytes()
 }
 
-func DeserializeBlock(d []byte) *Block {
+func DeserializeBlock(d []byte) Block {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&block)
 	if err != nil {
 		log.Panic(err)
 	}
-	return &block
+	return block
 }

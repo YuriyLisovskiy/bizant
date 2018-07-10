@@ -11,8 +11,8 @@ type BlockChainIterator struct {
 	db          *bolt.DB
 }
 
-func (i *BlockChainIterator) Next() *Block {
-	var block *Block
+func (i *BlockChainIterator) Next() Block {
+	var block Block
 	err := i.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
 		encodedBlock := b.Get(i.currentHash)

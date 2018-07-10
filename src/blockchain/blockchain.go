@@ -18,7 +18,7 @@ type BlockChain struct {
 	db  *bolt.DB
 }
 
-func CreateBlockChain(address, nodeID string) *BlockChain {
+func CreateBlockChain(address, nodeID string) BlockChain {
 	utils.DBFile = fmt.Sprintf(utils.DBFile, nodeID)
 	if utils.DBExists(utils.DBFile) {
 		fmt.Println("Blockchain already exists.")
@@ -50,11 +50,10 @@ func CreateBlockChain(address, nodeID string) *BlockChain {
 	if err != nil {
 		log.Panic(err)
 	}
-	bc := BlockChain{tip, db}
-	return &bc
+	return BlockChain{tip, db}
 }
 
-func NewBlockChain(nodeID string) *BlockChain {
+func NewBlockChain(nodeID string) BlockChain {
 	utils.DBFile = fmt.Sprintf(utils.DBFile, nodeID)
 	if utils.DBExists(utils.DBFile) == false {
 		fmt.Println("No existing blockchain found. Create one first.")
@@ -73,11 +72,10 @@ func NewBlockChain(nodeID string) *BlockChain {
 	if err != nil {
 		log.Panic(err)
 	}
-	bc := BlockChain{tip, db}
-	return &bc
+	return BlockChain{tip, db}
 }
 
-func (bc *BlockChain) AddBlock(block *Block) {
+func (bc *BlockChain) AddBlock(block Block) {
 	err := bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
 		blockInDb := b.Get(block.Hash)
@@ -112,7 +110,7 @@ func (bc *BlockChain) GetBestHeight() int {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
 		lastHash := b.Get([]byte("l"))
 		blockData := b.Get(lastHash)
-		lastBlock = *DeserializeBlock(blockData)
+		lastBlock = DeserializeBlock(blockData)
 		return nil
 	})
 	if err != nil {
@@ -129,7 +127,7 @@ func (bc *BlockChain) GetBlock(blockHash []byte) (Block, error) {
 		if blockData == nil {
 			return errors.New("block is not found")
 		}
-		block = *DeserializeBlock(blockData)
+		block = DeserializeBlock(blockData)
 		return nil
 	})
 	if err != nil {
@@ -157,7 +155,7 @@ func (bc *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
 		block := bci.Next()
 		for _, tx := range block.Transactions {
 			if bytes.Compare(tx.ID, ID) == 0 {
-				return *tx, nil
+				return tx, nil
 			}
 		}
 		if len(block.PrevBlockHash) == 0 {
@@ -205,12 +203,11 @@ func (bc *BlockChain) FindUTXO() map[string]txPkg.TXOutputs {
 	return UTXO
 }
 
-func (bc *BlockChain) Iterator() *BlockChainIterator {
-	bci := &BlockChainIterator{bc.tip, bc.db}
-	return bci
+func (bc *BlockChain) Iterator() BlockChainIterator {
+	return BlockChainIterator{bc.tip, bc.db}
 }
 
-func (bc *BlockChain) MineBlock(minerAddress string, transactions []*Transaction) *Block {
+func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction) (Block, error) {
 	var lastHash []byte
 	var lastHeight int
 	fees := 0.0
@@ -239,7 +236,7 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []*Transaction
 	newBlock, err := NewBlock(transactions, lastHash, lastHeight+1)
 	if err != nil {
 		fmt.Println(err.Error())
-		return nil
+		return Block{}, err
 	}
 	err = bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
@@ -257,10 +254,10 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []*Transaction
 	if err != nil {
 		log.Panic(err)
 	}
-	return newBlock
+	return newBlock, nil
 }
 
-func (bc *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
+func (bc *BlockChain) SignTransaction(tx Transaction, privKey ecdsa.PrivateKey) Transaction {
 	prevTXs := make(map[string]Transaction)
 	for _, vin := range tx.VIn {
 		prevTX, err := bc.FindTransaction(vin.TxId)
@@ -270,9 +267,10 @@ func (bc *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey)
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
 	tx.Sign(privKey, prevTXs)
+	return tx
 }
 
-func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
+func (bc *BlockChain) VerifyTransaction(tx Transaction) bool {
 	if tx.IsCoinBase() {
 		return true
 	}
