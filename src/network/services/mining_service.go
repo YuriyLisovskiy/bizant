@@ -34,9 +34,12 @@ func (ms *MiningService) Start(
 					for nodeAddr := range *knownNodes {
 						if nodeAddr != ms.MinerAddress {
 
-						//	println(newBlock)
+							// TODO: can't serialize newBlock in SendBlock() method when mine block with index 2,
+							// error: unexpected fault address 0x7f40a7852516
+							// 		  fatal error: fault
+							// 		  [signal SIGSEGV: segmentation violation code=0x1 addr=0x7f40a7852516 pc=0x456c77]
 
-							utils.SendBlock(ms.MinerAddress, nodeAddr, *newBlock, knownNodes)
+							utils.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
 						}
 					}
 				}()

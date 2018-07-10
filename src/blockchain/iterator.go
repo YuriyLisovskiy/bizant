@@ -20,6 +20,9 @@ func (i *BlockChainIterator) Next() *Block {
 		return nil
 	})
 	if err != nil {
+
+		// TODO: can't get genesis block because of and invalid prevBlockHash of next block
+
 		log.Panic(err)
 	}
 	i.currentHash = block.PrevBlockHash

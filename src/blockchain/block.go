@@ -21,7 +21,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte, height int) (*B
 	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0, height}
 	pow := NewProofOfWork(block)
 	nonce, hash, err := pow.Run()
-	block.Hash = hash[:]
+	block.Hash = hash
 	block.Nonce = nonce
 	return block, err
 }
@@ -54,9 +54,6 @@ func DeserializeBlock(d []byte) *Block {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&block)
-	
-	// TODO: check if not EOF
-	
 	if err != nil {
 		log.Panic(err)
 	}

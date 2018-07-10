@@ -115,7 +115,7 @@ func handleGetData(request []byte, bc *blockchain.BlockChain) {
 		if err != nil {
 			return
 		}
-		utils.SendBlock(selfNodeAddress, payload.AddrFrom, block, &KnownNodes)
+		utils.SendBlock(selfNodeAddress, payload.AddrFrom, &block, &KnownNodes)
 	}
 	if payload.Type == "tx" {
 		txID := hex.EncodeToString(payload.ID)
