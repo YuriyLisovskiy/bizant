@@ -30,3 +30,4 @@ func (i *BlockChainIterator) Next() Block {
 func (i *BlockChainIterator) End() bool {
 	return hex.EncodeToString(i.currentHash) == hex.EncodeToString([]byte{})
 }
+

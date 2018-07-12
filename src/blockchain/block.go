@@ -31,7 +31,7 @@ func NewGenesisBlock(coinBase Transaction) Block {
 	return block
 }
 
-func (b *Block) HashTransactions() []byte {
+func (b Block) HashTransactions() []byte {
 	var transactions [][]byte
 	for _, tx := range b.Transactions {
 		transactions = append(transactions, tx.Serialize())

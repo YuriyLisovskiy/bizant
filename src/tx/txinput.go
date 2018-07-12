@@ -12,6 +12,6 @@ type TXInput struct {
 	PubKey    []byte
 }
 
-func (in *TXInput) UsesKey(pubKeyHash []byte) bool {
+func (in TXInput) UsesKey(pubKeyHash []byte) bool {
 	return bytes.Compare(wallet.HashPubKey(in.PubKey), pubKeyHash) == 0
 }

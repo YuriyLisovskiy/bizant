@@ -62,3 +62,10 @@ test:
 
 clean:
 	-rm -rf bin/
+
+refresh:
+	make build
+	cp Genesis.db BlockChain_3000.db
+	cp Genesis.db BlockChain_3001.db
+	clear
+	./bin/linux/amd64/blockchain startnode

@@ -165,9 +165,6 @@ func (bc *BlockChain) FindUTXO() map[string]txPkg.TXOutputs {
 	bci := bc.Iterator()
 	for !bci.End() {
 		block := bci.Next()
-
-//		println(block.Height)
-
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
 		Outputs:
@@ -281,4 +278,8 @@ func (bc *BlockChain) CloseDB(Defer bool) {
 		defer bc.db.Close()
 	}
 	bc.db.Close()
+}
+
+func (bc *BlockChain) GetDB() *bolt.DB {
+	return bc.db
 }
