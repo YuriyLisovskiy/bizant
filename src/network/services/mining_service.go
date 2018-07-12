@@ -13,7 +13,7 @@ type MiningService struct {
 
 func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]bool, memPool *map[string]blockchain.Transaction) {
 	go func() {
-	//	for {
+		for {
 			var txs []blockchain.Transaction
 			for _, tx := range *memPool {
 				if bc.VerifyTransaction(tx) {
@@ -30,10 +30,10 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 							utils.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
 						}
 					}
-					UTXOSet := blockchain.UTXOSet{BlockChain: bc}
-					UTXOSet.Reindex()
 				}()
+				UTXOSet := blockchain.UTXOSet{BlockChain: bc}
+				UTXOSet.Reindex()
 			}
-	//	}
+		}
 	}()
 }
