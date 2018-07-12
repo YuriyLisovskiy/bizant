@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"log"
+	"encoding/hex"
 	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
@@ -20,11 +21,12 @@ func (i *BlockChainIterator) Next() Block {
 		return nil
 	})
 	if err != nil {
-
-		// TODO: can't get genesis block because of and invalid prevBlockHash of next block
-
 		log.Panic(err)
 	}
 	i.currentHash = block.PrevBlockHash
 	return block
+}
+
+func (i *BlockChainIterator) End() bool {
+	return hex.EncodeToString(i.currentHash) == hex.EncodeToString([]byte{})
 }

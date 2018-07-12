@@ -24,7 +24,9 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 			newBlock, err := bc.MineBlock(ms.MinerAddress, txs)
 			if err == nil {
 				UTXOSet := blockchain.UTXOSet{BlockChain: bc}
-				UTXOSet.Reindex()
+
+				UTXOSet.Reindex()	// TODO: newBlock.PrevBlockHash become zero byte array after UTXOSet.Reindex()
+
 				gUtils.PrintLog("New block is mined!\n")
 				go func() {
 					for nodeAddr := range *knownNodes {

@@ -49,7 +49,7 @@ func SendInv(selfAddress, address, kind string, items [][]byte, knownNodes *map[
 
 func SendBlock(addrFrom, addrTo string, block blockchain.Block, knownNodes *map[string]bool) bool {
 
-	println("Height:", block.Height)
+//	println("Height:", block.Height)
 
 	data := Block{AddrFrom: addrFrom, Block: block.Serialize()}
 	payload := GobEncode(data)

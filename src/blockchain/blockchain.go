@@ -139,27 +139,21 @@ func (bc *BlockChain) GetBlock(blockHash []byte) (Block, error) {
 func (bc *BlockChain) GetBlockHashes() [][]byte {
 	var blocks [][]byte
 	bci := bc.Iterator()
-	for {
+	for !bci.End() {
 		block := bci.Next()
 		blocks = append(blocks, block.Hash)
-		if len(block.PrevBlockHash) == 0 {
-			break
-		}
 	}
 	return blocks
 }
 
 func (bc *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
 	bci := bc.Iterator()
-	for {
+	for !bci.End() {
 		block := bci.Next()
 		for _, tx := range block.Transactions {
 			if bytes.Compare(tx.ID, ID) == 0 {
 				return tx, nil
 			}
-		}
-		if len(block.PrevBlockHash) == 0 {
-			break
 		}
 	}
 	return Transaction{}, errors.New("transaction is not found")
@@ -169,7 +163,7 @@ func (bc *BlockChain) FindUTXO() map[string]txPkg.TXOutputs {
 	UTXO := make(map[string]txPkg.TXOutputs)
 	spentTXOs := make(map[string][]int)
 	bci := bc.Iterator()
-	for {
+	for !bci.End() {
 		block := bci.Next()
 
 //		println(block.Height)
@@ -195,9 +189,6 @@ func (bc *BlockChain) FindUTXO() map[string]txPkg.TXOutputs {
 					spentTXOs[inTxID] = append(spentTXOs[inTxID], in.VOut)
 				}
 			}
-		}
-		if len(block.PrevBlockHash) == 0 {
-			break
 		}
 	}
 	return UTXO
