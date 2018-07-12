@@ -3,9 +3,10 @@ package cli
 import (
 	"fmt"
 	"errors"
-	"github.com/YuriyLisovskiy/blockchain-go/src/rpc"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
+//	"encoding/json"
 )
 
 func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error {
@@ -30,9 +31,15 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error 
 //	newBlock := bc.MineBlock(from, []*blockchain.Transaction{tx})
 //	UTXOSet.Update(newBlock)
 
-	for nodeAddr := range rpc.KnownNodes {
+//	data, err := json.MarshalIndent(tx, "", "  ")
+//	if err != nil {
+//		return err
+//	}
+//	fmt.Println(string(data))
+
+	for nodeAddr := range net.KnownNodes {
 		if nodeAddr != from {
-			rpc.SendTx(nodeAddr, tx)
+			net.SendTx(nodeAddr, tx)
 		}
 	}
 	bc.CloseDB(true)

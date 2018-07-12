@@ -4,8 +4,7 @@ import (
 	"encoding/hex"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	rpcUtils "github.com/YuriyLisovskiy/blockchain-go/src/rpc/utils"
-	"fmt"
+	netUtils "github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 )
 
 type MiningService struct {
@@ -17,12 +16,8 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 		for {
 			var txs []blockchain.Transaction
 			for _, tx := range *memPool {
-				if bc.VerifyTransaction(tx) {
-					txs = append(txs, tx)
-					delete(*memPool, hex.EncodeToString(tx.ID))
-				} else {
-					utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.ID))
-				}
+				txs = append(txs, tx)
+				delete(*memPool, hex.EncodeToString(tx.ID))
 			}
 			newBlock, err := bc.MineBlock(ms.MinerAddress, txs)
 			if err == nil {
@@ -30,7 +25,7 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 				go func() {
 					for nodeAddr := range *knownNodes {
 						if nodeAddr != ms.MinerAddress {
-							rpcUtils.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
+							netUtils.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
 						}
 					}
 				}()

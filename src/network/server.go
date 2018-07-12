@@ -1,4 +1,4 @@
-package rpc
+package network
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"io/ioutil"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	rpcUtils "github.com/YuriyLisovskiy/blockchain-go/src/rpc/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/rpc/services"
+	rpcUtils "github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
 )
 
 func handleConnection(conn net.Conn, bc blockchain.BlockChain) {

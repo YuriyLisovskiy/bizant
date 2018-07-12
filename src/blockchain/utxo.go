@@ -111,6 +111,7 @@ func (u UTXOSet) Reindex() {
 
 func (u UTXOSet) Update(block Block) {
 	db := u.BlockChain.db
+	DBMutex.Lock()
 	err := db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utxoBucket))
 		for _, tx := range block.Transactions {
@@ -148,6 +149,7 @@ func (u UTXOSet) Update(block Block) {
 		}
 		return nil
 	})
+	DBMutex.Unlock()
 	if err != nil {
 		log.Panic(err)
 	}

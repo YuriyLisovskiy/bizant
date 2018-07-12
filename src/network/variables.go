@@ -1,4 +1,4 @@
-package rpc
+package network
 
 import "github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 

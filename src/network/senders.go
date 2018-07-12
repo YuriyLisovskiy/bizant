@@ -1,7 +1,7 @@
-package rpc
+package network
 
 import (
-	"github.com/YuriyLisovskiy/blockchain-go/src/rpc/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 )
 

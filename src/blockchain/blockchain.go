@@ -11,6 +11,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	txPkg "github.com/YuriyLisovskiy/blockchain-go/src/tx"
+//	"encoding/json"
 )
 
 type BlockChain struct {
@@ -76,9 +77,6 @@ func NewBlockChain(nodeID string) BlockChain {
 }
 
 func (bc *BlockChain) AddBlock(block Block) {
-
-//	fmt.Printf("\nTIP: %x\n\n", bc.tip)
-
 	DBMutex.Lock()
 	err := bc.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
@@ -219,6 +217,13 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 		if !bc.VerifyTransaction(tx) {
 
 			// TODO: send an error to transaction's author
+
+			utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.ID))
+
+	//		data, err := json.MarshalIndent(tx, "", "  ")
+	//		if err == nil {
+	//			fmt.Println(string(data))
+	//		}
 
 		} else {
 			fees += tx.Fee

@@ -1,4 +1,4 @@
-package rpc
+package network
 
 import (
 	"log"
@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	rpcUtils "github.com/YuriyLisovskiy/blockchain-go/src/rpc/utils"
+	rpcUtils "github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 )
 
 func handleAddr(request []byte) {
