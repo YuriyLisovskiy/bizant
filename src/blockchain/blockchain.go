@@ -76,7 +76,11 @@ func NewBlockChain(nodeID string) BlockChain {
 }
 
 func (bc *BlockChain) AddBlock(block Block) {
-	err := bc.db.Update(func(tx *bolt.Tx) error {
+
+//	fmt.Printf("\nTIP: %x\n\n", bc.tip)
+
+	DBMutex.Lock()
+	err := bc.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
 		blockInDb := b.Get(block.Hash)
 		if blockInDb != nil {
@@ -95,10 +99,11 @@ func (bc *BlockChain) AddBlock(block Block) {
 			if err != nil {
 				log.Panic(err)
 			}
-			bc.tip = block.Hash
+		//	bc.tip = block.Hash
 		}
 		return nil
 	})
+	DBMutex.Unlock()
 	if err != nil {
 		log.Panic(err)
 	}
@@ -192,6 +197,17 @@ func (bc *BlockChain) FindUTXO() map[string]txPkg.TXOutputs {
 }
 
 func (bc *BlockChain) Iterator() BlockChainIterator {
+	DBMutex.Lock()
+	err := bc.db.Batch(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(utils.BlocksBucket))
+		bc.tip = b.Get([]byte("l"))
+		return nil
+	})
+	DBMutex.Unlock()
+	if err != nil {
+		log.Panic(err)
+	}
+
 	return BlockChainIterator{bc.tip, bc.db}
 }
 
@@ -225,7 +241,8 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 		fmt.Println(err.Error())
 		return Block{}, err
 	}
-	err = bc.db.Update(func(tx *bolt.Tx) error {
+	DBMutex.Lock()
+	err = bc.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utils.BlocksBucket))
 		err := b.Put(newBlock.Hash, newBlock.Serialize())
 		if err != nil {
@@ -235,9 +252,9 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 		if err != nil {
 			log.Panic(err)
 		}
-		bc.tip = newBlock.Hash
 		return nil
 	})
+	DBMutex.Unlock()
 	if err != nil {
 		log.Panic(err)
 	}

@@ -78,7 +78,7 @@ func (u UTXOSet) CountTransactions() int {
 func (u UTXOSet) Reindex() {
 	db := u.BlockChain.db
 	bucketName := []byte(utxoBucket)
-	err := db.Update(func(tx *bolt.Tx) error {
+	err := db.Batch(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket(bucketName)
 		if err != nil && err != bolt.ErrBucketNotFound {
 			log.Panic(err)
@@ -93,7 +93,7 @@ func (u UTXOSet) Reindex() {
 		log.Panic(err)
 	}
 	UTXO := u.BlockChain.FindUTXO()
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		for txID, outs := range UTXO {
 			key, err := hex.DecodeString(txID)
@@ -111,7 +111,7 @@ func (u UTXOSet) Reindex() {
 
 func (u UTXOSet) Update(block Block) {
 	db := u.BlockChain.db
-	err := db.Update(func(tx *bolt.Tx) error {
+	err := db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utxoBucket))
 		for _, tx := range block.Transactions {
 			if tx.IsCoinBase() == false {

@@ -1,10 +1,14 @@
 package blockchain
 
-import "math"
+import (
+	"math"
+	"sync"
+)
 
 var (
 	maxNonce        = math.MaxInt32
 	InterruptMining = false
+	DBMutex         = &sync.Mutex{}
 )
 
 const (

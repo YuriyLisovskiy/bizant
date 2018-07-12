@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"fmt"
 )
 
 type Block struct {
@@ -24,10 +23,6 @@ func NewBlock(transactions []Transaction, prevBlockHash []byte, height int) (Blo
 	nonce, hash, err := pow.Run()
 	block.Hash = hash
 	block.Nonce = nonce
-
-	fmt.Printf("\nHASH: %x\n", hash)
-	fmt.Printf("PREV HASH: %x\n\n", pow.block.PrevBlockHash)
-
 	return block, err
 }
 

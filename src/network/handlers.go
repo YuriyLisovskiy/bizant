@@ -39,9 +39,6 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 		log.Panic(err)
 	}
 	blockData := payload.Block
-
-//	println(blockData)
-
 	block := blockchain.DeserializeBlock(blockData)
 	gUtils.PrintLog("Recevied a new block!\n")
 	bc.AddBlock(block)
