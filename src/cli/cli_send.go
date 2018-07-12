@@ -6,7 +6,7 @@ import (
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
-//	"encoding/json"
+	"encoding/json"
 )
 
 func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error {
@@ -17,7 +17,7 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error 
 		return errors.New("ERROR: Recipient address is not valid")
 	}
 	bc := blockchain.NewBlockChain(nodeID)
-	UTXOSet := blockchain.UTXOSet{bc}
+	utxoSet := blockchain.UTXOSet{bc}
 	wallets, err := w.NewWallets(nodeID)
 	if err != nil {
 		return err
@@ -26,16 +26,18 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error 
 	if err != nil {
 		return err
 	}
-	tx := blockchain.NewUTXOTransaction(&wallet, to, amount, fee, &UTXOSet)
+	tx := blockchain.NewUTXOTransaction(&wallet, to, amount, fee, &utxoSet)
 
 //	newBlock := bc.MineBlock(from, []*blockchain.Transaction{tx})
 //	UTXOSet.Update(newBlock)
 
-//	data, err := json.MarshalIndent(tx, "", "  ")
-//	if err != nil {
-//		return err
-//	}
-//	fmt.Println(string(data))
+	fmt.Printf("\n\nTX VERIFIED: %t\n\n", utxoSet.BlockChain.VerifyTransaction(tx))
+
+	data, err := json.MarshalIndent(tx, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
 
 	for nodeAddr := range net.KnownNodes {
 		if nodeAddr != from {

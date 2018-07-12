@@ -12,6 +12,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	txPkg "github.com/YuriyLisovskiy/blockchain-go/src/tx"
 //	"encoding/json"
+	"encoding/json"
 )
 
 type BlockChain struct {
@@ -220,10 +221,10 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 
 			utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.ID))
 
-	//		data, err := json.MarshalIndent(tx, "", "  ")
-	//		if err == nil {
-	//			fmt.Println(string(data))
-	//		}
+			data, err := json.MarshalIndent(tx, "", "  ")
+			if err == nil {
+				fmt.Println(string(data))
+			}
 
 		} else {
 			fees += tx.Fee
@@ -275,8 +276,7 @@ func (bc *BlockChain) SignTransaction(tx Transaction, privKey ecdsa.PrivateKey) 
 		}
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
-	tx.Sign(privKey, prevTXs)
-	return tx
+	return tx.Sign(privKey, prevTXs)
 }
 
 func (bc *BlockChain) VerifyTransaction(tx Transaction) bool {

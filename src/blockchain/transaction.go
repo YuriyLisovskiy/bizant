@@ -46,9 +46,9 @@ func (tx *Transaction) Hash() []byte {
 	return hash[:]
 }
 
-func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Transaction) {
+func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Transaction) Transaction {
 	if tx.IsCoinBase() {
-		return
+		return *tx
 	}
 	for _, vin := range tx.VIn {
 		if prevTXs[hex.EncodeToString(vin.TxId)].ID == nil {
@@ -56,12 +56,12 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 		}
 	}
 	txCopy := tx.TrimmedCopy()
-	for inID, vin := range txCopy.VIn {
-		prevTx := prevTXs[hex.EncodeToString(vin.TxId)]
+	for inID, vIn := range txCopy.VIn {
+		prevTx := prevTXs[hex.EncodeToString(vIn.TxId)]
 		txCopy.VIn[inID].Signature = nil
-		txCopy.VIn[inID].PubKey = prevTx.VOut[vin.VOut].PubKeyHash
-		dataToSign := txCopy.Serialize()
-		r, s, err := ecdsa.Sign(rand.Reader, &privateKey, dataToSign)
+		txCopy.VIn[inID].PubKey = prevTx.VOut[vIn.VOut].PubKeyHash
+	//	dataToSign := fmt.Sprintf("%x\n", txCopy)
+		r, s, err := ecdsa.Sign(rand.Reader, &privateKey, txCopy.Serialize())
 		if err != nil {
 			log.Panic(err)
 		}
@@ -69,18 +69,19 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 		tx.VIn[inID].Signature = signature
 		txCopy.VIn[inID].PubKey = nil
 	}
+	return *tx
 }
 
 func (tx *Transaction) TrimmedCopy() Transaction {
 	var inputs []txPkg.TXInput
 	var outputs []txPkg.TXOutput
-	for _, vIn := range tx.VIn {
-		inputs = append(inputs, txPkg.TXInput{vIn.TxId, vIn.VOut, nil, nil})
+	for _, vin := range tx.VIn {
+		inputs = append(inputs, txPkg.TXInput{TxId: vin.TxId, VOut: vin.VOut, PubKey: nil, Signature: nil})
 	}
 	for _, vOut := range tx.VOut {
-		outputs = append(outputs, txPkg.TXOutput{vOut.Value, vOut.PubKeyHash})
+		outputs = append(outputs, txPkg.TXOutput{Value: vOut.Value, PubKeyHash: vOut.PubKeyHash})
 	}
-	txCopy := Transaction{tx.ID, inputs, outputs, tx.Timestamp, tx.Fee}
+	txCopy := Transaction{ID: tx.ID, VIn: inputs, VOut: outputs, Timestamp: tx.Timestamp, Fee: tx.Fee}
 	return txCopy
 }
 
@@ -109,9 +110,9 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 		keyLen := len(vin.PubKey)
 		x.SetBytes(vin.PubKey[:(keyLen / 2)])
 		y.SetBytes(vin.PubKey[(keyLen / 2):])
-		dataToVerify := txCopy.Serialize()
-		rawPubKey := ecdsa.PublicKey{curve, &x, &y}
-		if ecdsa.Verify(&rawPubKey, dataToVerify, &r, &s) == false {
+//		dataToVerify := fmt.Sprintf("%x\n", txCopy)
+		rawPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
+		if ecdsa.Verify(&rawPubKey, txCopy.Serialize(), &r, &s) == false {
 			return false
 		}
 		txCopy.VIn[inID].PubKey = nil
@@ -128,7 +129,7 @@ func NewCoinBaseTX(to string, fees float64, data string) Transaction {
 		}
 		data = fmt.Sprintf("%x", randData)
 	}
-	txIn := txPkg.TXInput{[]byte{}, -1, nil, []byte(data)}
+	txIn := txPkg.TXInput{TxId: []byte{}, VOut: -1, Signature: nil, PubKey: []byte(data)}
 	txOut := txPkg.NewTXOutput(MINING_REWARD + fees, to)
 	tx := Transaction{nil, []txPkg.TXInput{txIn}, []txPkg.TXOutput{*txOut}, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
@@ -149,11 +150,10 @@ func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, utxoSe
 			log.Panic(err)
 		}
 		for _, out := range outs {
-			input := txPkg.TXInput{txID, out, nil, wallet.PublicKey}
-			inputs = append(inputs, input)
+			inputs = append(inputs, txPkg.TXInput{TxId: txID, VOut: out, Signature: nil, PubKey: wallet.PublicKey})
 		}
 	}
-	from := fmt.Sprintf("%s", wallet.GetAddress())
+	from := fmt.Sprintf("%x", wallet.GetAddress())
 	outputs = append(outputs, *txPkg.NewTXOutput(amount, to))
 	if acc > amount {
 		outputs = append(outputs, *txPkg.NewTXOutput(acc-amount, from)) // a change
@@ -161,8 +161,7 @@ func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, utxoSe
 	tx := Transaction{nil, inputs, outputs, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
 	tx.Fee = tx.CalculateFee(fee)
-	tx = utxoSet.BlockChain.SignTransaction(tx, wallet.PrivateKey)
-	return tx
+	return utxoSet.BlockChain.SignTransaction(tx, wallet.PrivateKey)
 }
 
 func (tx *Transaction) CalculateFee(feePerByte float64) float64 {
