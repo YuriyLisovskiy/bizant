@@ -1,19 +1,19 @@
 package cli
 
 import (
+	"fmt"
 	"encoding/json"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	"fmt"
 )
 
-func (cli *CLI) printChain(nodeID string) {
+func (cli *CLI) printChain(nodeID string) error {
 	bc := blockchain.NewBlockChain(nodeID)
 	bci := bc.Iterator()
 	for {
 		block := bci.Next()
 		data, err := json.MarshalIndent(block, "", "  ")
 		if err != nil {
-			panic(err)
+			return err
 		}
 		fmt.Println(string(data))
 		if len(block.PrevBlockHash) == 0 {
@@ -21,4 +21,5 @@ func (cli *CLI) printChain(nodeID string) {
 		}
 	}
 	bc.CloseDB(true)
+	return nil
 }

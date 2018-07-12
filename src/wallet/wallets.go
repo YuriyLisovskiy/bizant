@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"encoding/gob"
 	"crypto/elliptic"
+	"errors"
 )
 
 type Wallets struct {
@@ -36,8 +37,12 @@ func (ws *Wallets) GetAddresses() []string {
 	return addresses
 }
 
-func (ws Wallets) GetWallet(address string) Wallet {
-	return *ws.Wallets[address]
+func (ws Wallets) GetWallet(address string) (Wallet, error) {
+	wallet, exists := ws.Wallets[address]
+	if !exists {
+		return Wallet{}, errors.New(fmt.Sprintf("wallet %s not found", address))
+	}
+	return *wallet, nil
 }
 
 func (ws *Wallets) LoadFromFile(nodeID string) error {

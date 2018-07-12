@@ -1,27 +1,30 @@
 package cli
 
 import (
-	"log"
 	"fmt"
+	"errors"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 )
 
-func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) {
+func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error {
 	if !w.ValidateAddress(from) {
-		log.Panic("ERROR: Sender address is not valid")
+		return errors.New("ERROR: Sender address is not valid")
 	}
 	if !w.ValidateAddress(to) {
-		log.Panic("ERROR: Recipient address is not valid")
+		return errors.New("ERROR: Recipient address is not valid")
 	}
 	bc := blockchain.NewBlockChain(nodeID)
 	UTXOSet := blockchain.UTXOSet{bc}
 	wallets, err := w.NewWallets(nodeID)
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
-	wallet := wallets.GetWallet(from)
+	wallet, err := wallets.GetWallet(from)
+	if err != nil {
+		return err
+	}
 	tx := blockchain.NewUTXOTransaction(&wallet, to, amount, fee, &UTXOSet)
 
 //	newBlock := bc.MineBlock(from, []*blockchain.Transaction{tx})
@@ -34,4 +37,5 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) {
 	}
 	bc.CloseDB(true)
 	fmt.Println("Success!")
+	return nil
 }
