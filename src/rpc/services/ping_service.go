@@ -2,7 +2,7 @@ package services
 
 import (
 	"time"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/rpc/utils"
 )
 
 type PingService struct {}

@@ -1,8 +1,8 @@
-package network
+package rpc
 
 import (
+	"github.com/YuriyLisovskiy/blockchain-go/src/rpc/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 )
 
 func sendAddr(address string) bool {

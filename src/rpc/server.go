@@ -1,4 +1,4 @@
-package network
+package rpc
 
 import (
 	"fmt"
@@ -6,9 +6,9 @@ import (
 	"net"
 	"io/ioutil"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	gUtils "github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	rpcUtils "github.com/YuriyLisovskiy/blockchain-go/src/rpc/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/rpc/services"
 )
 
 func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
@@ -16,8 +16,8 @@ func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
 	if err != nil {
 		log.Panic(err)
 	}
-	command := utils.BytesToCommand(request[:utils.COMMAND_LENGTH])
-	gUtils.PrintLog(fmt.Sprintf("Received %s command\n", command))
+	command := rpcUtils.BytesToCommand(request[:rpcUtils.COMMAND_LENGTH])
+	utils.PrintLog(fmt.Sprintf("Received %s command\n", command))
 	switch command {
 	case "addr":
 		handleAddr(request)
@@ -38,14 +38,17 @@ func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
 	case "pong":
 		handlePong(request)
 	default:
-		gUtils.PrintLog("Unknown command!\n")
+		utils.PrintLog("Unknown command!\n")
 	}
 	conn.Close()
 }
 
 func StartServer(nodeID, minerAddress string) {
 	selfNodeAddress = fmt.Sprintf("localhost:%s", nodeID)
-	ln, err := net.Listen(utils.PROTOCOL, selfNodeAddress)
+
+	delete(KnownNodes, selfNodeAddress)
+
+	ln, err := net.Listen(rpcUtils.PROTOCOL, selfNodeAddress)
 	if err != nil {
 		log.Panic(err)
 	}

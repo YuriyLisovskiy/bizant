@@ -1,4 +1,4 @@
-package network
+package rpc
 
 import (
 	"log"
@@ -6,15 +6,15 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/hex"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	gUtils "github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
+	rpcUtils "github.com/YuriyLisovskiy/blockchain-go/src/rpc/utils"
 )
 
 func handleAddr(request []byte) {
 	var buff bytes.Buffer
-	var payload utils.Addr
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var payload rpcUtils.Addr
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -25,14 +25,14 @@ func handleAddr(request []byte) {
 			KnownNodes[newNode] = true
 		}
 	}
-	gUtils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
+	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
 }
 
 func handleBlock(request []byte, bc blockchain.BlockChain) {
 	blockchain.InterruptMining = true
 	var buff bytes.Buffer
-	var payload utils.Block
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var payload rpcUtils.Block
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -40,9 +40,9 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 	}
 	blockData := payload.Block
 	block := blockchain.DeserializeBlock(blockData)
-	gUtils.PrintLog("Recevied a new block!\n")
+	utils.PrintLog("Recevied a new block!\n")
 	bc.AddBlock(block)
-	gUtils.PrintLog(fmt.Sprintf("Added block %x\n", block.Hash))
+	utils.PrintLog(fmt.Sprintf("Added block %x\n", block.Hash))
 	if len(blocksInTransit) > 0 {
 		blockHash := blocksInTransit[0]
 		sendGetData(payload.AddrFrom, "block", blockHash)
@@ -56,14 +56,14 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 
 func handleInv(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload utils.Inv
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var payload rpcUtils.Inv
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	gUtils.PrintLog(fmt.Sprintf("Recevied inventory with %d %s\n", len(payload.Items), payload.Type))
+	utils.PrintLog(fmt.Sprintf("Recevied inventory with %d %s\n", len(payload.Items), payload.Type))
 	if payload.Type == "block" {
 		blocksInTransit = payload.Items
 		blockHash := payload.Items[0]
@@ -87,21 +87,21 @@ func handleInv(request []byte, bc blockchain.BlockChain) {
 
 func handleGetBlocks(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload utils.Getblocks
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var payload rpcUtils.Getblocks
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	blocks := bc.GetBlockHashes()
-	utils.SendInv(selfNodeAddress, payload.AddrFrom, "block", blocks, &KnownNodes)
+	rpcUtils.SendInv(selfNodeAddress, payload.AddrFrom, "block", blocks, &KnownNodes)
 }
 
 func handleGetData(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload utils.Getdata
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var payload rpcUtils.Getdata
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -112,7 +112,7 @@ func handleGetData(request []byte, bc blockchain.BlockChain) {
 		if err != nil {
 			return
 		}
-		utils.SendBlock(selfNodeAddress, payload.AddrFrom, block, &KnownNodes)
+		rpcUtils.SendBlock(selfNodeAddress, payload.AddrFrom, block, &KnownNodes)
 	}
 	if payload.Type == "tx" {
 		txID := hex.EncodeToString(payload.ID)
@@ -124,8 +124,8 @@ func handleGetData(request []byte, bc blockchain.BlockChain) {
 
 func handleTx(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload utils.Tx
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var payload rpcUtils.Tx
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -178,8 +178,8 @@ func handleTx(request []byte, bc blockchain.BlockChain) {
 
 func handleVersion(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload utils.Version
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var payload rpcUtils.Version
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -205,22 +205,22 @@ func handleVersion(request []byte, bc blockchain.BlockChain) {
 
 func handlePing(request []byte) bool {
 	var buff bytes.Buffer
-	var data utils.Ping
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var data rpcUtils.Ping
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&data)
 	if err != nil {
 		log.Panic(err)
 	}
-	payload := utils.GobEncode(utils.Pong{AddrFrom: selfNodeAddress})
-	pongRequest := append(utils.CommandToBytes("pong"), payload...)
-	return utils.SendData(data.AddrFrom, pongRequest, &KnownNodes)
+	payload := rpcUtils.GobEncode(rpcUtils.Pong{AddrFrom: selfNodeAddress})
+	pongRequest := append(rpcUtils.CommandToBytes("pong"), payload...)
+	return rpcUtils.SendData(data.AddrFrom, pongRequest, &KnownNodes)
 }
 
 func handlePong(request []byte) {
 	var buff bytes.Buffer
-	var data utils.Pong
-	buff.Write(request[utils.COMMAND_LENGTH:])
+	var data rpcUtils.Pong
+	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&data)
 	if err != nil {
@@ -229,5 +229,5 @@ func handlePong(request []byte) {
 	if data.AddrFrom != selfNodeAddress {
 		KnownNodes[data.AddrFrom] = true
 	}
-	gUtils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
+	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
 }
