@@ -200,11 +200,10 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 	var lastHeight int
 	fees := 0.0
 	for _, tx := range transactions {
+		if !bc.VerifyTransaction(tx) {
 
-		// TODO: ignore transaction if it's not valid
+			// TODO: send an error to transaction's author
 
-		if bc.VerifyTransaction(tx) != true {
-			fmt.Print("ERROR: Invalid transaction")
 		} else {
 			fees += tx.Fee
 		}
@@ -242,7 +241,7 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 	if err != nil {
 		log.Panic(err)
 	}
-	return newBlock, nil
+	return bc.GetBlock(newBlock.Hash)
 }
 
 func (bc *BlockChain) SignTransaction(tx Transaction, privKey ecdsa.PrivateKey) Transaction {
@@ -278,8 +277,4 @@ func (bc *BlockChain) CloseDB(Defer bool) {
 		defer bc.db.Close()
 	}
 	bc.db.Close()
-}
-
-func (bc *BlockChain) GetDB() *bolt.DB {
-	return bc.db
 }

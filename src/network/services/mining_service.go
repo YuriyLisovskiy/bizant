@@ -27,12 +27,6 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 				go func() {
 					for nodeAddr := range *knownNodes {
 						if nodeAddr != ms.MinerAddress {
-
-							// TODO: can't serialize newBlock in SendBlock(),
-							// error: unexpected fault address 0x7f40a7852516
-							// 		  fatal error: fault
-							// 		  [signal SIGSEGV: segmentation violation code=0x1 addr=0x7f40a7852516 pc=0x456c77]
-
 							utils.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
 						}
 					}
