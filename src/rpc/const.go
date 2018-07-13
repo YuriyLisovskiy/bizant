@@ -13,8 +13,8 @@ const (
 	C_BLOCK      = "block"
 	C_ERROR      = "error"
 	C_VERSION    = "version"
-	C_GET_DATA   = "getdata"
-	C_GET_BLOCKS = "getblocks"
+	C_GETDATA   = "getdata"
+	C_GETBLOCKS = "getblocks"
 )
 
 const (

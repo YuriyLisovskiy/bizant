@@ -27,9 +27,9 @@ func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
 		handleBlock(request, bc)
 	case C_INV:
 		handleInv(request, bc)
-	case C_GET_BLOCKS:
+	case C_GETBLOCKS:
 		handleGetBlocks(request, bc)
-	case C_GET_DATA:
+	case C_GETDATA:
 		handleGetData(request, bc)
 	case C_TX:
 		handleTx(request, bc)

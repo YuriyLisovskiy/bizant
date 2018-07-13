@@ -13,7 +13,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 )
 
-func sendData(addr string, data []byte, knownNodes *map[string]bool) bool {
+func sendData(addr string, request []byte, knownNodes *map[string]bool) bool {
 	conn, err := net.Dial(PROTOCOL, addr)
 	if err != nil {
 		delete(*knownNodes, addr)
@@ -21,7 +21,7 @@ func sendData(addr string, data []byte, knownNodes *map[string]bool) bool {
 		return false
 	}
 	defer conn.Close()
-	_, err = io.Copy(conn, bytes.NewReader(data))
+	_, err = io.Copy(conn, bytes.NewReader(request))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -29,29 +29,19 @@ func sendData(addr string, data []byte, knownNodes *map[string]bool) bool {
 }
 
 func SendPing(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	data := GobEncode(ping{AddrFrom: addrFrom})
-	requestData := append(CommandToBytes(C_PING), data...)
-	return sendData(addrTo, requestData, knownNodes)
+	return sendData(addrTo, makeRequest(ping{AddrFrom: addrFrom}, C_PING), knownNodes)
 }
 
 func SendPong(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	data := GobEncode(pong{AddrFrom: addrFrom})
-	pongRequest := append(CommandToBytes(C_PONG), data...)
-	return sendData(addrTo, pongRequest, knownNodes)
+	return sendData(addrTo, makeRequest(pong{AddrFrom: addrFrom}, C_PONG), knownNodes)
 }
 
 func SendInv(addrFrom, addrTo, kind string, items [][]byte, knownNodes *map[string]bool) bool {
-	inventory := inv{AddrFrom: addrFrom, Type: kind, Items: items}
-	data := GobEncode(inventory)
-	requestData := append(CommandToBytes(C_INV), data...)
-	return sendData(addrTo, requestData, knownNodes)
+	return sendData(addrTo, makeRequest(inv{AddrFrom: addrFrom, Type: kind, Items: items}, C_INV), knownNodes)
 }
 
 func SendBlock(addrFrom, addrTo string, newBlock blockchain.Block, knownNodes *map[string]bool) bool {
-	blockData := block{AddrFrom: addrFrom, Block: newBlock.Serialize()}
-	data := GobEncode(blockData)
-	requestData := append(CommandToBytes(C_BLOCK), data...)
-	return sendData(addrTo, requestData, knownNodes)
+	return sendData(addrTo, makeRequest(block{AddrFrom: addrFrom, Block: newBlock.Serialize()}, C_BLOCK), knownNodes)
 }
 
 func SendAddr(addrTo string, knownNodes *map[string]bool) bool {
@@ -61,33 +51,25 @@ func SendAddr(addrTo string, knownNodes *map[string]bool) bool {
 			nodes.AddrList = append(nodes.AddrList, knownNodeAddr)
 		}
 	}
-	data := GobEncode(nodes)
-	requestData := append(CommandToBytes(C_ADDR), data...)
-	return sendData(addrTo, requestData, knownNodes)
+	return sendData(addrTo, makeRequest(nodes, C_ADDR), knownNodes)
 }
 
 func SendGetBlocks(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	data := GobEncode(getblocks{AddrFrom: addrFrom})
-	requestData := append(CommandToBytes(C_GET_BLOCKS), data...)
-	return sendData(addrTo, requestData, knownNodes)
+	return sendData(addrTo, makeRequest(getblocks{AddrFrom: addrFrom}, C_GETBLOCKS), knownNodes)
 }
 
 func SendGetData(addrFrom, addrTo, kind string, id []byte, knownNodes *map[string]bool) bool {
-	data := GobEncode(getdata{AddrFrom: addrFrom, Type: kind, ID: id})
-	requestData := append(CommandToBytes(C_GET_DATA), data...)
-	return sendData(addrTo, requestData, knownNodes)
+	return sendData(addrTo, makeRequest(getdata{AddrFrom: addrFrom, Type: kind, ID: id}, C_GETDATA), knownNodes)
 }
 
 func SendTx(addrFrom, addrTo string, tnx blockchain.Transaction, knownNodes *map[string]bool) bool {
-	txData := tx{AddFrom: addrFrom, Transaction: tnx.Serialize()}
-	data := GobEncode(txData)
-	requestData := append(CommandToBytes(C_TX), data...)
-	return sendData(addrTo, requestData, knownNodes)
+	return sendData(addrTo, makeRequest(tx{AddFrom: addrFrom, Transaction: tnx.Serialize()}, C_TX), knownNodes)
 }
 
 func SendVersion(addrFrom, addrTo string, bc blockchain.BlockChain, knownNodes *map[string]bool) bool {
-	bestHeight := bc.GetBestHeight()
-	data := GobEncode(version{Version: NODE_VERSION, BestHeight: bestHeight, AddrFrom: addrFrom})
-	requestData := append(CommandToBytes(C_VERSION), data...)
-	return sendData(addrTo, requestData, knownNodes)
+	return sendData(
+		addrTo,
+		makeRequest(version{Version: NODE_VERSION, BestHeight: bc.GetBestHeight(), AddrFrom: addrFrom}, C_VERSION),
+		knownNodes,
+	)
 }

@@ -42,3 +42,7 @@ func GobEncode(data interface{}) []byte {
 	}
 	return buff.Bytes()
 }
+
+func makeRequest(data interface{}, cmd string) []byte {
+	return append(CommandToBytes(cmd), GobEncode(data)...)
+}
