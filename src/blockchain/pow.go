@@ -1,12 +1,16 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package blockchain
 
 import (
 	"fmt"
 	"bytes"
+	"errors"
 	"math/big"
 	"crypto/sha256"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"errors"
 )
 
 type ProofOfWork struct {
@@ -16,7 +20,7 @@ type ProofOfWork struct {
 
 func NewProofOfWork(b Block) ProofOfWork {
 	target := big.NewInt(1)
-	target.Lsh(target, uint(256-targetBits))
+	target.Lsh(target, uint(256-TARGET_BITS))
 	pow := ProofOfWork{b, target}
 	return pow
 }
@@ -27,7 +31,7 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 			pow.block.PrevBlockHash,
 			pow.block.HashTransactions(),
 			utils.IntToHex(pow.block.Timestamp),
-			utils.IntToHex(int64(targetBits)),
+			utils.IntToHex(int64(TARGET_BITS)),
 			utils.IntToHex(int64(nonce)),
 		},
 		[]byte{},

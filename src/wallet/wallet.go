@@ -1,3 +1,7 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package wallet
 
 import (
@@ -24,7 +28,7 @@ func NewWallet() *Wallet {
 
 func (w Wallet) GetAddress() []byte {
 	pubKeyHash := HashPubKey(w.PublicKey)
-	versionedPayload := append([]byte{version}, pubKeyHash...)
+	versionedPayload := append([]byte{WALLLET_VERSION}, pubKeyHash...)
 	checksum := checksum(versionedPayload)
 	fullPayload := append(versionedPayload, checksum...)
 	address := utils.Base58Encode(fullPayload)
@@ -44,9 +48,9 @@ func HashPubKey(pubKey []byte) []byte {
 
 func ValidateAddress(address string) bool {
 	pubKeyHash := utils.Base58Decode([]byte(address))
-	actualChecksum := pubKeyHash[len(pubKeyHash)-addressChecksumLen:]
+	actualChecksum := pubKeyHash[len(pubKeyHash)-ADDRESS_CHECKSUM_LEN:]
 	version := pubKeyHash[0]
-	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-addressChecksumLen]
+	pubKeyHash = pubKeyHash[1: len(pubKeyHash)-ADDRESS_CHECKSUM_LEN]
 	targetChecksum := checksum(append([]byte{version}, pubKeyHash...))
 	return bytes.Compare(actualChecksum, targetChecksum) == 0
 }
@@ -54,7 +58,7 @@ func ValidateAddress(address string) bool {
 func checksum(payload []byte) []byte {
 	firstSHA := sha256.Sum256(payload)
 	secondSHA := sha256.Sum256(firstSHA[:])
-	return secondSHA[:addressChecksumLen]
+	return secondSHA[:ADDRESS_CHECKSUM_LEN]
 }
 
 func newKeyPair() (ecdsa.PrivateKey, []byte) {

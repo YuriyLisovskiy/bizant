@@ -1,3 +1,7 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package blockchain
 
 import (
@@ -11,7 +15,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	txPkg "github.com/YuriyLisovskiy/blockchain-go/src/tx"
-//	"encoding/json"
+
 	"encoding/json"
 )
 
@@ -27,14 +31,14 @@ func CreateBlockChain(address, nodeID string) BlockChain {
 		os.Exit(1)
 	}
 	var tip []byte
-	cbTx := NewCoinBaseTX(address, 0, utils.GenesisCoinbaseData)
+	cbTx := NewCoinBaseTX(address, 0, utils.GENESIS_COINBASE_DATA)
 	genesis := NewGenesisBlock(cbTx)
 	db, err := bolt.Open(utils.DBFile, 0600, nil)
 	if err != nil {
 		log.Panic(err)
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucket([]byte(utils.BlocksBucket))
+		b, err := tx.CreateBucket([]byte(utils.BLOCKS_BUCKET))
 		if err != nil {
 			log.Panic(err)
 		}
@@ -67,7 +71,7 @@ func NewBlockChain(nodeID string) BlockChain {
 		log.Panic(err)
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BlocksBucket))
+		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		tip = b.Get([]byte("l"))
 		return nil
 	})
@@ -80,7 +84,7 @@ func NewBlockChain(nodeID string) BlockChain {
 func (bc *BlockChain) AddBlock(block Block) {
 	DBMutex.Lock()
 	err := bc.db.Batch(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BlocksBucket))
+		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		blockInDb := b.Get(block.Hash)
 		if blockInDb != nil {
 			return nil
@@ -98,7 +102,7 @@ func (bc *BlockChain) AddBlock(block Block) {
 			if err != nil {
 				log.Panic(err)
 			}
-		//	bc.tip = block.Hash
+			//	bc.tip = block.Hash
 		}
 		return nil
 	})
@@ -111,7 +115,7 @@ func (bc *BlockChain) AddBlock(block Block) {
 func (bc *BlockChain) GetBestHeight() int {
 	var lastBlock Block
 	err := bc.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BlocksBucket))
+		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		lastHash := b.Get([]byte("l"))
 		blockData := b.Get(lastHash)
 		lastBlock = DeserializeBlock(blockData)
@@ -126,7 +130,7 @@ func (bc *BlockChain) GetBestHeight() int {
 func (bc *BlockChain) GetBlock(blockHash []byte) (Block, error) {
 	var block Block
 	err := bc.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BlocksBucket))
+		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		blockData := b.Get(blockHash)
 		if blockData == nil {
 			return errors.New("block is not found")
@@ -198,7 +202,7 @@ func (bc *BlockChain) FindUTXO() map[string]txPkg.TXOutputs {
 func (bc *BlockChain) Iterator() BlockChainIterator {
 	DBMutex.Lock()
 	err := bc.db.Batch(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BlocksBucket))
+		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		bc.tip = b.Get([]byte("l"))
 		return nil
 	})
@@ -231,7 +235,7 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 		}
 	}
 	err := bc.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BlocksBucket))
+		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		lastHash = b.Get([]byte("l"))
 		blockData := b.Get(lastHash)
 		block := DeserializeBlock(blockData)
@@ -249,7 +253,7 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 	}
 	DBMutex.Lock()
 	err = bc.db.Batch(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BlocksBucket))
+		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		err := b.Put(newBlock.Hash, newBlock.Serialize())
 		if err != nil {
 			log.Panic(err)

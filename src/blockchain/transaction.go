@@ -1,3 +1,7 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package blockchain
 
 import (
@@ -60,7 +64,7 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 		prevTx := prevTXs[hex.EncodeToString(vIn.TxId)]
 		txCopy.VIn[inID].Signature = nil
 		txCopy.VIn[inID].PubKey = prevTx.VOut[vIn.VOut].PubKeyHash
-	//	dataToSign := fmt.Sprintf("%x\n", txCopy)
+		//	dataToSign := fmt.Sprintf("%x\n", txCopy)
 		r, s, err := ecdsa.Sign(rand.Reader, &privateKey, txCopy.Serialize())
 		if err != nil {
 			log.Panic(err)
@@ -110,7 +114,7 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 		keyLen := len(vin.PubKey)
 		x.SetBytes(vin.PubKey[:(keyLen / 2)])
 		y.SetBytes(vin.PubKey[(keyLen / 2):])
-//		dataToVerify := fmt.Sprintf("%x\n", txCopy)
+		//		dataToVerify := fmt.Sprintf("%x\n", txCopy)
 		rawPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
 		if ecdsa.Verify(&rawPubKey, txCopy.Serialize(), &r, &s) == false {
 			return false
@@ -130,7 +134,7 @@ func NewCoinBaseTX(to string, fees float64, data string) Transaction {
 		data = fmt.Sprintf("%x", randData)
 	}
 	txIn := txPkg.TXInput{TxId: []byte{}, VOut: -1, Signature: nil, PubKey: []byte(data)}
-	txOut := txPkg.NewTXOutput(MINING_REWARD + fees, to)
+	txOut := txPkg.NewTXOutput(MINING_REWARD+fees, to)
 	tx := Transaction{nil, []txPkg.TXInput{txIn}, []txPkg.TXOutput{*txOut}, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
 	return tx

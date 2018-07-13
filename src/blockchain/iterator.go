@@ -1,3 +1,7 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package blockchain
 
 import (
@@ -15,7 +19,7 @@ type BlockChainIterator struct {
 func (i *BlockChainIterator) Next() Block {
 	var block Block
 	err := i.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BlocksBucket))
+		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		encodedBlock := b.Get(i.currentHash)
 		block = DeserializeBlock(encodedBlock)
 		return nil

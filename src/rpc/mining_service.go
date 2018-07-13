@@ -1,4 +1,8 @@
-package services
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
+package rpc
 
 import (
 	"fmt"
@@ -6,7 +10,6 @@ import (
 	"encoding/json"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/response"
 )
 
 type MiningService struct {
@@ -40,7 +43,7 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 				go func() {
 					for nodeAddr := range *knownNodes {
 						if nodeAddr != ms.MinerAddress {
-							response.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
+							SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
 						}
 					}
 				}()

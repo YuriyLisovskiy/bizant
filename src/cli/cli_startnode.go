@@ -1,10 +1,14 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package cli
 
 import (
 	"fmt"
 	"errors"
+	"github.com/YuriyLisovskiy/blockchain-go/src/rpc"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network"
 )
 
 func (cli *CLI) startNode(nodeID string, minerAddress string) error {
@@ -16,6 +20,6 @@ func (cli *CLI) startNode(nodeID string, minerAddress string) error {
 			return errors.New(fmt.Sprintf("wrong miner address %s", minerAddress))
 		}
 	}
-	network.StartServer(nodeID, minerAddress)
+	rpc.StartRPCServer(nodeID, minerAddress)
 	return nil
 }

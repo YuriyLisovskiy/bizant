@@ -2,12 +2,15 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package cli
+package blockchain
 
-import "log"
+import (
+	"math"
+	"sync"
+)
 
-func checkError(err error) {
-	if err != nil {
-		log.Panic(err)
-	}
-}
+var (
+	maxNonce        = math.MaxInt32
+	DBMutex         = &sync.Mutex{}
+	InterruptMining = false
+)

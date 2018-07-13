@@ -1,4 +1,8 @@
-package network
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
+package rpc
 
 import (
 	"fmt"
@@ -7,9 +11,6 @@ import (
 	"io/ioutil"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/response"
-	netUtils "github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 )
 
 func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
@@ -17,28 +18,28 @@ func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
 	if err != nil {
 		log.Panic(err)
 	}
-	command := netUtils.BytesToCommand(request[:netUtils.COMMAND_LENGTH])
+	command := BytesToCommand(request[:COMMAND_LENGTH])
 	utils.PrintLog(fmt.Sprintf("Received %s command\n", command))
 	switch command {
-	case netUtils.C_ADDR:
+	case C_ADDR:
 		handleAddr(request)
-	case netUtils.C_BLOCK:
+	case C_BLOCK:
 		handleBlock(request, bc)
-	case netUtils.C_INV:
+	case C_INV:
 		handleInv(request, bc)
-	case netUtils.C_GET_BLOCKS:
+	case C_GET_BLOCKS:
 		handleGetBlocks(request, bc)
-	case netUtils.C_GET_DATA:
+	case C_GET_DATA:
 		handleGetData(request, bc)
-	case netUtils.C_TX:
+	case C_TX:
 		handleTx(request, bc)
-	case netUtils.C_VERSION:
+	case C_VERSION:
 		handleVersion(request, bc)
-	case netUtils.C_PING:
+	case C_PING:
 		handlePing(request)
-	case netUtils.C_PONG:
+	case C_PONG:
 		handlePong(request)
-	case netUtils.C_ERROR:
+	case C_ERROR:
 		handleError(request)
 	default:
 		utils.PrintLog("Unknown command!\n")
@@ -46,27 +47,27 @@ func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
 	conn.Close()
 }
 
-func StartServer(nodeID, minerAddress string) {
+func StartRPCServer(nodeID, minerAddress string) {
 	SelfNodeAddress = fmt.Sprintf("localhost:%s", nodeID)
 	if _, ok := KnownNodes[SelfNodeAddress]; ok {
 		delete(KnownNodes, SelfNodeAddress)
 	}
-	ln, err := net.Listen(netUtils.PROTOCOL, SelfNodeAddress)
+	ln, err := net.Listen(PROTOCOL, SelfNodeAddress)
 	if err != nil {
 		log.Panic(err)
 	}
 	defer ln.Close()
 	bc := blockchain.NewBlockChain(nodeID)
-	pingService := &services.PingService{}
+	pingService := &PingService{}
 	pingService.Start(SelfNodeAddress, &KnownNodes)
 	if len(minerAddress) > 0 {
-		miningService := &services.MiningService{MinerAddress: minerAddress}
+		miningService := &MiningService{MinerAddress: minerAddress}
 		miningService.Start(bc, &KnownNodes, &memPool)
 	}
 	go func() {
 		for nodeAddr := range KnownNodes {
 			if nodeAddr != SelfNodeAddress {
-				if response.SendVersion(SelfNodeAddress, nodeAddr, bc, &KnownNodes) {
+				if SendVersion(SelfNodeAddress, nodeAddr, bc, &KnownNodes) {
 					break
 				}
 			}

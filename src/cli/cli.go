@@ -1,3 +1,7 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package cli
 
 import (
@@ -46,21 +50,21 @@ func (cli *CLI) Run() {
 
 	switch os.Args[1] {
 	case "getbalance":
-		handleError(getBalanceCmd.Parse(os.Args[2:]))
+		checkError(getBalanceCmd.Parse(os.Args[2:]))
 	case "createblockchain":
-		handleError(createBlockChainCmd.Parse(os.Args[2:]))
+		checkError(createBlockChainCmd.Parse(os.Args[2:]))
 	case "createwallet":
-		handleError(createWalletCmd.Parse(os.Args[2:]))
+		checkError(createWalletCmd.Parse(os.Args[2:]))
 	case "listaddresses":
-		handleError(listAddressesCmd.Parse(os.Args[2:]))
+		checkError(listAddressesCmd.Parse(os.Args[2:]))
 	case "printchain":
-		handleError(printChainCmd.Parse(os.Args[2:]))
+		checkError(printChainCmd.Parse(os.Args[2:]))
 	case "reindexutxo":
-		handleError(reindexUTXOCmd.Parse(os.Args[2:]))
+		checkError(reindexUTXOCmd.Parse(os.Args[2:]))
 	case "send":
-		handleError(sendCmd.Parse(os.Args[2:]))
+		checkError(sendCmd.Parse(os.Args[2:]))
 	case "startnode":
-		handleError(startNodeCmd.Parse(os.Args[2:]))
+		checkError(startNodeCmd.Parse(os.Args[2:]))
 	default:
 		cli.printUsage()
 		os.Exit(1)
@@ -70,23 +74,23 @@ func (cli *CLI) Run() {
 			getBalanceCmd.Usage()
 			os.Exit(1)
 		}
-		handleError(cli.getBalance(*getBalanceAddress, nodeID))
+		checkError(cli.getBalance(*getBalanceAddress, nodeID))
 	}
 	if createBlockChainCmd.Parsed() {
 		if *createBlockChainAddress == "" {
 			createBlockChainCmd.Usage()
 			os.Exit(1)
 		}
-		handleError(cli.createBlockChain(*createBlockChainAddress, nodeID))
+		checkError(cli.createBlockChain(*createBlockChainAddress, nodeID))
 	}
 	if createWalletCmd.Parsed() {
 		cli.createWallet(nodeID)
 	}
 	if listAddressesCmd.Parsed() {
-		handleError(cli.listAddresses(nodeID))
+		checkError(cli.listAddresses(nodeID))
 	}
 	if printChainCmd.Parsed() {
-		handleError(cli.printChain(nodeID))
+		checkError(cli.printChain(nodeID))
 	}
 	if reindexUTXOCmd.Parsed() {
 		cli.reindexUTXO(nodeID)
@@ -96,7 +100,7 @@ func (cli *CLI) Run() {
 			sendCmd.Usage()
 			os.Exit(1)
 		}
-		handleError(cli.send(*sendFrom, *sendTo, *sendAmount, *sendFee, nodeID))
+		checkError(cli.send(*sendFrom, *sendTo, *sendAmount, *sendFee, nodeID))
 	}
 	if startNodeCmd.Parsed() {
 		nodeID := os.Getenv("NODE_ID")
@@ -104,6 +108,6 @@ func (cli *CLI) Run() {
 			startNodeCmd.Usage()
 			os.Exit(1)
 		}
-		handleError(cli.startNode(nodeID, *startNodeMiner))
+		checkError(cli.startNode(nodeID, *startNodeMiner))
 	}
 }

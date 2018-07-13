@@ -1,12 +1,15 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package cli
 
 import (
 	"fmt"
 	"errors"
+	"github.com/YuriyLisovskiy/blockchain-go/src/rpc"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/response"
-	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
 	"encoding/json"
 )
 
@@ -40,9 +43,9 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error 
 	}
 	fmt.Println(string(data))
 
-	for nodeAddr := range net.KnownNodes {
-		if nodeAddr != net.SelfNodeAddress {
-			response.SendTx(net.SelfNodeAddress, nodeAddr, tx, &net.KnownNodes)
+	for nodeAddr := range rpc.KnownNodes {
+		if nodeAddr != rpc.SelfNodeAddress {
+			rpc.SendTx(rpc.SelfNodeAddress, nodeAddr, tx, &rpc.KnownNodes)
 		}
 	}
 	bc.CloseDB(true)
