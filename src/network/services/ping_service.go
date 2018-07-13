@@ -2,7 +2,7 @@ package services
 
 import (
 	"time"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/response"
 )
 
 type PingService struct {}
@@ -15,7 +15,7 @@ func (ps *PingService) Start(nodeAddress string, knownNodes *map[string]bool) {
 			case <-ticker.C:
 				for addr := range *knownNodes {
 					if addr != nodeAddress {
-						utils.SendPing(nodeAddress, addr, knownNodes)
+						response.SendPing(nodeAddress, addr, knownNodes)
 					}
 				}
 			}

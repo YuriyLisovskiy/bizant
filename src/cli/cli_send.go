@@ -5,6 +5,7 @@ import (
 	"errors"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/response"
 	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
 	"encoding/json"
 )
@@ -17,7 +18,7 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error 
 		return errors.New("ERROR: Recipient address is not valid")
 	}
 	bc := blockchain.NewBlockChain(nodeID)
-	utxoSet := blockchain.UTXOSet{bc}
+	utxoSet := blockchain.UTXOSet{BlockChain: bc}
 	wallets, err := w.NewWallets(nodeID)
 	if err != nil {
 		return err
@@ -40,8 +41,8 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error 
 	fmt.Println(string(data))
 
 	for nodeAddr := range net.KnownNodes {
-		if nodeAddr != from {
-			net.SendTx(nodeAddr, tx)
+		if nodeAddr != net.SelfNodeAddress {
+			response.SendTx(net.SelfNodeAddress, nodeAddr, tx, &net.KnownNodes)
 		}
 	}
 	bc.CloseDB(true)

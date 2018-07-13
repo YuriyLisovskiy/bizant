@@ -1,4 +1,4 @@
-package utils
+package request
 
 type Addr struct {
 	AddrList []string
@@ -34,4 +34,12 @@ type Version struct {
 	Version    int
 	BestHeight int
 	AddrFrom   string
+}
+
+type Ping struct {
+	AddrFrom string
+}
+
+type Pong struct {
+	AddrFrom string
 }

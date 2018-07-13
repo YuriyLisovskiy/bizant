@@ -8,20 +8,22 @@ import (
 	"encoding/hex"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	rpcUtils "github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/response"
+	req "github.com/YuriyLisovskiy/blockchain-go/src/network/request"
+	netUtils "github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
 )
 
 func handleAddr(request []byte) {
 	var buff bytes.Buffer
-	var payload rpcUtils.Addr
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	payload := req.Addr{}
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	for _, newNode := range payload.AddrList {
-		if newNode != selfNodeAddress {
+		if newNode != SelfNodeAddress {
 			KnownNodes[newNode] = true
 		}
 	}
@@ -31,8 +33,8 @@ func handleAddr(request []byte) {
 func handleBlock(request []byte, bc blockchain.BlockChain) {
 	blockchain.InterruptMining = true
 	var buff bytes.Buffer
-	var payload rpcUtils.Block
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	var payload req.Block
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -45,7 +47,7 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 	utils.PrintLog(fmt.Sprintf("Added block %x\n", block.Hash))
 	if len(blocksInTransit) > 0 {
 		blockHash := blocksInTransit[0]
-		sendGetData(payload.AddrFrom, "block", blockHash)
+		response.SendGetData(SelfNodeAddress, payload.AddrFrom, "block", blockHash, &KnownNodes)
 		blocksInTransit = blocksInTransit[1:]
 	} else {
 		UTXOSet := blockchain.UTXOSet{BlockChain: bc}
@@ -56,8 +58,8 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 
 func handleInv(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload rpcUtils.Inv
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	var payload req.Inv
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -67,8 +69,8 @@ func handleInv(request []byte, bc blockchain.BlockChain) {
 	if payload.Type == "block" {
 		blocksInTransit = payload.Items
 		blockHash := payload.Items[0]
-		sendGetData(payload.AddrFrom, "block", blockHash)
-		newInTransit := [][]byte{}
+		response.SendGetData(SelfNodeAddress, payload.AddrFrom, "block", blockHash, &KnownNodes)
+		var newInTransit [][]byte
 		for _, b := range blocksInTransit {
 			if bytes.Compare(b, blockHash) != 0 {
 				newInTransit = append(newInTransit, b)
@@ -80,28 +82,28 @@ func handleInv(request []byte, bc blockchain.BlockChain) {
 		txID := payload.Items[0]
 
 		if memPool[hex.EncodeToString(txID)].ID == nil {
-			sendGetData(payload.AddrFrom, "tx", txID)
+			response.SendGetData(SelfNodeAddress, payload.AddrFrom, "tx", txID, &KnownNodes)
 		}
 	}
 }
 
 func handleGetBlocks(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload rpcUtils.Getblocks
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	var payload req.Getblocks
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	blocks := bc.GetBlockHashes()
-	rpcUtils.SendInv(selfNodeAddress, payload.AddrFrom, "block", blocks, &KnownNodes)
+	response.SendInv(SelfNodeAddress, payload.AddrFrom, "block", blocks, &KnownNodes)
 }
 
 func handleGetData(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload rpcUtils.Getdata
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	var payload req.Getdata
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -112,20 +114,20 @@ func handleGetData(request []byte, bc blockchain.BlockChain) {
 		if err != nil {
 			return
 		}
-		rpcUtils.SendBlock(selfNodeAddress, payload.AddrFrom, block, &KnownNodes)
+		response.SendBlock(SelfNodeAddress, payload.AddrFrom, block, &KnownNodes)
 	}
 	if payload.Type == "tx" {
 		txID := hex.EncodeToString(payload.ID)
 		tx := memPool[txID]
-		SendTx(payload.AddrFrom, tx)
+		response.SendTx(SelfNodeAddress, payload.AddrFrom, tx, &KnownNodes)
 		// delete(mempool, txID)
 	}
 }
 
 func handleTx(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload rpcUtils.Tx
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	var payload req.Tx
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -178,8 +180,8 @@ func handleTx(request []byte, bc blockchain.BlockChain) {
 
 func handleVersion(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
-	var payload rpcUtils.Version
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	var payload req.Version
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -188,46 +190,50 @@ func handleVersion(request []byte, bc blockchain.BlockChain) {
 	myBestHeight := bc.GetBestHeight()
 	foreignerBestHeight := payload.BestHeight
 	if myBestHeight < foreignerBestHeight {
-		sendGetBlocks(payload.AddrFrom)
+		response.SendGetBlocks(SelfNodeAddress, payload.AddrFrom, &KnownNodes)
 	} else if myBestHeight > foreignerBestHeight {
-		sendVersion(payload.AddrFrom, bc)
+		response.SendVersion(SelfNodeAddress, payload.AddrFrom, bc, &KnownNodes)
 	}
 	KnownNodes[payload.AddrFrom] = true
 //	if !utils.NodeIsKnown(payload.AddrFrom, KnownNodes) {
 //		KnownNodes = append([]string{payload.AddrFrom}, KnownNodes...)
 //	}
 	for address := range KnownNodes {
-		if address != selfNodeAddress {
-			sendAddr(address)
+		if address != SelfNodeAddress {
+			response.SendAddr(address, &KnownNodes)
 		}
 	}
 }
 
 func handlePing(request []byte) bool {
 	var buff bytes.Buffer
-	var data rpcUtils.Ping
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	var data req.Ping
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&data)
 	if err != nil {
 		log.Panic(err)
 	}
-	payload := rpcUtils.GobEncode(rpcUtils.Pong{AddrFrom: selfNodeAddress})
-	pongRequest := append(rpcUtils.CommandToBytes("pong"), payload...)
-	return rpcUtils.SendData(data.AddrFrom, pongRequest, &KnownNodes)
+	return response.SendPong(SelfNodeAddress, data.AddrFrom, &KnownNodes)
 }
 
 func handlePong(request []byte) {
 	var buff bytes.Buffer
-	var data rpcUtils.Pong
-	buff.Write(request[rpcUtils.COMMAND_LENGTH:])
+	var data req.Pong
+	buff.Write(request[netUtils.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&data)
 	if err != nil {
 		log.Panic(err)
 	}
-	if data.AddrFrom != selfNodeAddress {
+	if data.AddrFrom != SelfNodeAddress {
 		KnownNodes[data.AddrFrom] = true
 	}
 	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
+}
+
+func handleError(request []byte) {
+
+	// TODO: implement protocol error handling
+
 }

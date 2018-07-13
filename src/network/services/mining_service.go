@@ -1,12 +1,12 @@
 package services
 
 import (
+	"fmt"
 	"encoding/hex"
+	"encoding/json"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
-	netUtils "github.com/YuriyLisovskiy/blockchain-go/src/network/utils"
-	"fmt"
-	"encoding/json"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/response"
 )
 
 type MiningService struct {
@@ -40,7 +40,7 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 				go func() {
 					for nodeAddr := range *knownNodes {
 						if nodeAddr != ms.MinerAddress {
-							netUtils.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
+							response.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
 						}
 					}
 				}()
