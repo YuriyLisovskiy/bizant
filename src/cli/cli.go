@@ -33,13 +33,11 @@ func (cli *CLI) validateArgs() {
 
 func (cli *CLI) Run() {
 	cli.validateArgs()
-
 	nodeID := os.Getenv("NODE_ID")
 	if nodeID == "" {
 		fmt.Printf("NODE_ID env. var is not set!")
 		os.Exit(1)
 	}
-
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
 	createBlockChainAddress := createBlockChainCmd.String("address", "", "The address to send genesis block reward to")
 	sendFrom := sendCmd.String("from", "", "Source wallet address")
@@ -47,9 +45,8 @@ func (cli *CLI) Run() {
 	sendAmount := sendCmd.Float64("amount", 0, "Amount to send")
 	sendFee := sendCmd.Float64("fee", blockchain.MIN_FEE_PER_BYTE, "Mine immediately on the same node")
 	startNodeMiner := startNodeCmd.String("mine", "", "Enable mining mode")
-
 	switch os.Args[1] {
-	case "getbalance":
+	case "balance":
 		checkError(getBalanceCmd.Parse(os.Args[2:]))
 	case "createblockchain":
 		checkError(createBlockChainCmd.Parse(os.Args[2:]))

@@ -7,7 +7,7 @@ package cli
 import (
 	"fmt"
 	"errors"
-	"github.com/YuriyLisovskiy/blockchain-go/src/rpc"
+	"github.com/YuriyLisovskiy/blockchain-go/src/net"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 )
 
@@ -20,6 +20,6 @@ func (cli *CLI) startNode(nodeID string, minerAddress string) error {
 			return errors.New(fmt.Sprintf("wrong miner address %s", minerAddress))
 		}
 	}
-	rpc.StartRPCServer(nodeID, minerAddress)
+	net.StartServer(nodeID, minerAddress)
 	return nil
 }

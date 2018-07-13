@@ -11,7 +11,7 @@ import (
 
 func (cli *CLI) reindexUTXO(nodeID string) {
 	bc := blockchain.NewBlockChain(nodeID)
-	UTXOSet := blockchain.UTXOSet{bc}
+	UTXOSet := blockchain.UTXOSet{BlockChain: bc}
 	UTXOSet.Reindex()
 	count := UTXOSet.CountTransactions()
 	fmt.Printf("Done! There are %d transactions in the UTXO set.\n", count)

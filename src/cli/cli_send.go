@@ -7,7 +7,7 @@ package cli
 import (
 	"fmt"
 	"errors"
-	"github.com/YuriyLisovskiy/blockchain-go/src/rpc"
+	"github.com/YuriyLisovskiy/blockchain-go/src/net"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
 	"encoding/json"
@@ -43,9 +43,9 @@ func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error 
 	}
 	fmt.Println(string(data))
 
-	for nodeAddr := range rpc.KnownNodes {
-		if nodeAddr != rpc.SelfNodeAddress {
-			rpc.SendTx(rpc.SelfNodeAddress, nodeAddr, tx, &rpc.KnownNodes)
+	for nodeAddr := range net.KnownNodes {
+		if nodeAddr != net.SelfNodeAddress {
+			net.SendTx(net.SelfNodeAddress, nodeAddr, tx, &net.KnownNodes)
 		}
 	}
 	bc.CloseDB(true)

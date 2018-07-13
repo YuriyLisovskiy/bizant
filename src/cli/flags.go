@@ -7,7 +7,7 @@ package cli
 import "flag"
 
 var (
-	getBalanceCmd       = flag.NewFlagSet("getbalance", flag.ExitOnError)
+	getBalanceCmd       = flag.NewFlagSet("balance", flag.ExitOnError)
 	createBlockChainCmd = flag.NewFlagSet("createblockchain", flag.ExitOnError)
 	createWalletCmd     = flag.NewFlagSet("createwallet", flag.ExitOnError)
 	listAddressesCmd    = flag.NewFlagSet("listaddresses", flag.ExitOnError)

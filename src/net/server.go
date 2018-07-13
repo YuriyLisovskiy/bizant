@@ -2,7 +2,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package rpc
+package net
 
 import (
 	"fmt"
@@ -47,7 +47,7 @@ func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
 	conn.Close()
 }
 
-func StartRPCServer(nodeID, minerAddress string) {
+func StartServer(nodeID, minerAddress string) {
 	SelfNodeAddress = fmt.Sprintf("localhost:%s", nodeID)
 	if _, ok := KnownNodes[SelfNodeAddress]; ok {
 		delete(KnownNodes, SelfNodeAddress)
