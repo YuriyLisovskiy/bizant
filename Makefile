@@ -7,9 +7,9 @@ ARCH64_arm64 = arm64
 
 FLAGS = main.go
 
-all: clean test linux windows darwin freebsd
+all: test build
 
-build: clean linux windows darwin freebsd
+build: linux windows darwin freebsd
 
 linux: linux-386 linux-arm linux-amd64 linux-arm64
 
@@ -20,7 +20,7 @@ windows: windows-386 windows-amd64
 freebsd: freebsd-386 freebsd-arm freebsd-amd64
 
 
-linux-386:
+linux-386: clean
 	GOOS=linux GOARCH=${ARCH32_386} go build -o bin/linux/${ARCH32_386}/${BINARY} ${FLAGS}
 
 linux-arm:
@@ -63,7 +63,7 @@ test:
 clean:
 	-rm -rf bin/
 
-refresh:
+renewchain:
 	make build
 	cp Genesis.db BlockChain_3000.db
 	cp Genesis.db BlockChain_3001.db
