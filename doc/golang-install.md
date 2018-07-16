@@ -27,7 +27,7 @@ For example, if you installed Go to your home directory you should add commands 
 $ export GOROOT=$HOME/go1.X
 $ export PATH=$PATH:$GOROOT/bin
 ```
-Note: GOROOT must be set only when installing to a custom location.
+Note: `GOROOT` must be set only when installing to a custom location.
 
 ### Mac OS X package installer
 
