@@ -9,17 +9,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
+	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 )
 
 type MiningService struct {
 	MinerAddress string
 }
 
-func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]bool, memPool *map[string]blockchain.Transaction) {
+func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]bool, memPool *map[string]primitives.Transaction) {
 	go func() {
 		for {
-			var txs []blockchain.Transaction
+			var txs []primitives.Transaction
 			for _, tx := range *memPool {
 				if bc.VerifyTransaction(tx) {
 

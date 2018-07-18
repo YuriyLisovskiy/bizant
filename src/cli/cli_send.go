@@ -9,7 +9,7 @@ import (
 	"errors"
 	"github.com/YuriyLisovskiy/blockchain-go/src/net"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
 	"encoding/json"
 )
 

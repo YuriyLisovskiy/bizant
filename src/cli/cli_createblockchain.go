@@ -8,15 +8,15 @@ import (
 	"fmt"
 	"errors"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	"github.com/YuriyLisovskiy/blockchain-go/src"
 )
 
 func (cli *CLI) createBlockChain(address, nodeId string) error {
 	if !wallet.ValidateAddress(address) {
 		return errors.New(fmt.Sprintf("ERROR: Address '%s' is not valid", address))
 	}
-	bc := blockchain.CreateBlockChain(address, nodeId)
-	UTXOSet := blockchain.UTXOSet{BlockChain: bc}
+	bc := src.CreateBlockChain(address, nodeId)
+	UTXOSet := src.UTXOSet{BlockChain: bc}
 	UTXOSet.Reindex()
 	bc.CloseDB(true)
 	fmt.Println("Done!")

@@ -7,11 +7,11 @@ package cli
 import (
 	"fmt"
 	"encoding/json"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	bc "github.com/YuriyLisovskiy/blockchain-go/src"
 )
 
 func (cli *CLI) printChain(nodeID string) error {
-	bc := blockchain.NewBlockChain(nodeID)
+	bc := bc.NewBlockChain(nodeID)
 	bci := bc.Iterator()
 	for !bci.End() {
 		block := bci.Next()

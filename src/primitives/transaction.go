@@ -2,7 +2,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package blockchain
+package primitives
 
 import (
 	"fmt"
@@ -16,14 +16,13 @@ import (
 	"encoding/hex"
 	"crypto/sha256"
 	"crypto/elliptic"
-	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
-	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
+	"github.com/YuriyLisovskiy/blockchain-go/src/primitives/tx_io"
 )
 
 type Transaction struct {
 	ID        []byte
-	VIn       []primitives.TXInput
-	VOut      []primitives.TXOutput
+	VIn       []tx_io.TXInput
+	VOut      []tx_io.TXOutput
 	Timestamp int64
 	Fee       float64
 }
@@ -77,13 +76,13 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 }
 
 func (tx *Transaction) TrimmedCopy() Transaction {
-	var inputs []primitives.TXInput
-	var outputs []primitives.TXOutput
+	var inputs []tx_io.TXInput
+	var outputs []tx_io.TXOutput
 	for _, vin := range tx.VIn {
-		inputs = append(inputs, primitives.TXInput{TxId: vin.TxId, VOut: vin.VOut, PubKey: nil, Signature: nil})
+		inputs = append(inputs, tx_io.TXInput{TxId: vin.TxId, VOut: vin.VOut, PubKey: nil, Signature: nil})
 	}
 	for _, vOut := range tx.VOut {
-		outputs = append(outputs, primitives.TXOutput{Value: vOut.Value, PubKeyHash: vOut.PubKeyHash})
+		outputs = append(outputs, tx_io.TXOutput{Value: vOut.Value, PubKeyHash: vOut.PubKeyHash})
 	}
 	txCopy := Transaction{ID: tx.ID, VIn: inputs, VOut: outputs, Timestamp: tx.Timestamp, Fee: tx.Fee}
 	return txCopy
@@ -145,39 +144,11 @@ func NewCoinBaseTX(to string, fees float64, data string) Transaction {
 		}
 		data = fmt.Sprintf("%x", randData)
 	}
-	txIn := primitives.TXInput{TxId: []byte{}, VOut: -1, Signature: nil, PubKey: []byte(data)}
-	txOut := primitives.NewTXOutput(MINING_REWARD+fees, to)
-	tx := Transaction{nil, []primitives.TXInput{txIn}, []primitives.TXOutput{*txOut}, time.Now().Unix(), 0}
+	txIn := tx_io.TXInput{TxId: []byte{}, VOut: -1, Signature: nil, PubKey: []byte(data)}
+	txOut := tx_io.NewTXOutput(MINING_REWARD+fees, to)
+	tx := Transaction{nil, []tx_io.TXInput{txIn}, []tx_io.TXOutput{*txOut}, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
 	return tx
-}
-
-func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, utxoSet *UTXOSet) Transaction {
-	var inputs []primitives.TXInput
-	var outputs []primitives.TXOutput
-	pubKeyHash := w.HashPubKey(wallet.PublicKey)
-	acc, validOutputs := utxoSet.FindSpendableOutputs(pubKeyHash, amount,)
-	if acc < amount {
-		log.Panic("ERROR: Not enough funds")
-	}
-	for txId, outs := range validOutputs {
-		txID, err := hex.DecodeString(txId)
-		if err != nil {
-			log.Panic(err)
-		}
-		for _, out := range outs {
-			inputs = append(inputs, primitives.TXInput{TxId: txID, VOut: out, Signature: nil, PubKey: wallet.PublicKey})
-		}
-	}
-	from := fmt.Sprintf("%x", wallet.GetAddress())
-	outputs = append(outputs, *primitives.NewTXOutput(amount, to))
-	if acc > amount {
-		outputs = append(outputs, *primitives.NewTXOutput(acc-amount, from)) // a change
-	}
-	tx := Transaction{nil, inputs, outputs, time.Now().Unix(), 0}
-	tx.ID = tx.Hash()
-	tx.Fee = tx.CalculateFee(fee)
-	return utxoSet.BlockChain.SignTransaction(tx, wallet.PrivateKey)
 }
 
 func (tx *Transaction) CalculateFee(feePerByte float64) float64 {

@@ -6,12 +6,12 @@ package cli
 
 import (
 	"fmt"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	bc "github.com/YuriyLisovskiy/blockchain-go/src"
 )
 
 func (cli *CLI) reindexUTXO(nodeID string) {
-	bc := blockchain.NewBlockChain(nodeID)
-	UTXOSet := blockchain.UTXOSet{BlockChain: bc}
+	chain := bc.NewBlockChain(nodeID)
+	UTXOSet := bc.UTXOSet{BlockChain: chain}
 	UTXOSet.Reindex()
 	count := UTXOSet.CountTransactions()
 	fmt.Printf("Done! There are %d transactions in the UTXO set.\n", count)

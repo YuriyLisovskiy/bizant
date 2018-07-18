@@ -2,7 +2,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package src
+package primitives
 
 import (
 	"fmt"
@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"crypto/sha256"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 )
 
 type ProofOfWork struct {

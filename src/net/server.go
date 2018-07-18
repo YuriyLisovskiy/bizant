@@ -10,7 +10,7 @@ import (
 	"net"
 	"io/ioutil"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
 )
 
 func handleConnection(conn net.Conn, bc blockchain.BlockChain) {

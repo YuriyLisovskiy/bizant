@@ -11,7 +11,8 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
+	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 )
 
 func handleAddr(request []byte) {
@@ -32,7 +33,7 @@ func handleAddr(request []byte) {
 }
 
 func handleBlock(request []byte, bc blockchain.BlockChain) {
-	blockchain.InterruptMining = true
+	primitives.InterruptMining = true
 	var buff bytes.Buffer
 	payload := block{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -42,7 +43,7 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 		log.Panic(err)
 	}
 	blockData := payload.Block
-	block := blockchain.DeserializeBlock(blockData)
+	block := primitives.DeserializeBlock(blockData)
 	utils.PrintLog("Recevied a new block!\n")
 	bc.AddBlock(block)
 	utils.PrintLog(fmt.Sprintf("Added block %x\n", block.Hash))
@@ -54,7 +55,7 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 		UTXOSet := blockchain.UTXOSet{BlockChain: bc}
 		UTXOSet.Reindex()
 	}
-	blockchain.InterruptMining = false
+	primitives.InterruptMining = false
 }
 
 func handleInv(request []byte, bc blockchain.BlockChain) {
@@ -136,7 +137,7 @@ func handleTx(request []byte, bc blockchain.BlockChain) {
 		log.Panic(err)
 	}
 	txData := payload.Transaction
-	tx := blockchain.DeserializeTransaction(txData)
+	tx := primitives.DeserializeTransaction(txData)
 	memPool[hex.EncodeToString(tx.ID)] = tx
 	/*
 		if selfNodeAddress == KnownNodes[0] {
@@ -209,27 +210,27 @@ func handleVersion(request []byte, bc blockchain.BlockChain) {
 
 func handlePing(request []byte) bool {
 	var buff bytes.Buffer
-	data := ping{}
+	payload := ping{}
 	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
-	err := dec.Decode(&data)
+	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	return SendPong(SelfNodeAddress, data.AddrFrom, &KnownNodes)
+	return SendPong(SelfNodeAddress, payload.AddrFrom, &KnownNodes)
 }
 
 func handlePong(request []byte) {
 	var buff bytes.Buffer
-	data := pong{}
+	payload := pong{}
 	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
-	err := dec.Decode(&data)
+	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	if data.AddrFrom != SelfNodeAddress {
-		KnownNodes[data.AddrFrom] = true
+	if payload.AddrFrom != SelfNodeAddress {
+		KnownNodes[payload.AddrFrom] = true
 	}
 	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
 }

@@ -9,7 +9,7 @@ import (
 	"errors"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
-	"github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
 )
 
 func (cli *CLI) getBalance(address, nodeID string) error {

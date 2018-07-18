@@ -4,7 +4,7 @@
 
 package net
 
-import "github.com/YuriyLisovskiy/blockchain-go/src/blockchain"
+import "github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 
 var (
 	SelfNodeAddress string
@@ -15,5 +15,5 @@ var (
 	}
 
 	blocksInTransit [][]byte
-	memPool         = make(map[string]blockchain.Transaction)
+	memPool         = make(map[string]primitives.Transaction)
 )

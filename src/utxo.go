@@ -2,13 +2,14 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package blockchain
+package src
 
 import (
 	"log"
 	"encoding/hex"
 	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
+	"github.com/YuriyLisovskiy/blockchain-go/src/primitives/tx_io"
 )
 
 type UTXOSet struct {
@@ -24,7 +25,7 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount float64) (float6
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			txID := hex.EncodeToString(k)
-			outs := primitives.DeserializeOutputs(v)
+			outs := tx_io.DeserializeOutputs(v)
 			for outIdx, out := range outs.Outputs {
 				if out.IsLockedWithKey(pubkeyHash) && accumulated < amount {
 					accumulated += out.Value
@@ -40,13 +41,14 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount float64) (float6
 	return accumulated, unspentOutputs
 }
 
-func (u UTXOSet) FindUTXO(pubKeyHash []byte, db *bolt.DB) []primitives.TXOutput {
-	var UTXOs []primitives.TXOutput
+func (u UTXOSet) FindUTXO(pubKeyHash []byte) []tx_io.TXOutput {
+	db := u.BlockChain.db
+	var UTXOs []tx_io.TXOutput
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(UTXO_BUCKET))
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			outs := primitives.DeserializeOutputs(v)
+			outs := tx_io.DeserializeOutputs(v)
 			for _, out := range outs.Outputs {
 				if out.IsLockedWithKey(pubKeyHash) {
 					UTXOs = append(UTXOs, out)
@@ -61,7 +63,8 @@ func (u UTXOSet) FindUTXO(pubKeyHash []byte, db *bolt.DB) []primitives.TXOutput 
 	return UTXOs
 }
 
-func (u UTXOSet) CountTransactions(db *bolt.DB) int {
+func (u UTXOSet) CountTransactions() int {
+	db := u.BlockChain.db
 	counter := 0
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(UTXO_BUCKET))
@@ -77,7 +80,8 @@ func (u UTXOSet) CountTransactions(db *bolt.DB) int {
 	return counter
 }
 
-func (u UTXOSet) Reindex(db *bolt.DB) {
+func (u UTXOSet) Reindex() {
+	db := u.BlockChain.db
 	bucketName := []byte(UTXO_BUCKET)
 	err := db.Batch(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket(bucketName)
@@ -110,7 +114,7 @@ func (u UTXOSet) Reindex(db *bolt.DB) {
 	})
 }
 
-func (u UTXOSet) Update(block Block) {
+func (u UTXOSet) Update(block primitives.Block) {
 	db := u.BlockChain.db
 	DBMutex.Lock()
 	err := db.Batch(func(tx *bolt.Tx) error {
@@ -118,9 +122,9 @@ func (u UTXOSet) Update(block Block) {
 		for _, tx := range block.Transactions {
 			if tx.IsCoinBase() == false {
 				for _, vin := range tx.VIn {
-					updatedOuts := primitives.TXOutputs{}
+					updatedOuts := tx_io.TXOutputs{}
 					outsBytes := b.Get(vin.TxId)
-					outs := primitives.DeserializeOutputs(outsBytes)
+					outs := tx_io.DeserializeOutputs(outsBytes)
 					for outIdx, out := range outs.Outputs {
 						if outIdx != vin.VOut {
 							updatedOuts.Outputs = append(updatedOuts.Outputs, out)
@@ -139,7 +143,7 @@ func (u UTXOSet) Update(block Block) {
 					}
 				}
 			}
-			newOutputs := primitives.TXOutputs{}
+			newOutputs := tx_io.TXOutputs{}
 			for _, out := range tx.VOut {
 				newOutputs.Outputs = append(newOutputs.Outputs, out)
 			}
