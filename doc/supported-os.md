@@ -1,20 +1,20 @@
 ### Supported Operating Systems and Architectures
 
 #### Linux:
-* 386
 * arm
+* i386
 * amd64
 * arm64
 
 #### Windows:
-* 386
+* i386
 * amd64
 
 #### Darwin:
-* 386
+* i386
 * amd64
 
 #### FreeBSD:
-* 386
-* amd64
 * arm
+* i386
+* amd64

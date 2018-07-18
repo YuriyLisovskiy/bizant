@@ -3,5 +3,4 @@ The following are developer notes on how to build Block Chain Go on your native 
 
 * [Build](build.md)
 * [Dependencies](dependencies.md)
-* [Golang installation](golang-install.md)
 * [Supported Operating Systems and Architectures](supported-os.md)

@@ -38,4 +38,4 @@ $ go get github.com/boltdb/bolt/...
 
 Minimum version of Go language required: `go1.10`.
 
-The installation of Go programming language was took from https://golang.org/doc/install. See [`golang-install.md`](golang-install.md) or https://golang.org/doc/install for installation info.
+See [golang installation](https://golang.org/doc/install) for more info.
