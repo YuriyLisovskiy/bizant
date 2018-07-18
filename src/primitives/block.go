@@ -2,14 +2,14 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package blockchain
+package src
 
 import (
 	"log"
 	"time"
 	"bytes"
 	"encoding/gob"
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/consensus"
 )
 
 type Block struct {
@@ -40,8 +40,7 @@ func (b Block) HashTransactions() []byte {
 	for _, tx := range b.Transactions {
 		transactions = append(transactions, tx.Serialize())
 	}
-	merkleTree := utils.NewMerkleTree(transactions)
-	return merkleTree.RootNode.Data
+	return consensus.ComputeMerkleRoot(transactions)
 }
 
 func (b Block) Serialize() []byte {

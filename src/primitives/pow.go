@@ -2,7 +2,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package blockchain
+package src
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"crypto/sha256"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 )
 
 type ProofOfWork struct {
@@ -18,10 +19,10 @@ type ProofOfWork struct {
 	target *big.Int
 }
 
-func NewProofOfWork(b Block) ProofOfWork {
+func NewProofOfWork(block Block) ProofOfWork {
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-TARGET_BITS))
-	pow := ProofOfWork{b, target}
+	pow := ProofOfWork{block, target}
 	return pow
 }
 

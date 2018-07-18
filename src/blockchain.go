@@ -14,9 +14,9 @@ import (
 	"crypto/ecdsa"
 	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	txPkg "github.com/YuriyLisovskiy/blockchain-go/src/tx"
-
 	"encoding/json"
+	"github.com/YuriyLisovskiy/blockchain-go/src/consensus"
+	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 )
 
 type BlockChain struct {
@@ -167,8 +167,8 @@ func (bc *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
 	return Transaction{}, errors.New("transaction is not found")
 }
 
-func (bc *BlockChain) FindUTXO() map[string]txPkg.TXOutputs {
-	UTXO := make(map[string]txPkg.TXOutputs)
+func (bc *BlockChain) FindUTXO() map[string]primitives.TXOutputs {
+	UTXO := make(map[string]primitives.TXOutputs)
 	spentTXOs := make(map[string][]int)
 	bci := bc.Iterator()
 	for !bci.End() {
@@ -219,7 +219,7 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []Transaction)
 	var lastHeight int
 	fees := 0.0
 	for _, tx := range transactions {
-		if !bc.VerifyTransaction(tx) {
+		if !consensus.VerifyTransaction(tx, *bc) {
 
 			// TODO: send an error to transaction's author
 
@@ -281,21 +281,6 @@ func (bc *BlockChain) SignTransaction(tx Transaction, privKey ecdsa.PrivateKey) 
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
 	return tx.Sign(privKey, prevTXs)
-}
-
-func (bc *BlockChain) VerifyTransaction(tx Transaction) bool {
-	if tx.IsCoinBase() {
-		return true
-	}
-	prevTXs := make(map[string]Transaction)
-	for _, vin := range tx.VIn {
-		prevTX, err := bc.FindTransaction(vin.TxId)
-		if err != nil {
-			log.Panic(err)
-		}
-		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
-	}
-	return tx.Verify(prevTXs)
 }
 
 func (bc *BlockChain) CloseDB(Defer bool) {

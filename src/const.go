@@ -6,8 +6,8 @@ package blockchain
 
 const (
 	MINING_REWARD     = 50.0
-	TARGET_BITS       = 16
 	UTXO_BUCKET       = "chainstate"
+	TARGET_BITS       = 16
 	MIN_CURRENCY_UNIT = 0.000001
 	MIN_FEE_PER_BYTE  = 20 * MIN_CURRENCY_UNIT
 )

@@ -17,13 +17,13 @@ import (
 	"crypto/sha256"
 	"crypto/elliptic"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
-	txPkg "github.com/YuriyLisovskiy/blockchain-go/src/tx"
+	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 )
 
 type Transaction struct {
 	ID        []byte
-	VIn       []txPkg.TXInput
-	VOut      []txPkg.TXOutput
+	VIn       []primitives.TXInput
+	VOut      []primitives.TXOutput
 	Timestamp int64
 	Fee       float64
 }
@@ -77,13 +77,13 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 }
 
 func (tx *Transaction) TrimmedCopy() Transaction {
-	var inputs []txPkg.TXInput
-	var outputs []txPkg.TXOutput
+	var inputs []primitives.TXInput
+	var outputs []primitives.TXOutput
 	for _, vin := range tx.VIn {
-		inputs = append(inputs, txPkg.TXInput{TxId: vin.TxId, VOut: vin.VOut, PubKey: nil, Signature: nil})
+		inputs = append(inputs, primitives.TXInput{TxId: vin.TxId, VOut: vin.VOut, PubKey: nil, Signature: nil})
 	}
 	for _, vOut := range tx.VOut {
-		outputs = append(outputs, txPkg.TXOutput{Value: vOut.Value, PubKeyHash: vOut.PubKeyHash})
+		outputs = append(outputs, primitives.TXOutput{Value: vOut.Value, PubKeyHash: vOut.PubKeyHash})
 	}
 	txCopy := Transaction{ID: tx.ID, VIn: inputs, VOut: outputs, Timestamp: tx.Timestamp, Fee: tx.Fee}
 	return txCopy
@@ -93,12 +93,24 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 	if tx.IsCoinBase() {
 		return true
 	}
+	if len(tx.VIn) == 0 {
+		log.Panic("ERROR: bad-txns-vin-empty")
+	}
+	if len(tx.VOut) == 0 {
+		log.Panic("ERROR: bad-txns-vout-empty")
+	}
 	for _, vin := range tx.VIn {
 		if prevTXs[hex.EncodeToString(vin.TxId)].ID == nil {
 			log.Panic("ERROR: Previous transaction is not correct")
 		}
 	}
 	txCopy := tx.TrimmedCopy()
+
+	fmt.Printf("LOG: tx hash: %x == tx copy hash: %x ? %t",
+		tx.Hash(), txCopy.Hash(),
+		fmt.Sprintf("%x", tx.Hash()) == fmt.Sprintf("%x", txCopy.Hash()),
+	)
+
 	curve := elliptic.P256()
 	for inID, vin := range tx.VIn {
 		prevTx := prevTXs[hex.EncodeToString(vin.TxId)]
@@ -133,18 +145,18 @@ func NewCoinBaseTX(to string, fees float64, data string) Transaction {
 		}
 		data = fmt.Sprintf("%x", randData)
 	}
-	txIn := txPkg.TXInput{TxId: []byte{}, VOut: -1, Signature: nil, PubKey: []byte(data)}
-	txOut := txPkg.NewTXOutput(MINING_REWARD+fees, to)
-	tx := Transaction{nil, []txPkg.TXInput{txIn}, []txPkg.TXOutput{*txOut}, time.Now().Unix(), 0}
+	txIn := primitives.TXInput{TxId: []byte{}, VOut: -1, Signature: nil, PubKey: []byte(data)}
+	txOut := primitives.NewTXOutput(MINING_REWARD+fees, to)
+	tx := Transaction{nil, []primitives.TXInput{txIn}, []primitives.TXOutput{*txOut}, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()
 	return tx
 }
 
 func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, utxoSet *UTXOSet) Transaction {
-	var inputs []txPkg.TXInput
-	var outputs []txPkg.TXOutput
+	var inputs []primitives.TXInput
+	var outputs []primitives.TXOutput
 	pubKeyHash := w.HashPubKey(wallet.PublicKey)
-	acc, validOutputs := utxoSet.FindSpendableOutputs(pubKeyHash, amount)
+	acc, validOutputs := utxoSet.FindSpendableOutputs(pubKeyHash, amount,)
 	if acc < amount {
 		log.Panic("ERROR: Not enough funds")
 	}
@@ -154,13 +166,13 @@ func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, utxoSe
 			log.Panic(err)
 		}
 		for _, out := range outs {
-			inputs = append(inputs, txPkg.TXInput{TxId: txID, VOut: out, Signature: nil, PubKey: wallet.PublicKey})
+			inputs = append(inputs, primitives.TXInput{TxId: txID, VOut: out, Signature: nil, PubKey: wallet.PublicKey})
 		}
 	}
 	from := fmt.Sprintf("%x", wallet.GetAddress())
-	outputs = append(outputs, *txPkg.NewTXOutput(amount, to))
+	outputs = append(outputs, *primitives.NewTXOutput(amount, to))
 	if acc > amount {
-		outputs = append(outputs, *txPkg.NewTXOutput(acc-amount, from)) // a change
+		outputs = append(outputs, *primitives.NewTXOutput(acc-amount, from)) // a change
 	}
 	tx := Transaction{nil, inputs, outputs, time.Now().Unix(), 0}
 	tx.ID = tx.Hash()

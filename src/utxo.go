@@ -8,7 +8,7 @@ import (
 	"log"
 	"encoding/hex"
 	"github.com/boltdb/bolt"
-	txPkg "github.com/YuriyLisovskiy/blockchain-go/src/tx"
+	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 )
 
 type UTXOSet struct {
@@ -24,7 +24,7 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount float64) (float6
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			txID := hex.EncodeToString(k)
-			outs := txPkg.DeserializeOutputs(v)
+			outs := primitives.DeserializeOutputs(v)
 			for outIdx, out := range outs.Outputs {
 				if out.IsLockedWithKey(pubkeyHash) && accumulated < amount {
 					accumulated += out.Value
@@ -40,14 +40,13 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount float64) (float6
 	return accumulated, unspentOutputs
 }
 
-func (u UTXOSet) FindUTXO(pubKeyHash []byte) []txPkg.TXOutput {
-	var UTXOs []txPkg.TXOutput
-	db := u.BlockChain.db
+func (u UTXOSet) FindUTXO(pubKeyHash []byte, db *bolt.DB) []primitives.TXOutput {
+	var UTXOs []primitives.TXOutput
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(UTXO_BUCKET))
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			outs := txPkg.DeserializeOutputs(v)
+			outs := primitives.DeserializeOutputs(v)
 			for _, out := range outs.Outputs {
 				if out.IsLockedWithKey(pubKeyHash) {
 					UTXOs = append(UTXOs, out)
@@ -62,8 +61,7 @@ func (u UTXOSet) FindUTXO(pubKeyHash []byte) []txPkg.TXOutput {
 	return UTXOs
 }
 
-func (u UTXOSet) CountTransactions() int {
-	db := u.BlockChain.db
+func (u UTXOSet) CountTransactions(db *bolt.DB) int {
 	counter := 0
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(UTXO_BUCKET))
@@ -79,8 +77,7 @@ func (u UTXOSet) CountTransactions() int {
 	return counter
 }
 
-func (u UTXOSet) Reindex() {
-	db := u.BlockChain.db
+func (u UTXOSet) Reindex(db *bolt.DB) {
 	bucketName := []byte(UTXO_BUCKET)
 	err := db.Batch(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket(bucketName)
@@ -121,9 +118,9 @@ func (u UTXOSet) Update(block Block) {
 		for _, tx := range block.Transactions {
 			if tx.IsCoinBase() == false {
 				for _, vin := range tx.VIn {
-					updatedOuts := txPkg.TXOutputs{}
+					updatedOuts := primitives.TXOutputs{}
 					outsBytes := b.Get(vin.TxId)
-					outs := txPkg.DeserializeOutputs(outsBytes)
+					outs := primitives.DeserializeOutputs(outsBytes)
 					for outIdx, out := range outs.Outputs {
 						if outIdx != vin.VOut {
 							updatedOuts.Outputs = append(updatedOuts.Outputs, out)
@@ -142,7 +139,7 @@ func (u UTXOSet) Update(block Block) {
 					}
 				}
 			}
-			newOutputs := txPkg.TXOutputs{}
+			newOutputs := primitives.TXOutputs{}
 			for _, out := range tx.VOut {
 				newOutputs.Outputs = append(newOutputs.Outputs, out)
 			}
