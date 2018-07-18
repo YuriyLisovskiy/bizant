@@ -7,8 +7,8 @@ package cli
 import (
 	"fmt"
 	"errors"
-	"github.com/YuriyLisovskiy/blockchain-go/src/net"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
+	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
 )
 
 func (cli *CLI) startNode(nodeID string, minerAddress string) error {

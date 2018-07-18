@@ -7,10 +7,10 @@ package cli
 import (
 	"fmt"
 	"errors"
-	"github.com/YuriyLisovskiy/blockchain-go/src/net"
+	"encoding/json"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
-	"encoding/json"
+	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
 )
 
 func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error {
