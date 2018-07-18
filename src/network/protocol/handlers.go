@@ -2,7 +2,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package network
+package protocol
 
 import (
 	"log"
@@ -13,30 +13,31 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
 	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 )
 
-func handleAddr(request []byte) {
+func HandleAddr(request []byte) {
 	var buff bytes.Buffer
 	payload := addr{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	for _, newNode := range payload.AddrList {
-		if newNode != SelfNodeAddress {
-			KnownNodes[newNode] = true
+		if newNode != static.SelfNodeAddress {
+			static.KnownNodes[newNode] = true
 		}
 	}
-	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
+	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(static.KnownNodes)))
 }
 
-func handleBlock(request []byte, bc blockchain.BlockChain) {
+func HandleBlock(request []byte, bc blockchain.BlockChain) {
 	primitives.InterruptMining = true
 	var buff bytes.Buffer
 	payload := block{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -47,10 +48,10 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 	utils.PrintLog("Recevied a new block!\n")
 	bc.AddBlock(block)
 	utils.PrintLog(fmt.Sprintf("Added block %x\n", block.Hash))
-	if len(blocksInTransit) > 0 {
-		blockHash := blocksInTransit[0]
-		SendGetData(SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash, &KnownNodes)
-		blocksInTransit = blocksInTransit[1:]
+	if len(static.BlocksInTransit) > 0 {
+		blockHash := static.BlocksInTransit[0]
+		SendGetData(static.SelfNodeAddress, payload.AddrFrom, static.C_BLOCK, blockHash, &static.KnownNodes)
+		static.BlocksInTransit = static.BlocksInTransit[1:]
 	} else {
 		UTXOSet := blockchain.UTXOSet{BlockChain: bc}
 		UTXOSet.Reindex()
@@ -58,10 +59,10 @@ func handleBlock(request []byte, bc blockchain.BlockChain) {
 	primitives.InterruptMining = false
 }
 
-func handleInv(request []byte, bc blockchain.BlockChain) {
+func HandleInv(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	payload := inv{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -69,68 +70,68 @@ func handleInv(request []byte, bc blockchain.BlockChain) {
 	}
 	utils.PrintLog(fmt.Sprintf("Recevied inventory with %d %s\n", len(payload.Items), payload.Type))
 	switch payload.Type {
-	case C_BLOCK:
-		blocksInTransit = payload.Items
+	case static.C_BLOCK:
+		static.BlocksInTransit = payload.Items
 		blockHash := payload.Items[0]
-		SendGetData(SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash, &KnownNodes)
+		SendGetData(static.SelfNodeAddress, payload.AddrFrom, static.C_BLOCK, blockHash, &static.KnownNodes)
 		var newInTransit [][]byte
-		for _, b := range blocksInTransit {
+		for _, b := range static.BlocksInTransit {
 			if bytes.Compare(b, blockHash) != 0 {
 				newInTransit = append(newInTransit, b)
 			}
 		}
-		blocksInTransit = newInTransit
-	case C_TX:
+		static.BlocksInTransit = newInTransit
+	case static.C_TX:
 		txID := payload.Items[0]
-		if memPool[hex.EncodeToString(txID)].ID == nil {
-			SendGetData(SelfNodeAddress, payload.AddrFrom, C_TX, txID, &KnownNodes)
+		if static.MemPool[hex.EncodeToString(txID)].ID == nil {
+			SendGetData(static.SelfNodeAddress, payload.AddrFrom, static.C_TX, txID, &static.KnownNodes)
 		}
 	default:
 	}
 }
 
-func handleGetBlocks(request []byte, bc blockchain.BlockChain) {
+func HandleGetBlocks(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	payload := getblocks{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	blocks := bc.GetBlockHashes()
-	SendInv(SelfNodeAddress, payload.AddrFrom, C_BLOCK, blocks, &KnownNodes)
+	SendInv(static.SelfNodeAddress, payload.AddrFrom, static.C_BLOCK, blocks, &static.KnownNodes)
 }
 
-func handleGetData(request []byte, bc blockchain.BlockChain) {
+func HandleGetData(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	payload := getdata{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	switch payload.Type {
-	case C_BLOCK:
+	case static.C_BLOCK:
 		block, err := bc.GetBlock([]byte(payload.ID))
 		if err != nil {
 			return
 		}
-		SendBlock(SelfNodeAddress, payload.AddrFrom, block, &KnownNodes)
-	case C_TX:
+		SendBlock(static.SelfNodeAddress, payload.AddrFrom, block, &static.KnownNodes)
+	case static.C_TX:
 		txID := hex.EncodeToString(payload.ID)
-		tx := memPool[txID]
-		SendTx(SelfNodeAddress, payload.AddrFrom, tx, &KnownNodes)
+		tx := static.MemPool[txID]
+		SendTx(static.SelfNodeAddress, payload.AddrFrom, tx, &static.KnownNodes)
 		// delete(mempool, txID)
 	default:
 	}
 }
 
-func handleTx(request []byte, bc blockchain.BlockChain) {
+func HandleTx(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	payload := tx{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -138,7 +139,7 @@ func handleTx(request []byte, bc blockchain.BlockChain) {
 	}
 	txData := payload.Transaction
 	tx := primitives.DeserializeTransaction(txData)
-	memPool[hex.EncodeToString(tx.ID)] = tx
+	static.MemPool[hex.EncodeToString(tx.ID)] = tx
 	/*
 		if selfNodeAddress == KnownNodes[0] {
 			for _, node := range KnownNodes {
@@ -181,10 +182,10 @@ func handleTx(request []byte, bc blockchain.BlockChain) {
 	*/
 }
 
-func handleVersion(request []byte, bc blockchain.BlockChain) {
+func HandleVersion(request []byte, bc blockchain.BlockChain) {
 	var buff bytes.Buffer
 	payload := version{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -193,49 +194,49 @@ func handleVersion(request []byte, bc blockchain.BlockChain) {
 	myBestHeight := bc.GetBestHeight()
 	foreignerBestHeight := payload.BestHeight
 	if myBestHeight < foreignerBestHeight {
-		SendGetBlocks(SelfNodeAddress, payload.AddrFrom, &KnownNodes)
+		SendGetBlocks(static.SelfNodeAddress, payload.AddrFrom, &static.KnownNodes)
 	} else if myBestHeight > foreignerBestHeight {
-		SendVersion(SelfNodeAddress, payload.AddrFrom, bc, &KnownNodes)
+		SendVersion(static.SelfNodeAddress, payload.AddrFrom, bc, &static.KnownNodes)
 	}
-	KnownNodes[payload.AddrFrom] = true
+	static.KnownNodes[payload.AddrFrom] = true
 	//	if !utils.NodeIsKnown(payload.AddrFrom, KnownNodes) {
 	//		KnownNodes = append([]string{payload.AddrFrom}, KnownNodes...)
 	//	}
-	for address := range KnownNodes {
-		if address != SelfNodeAddress {
-			SendAddr(address, &KnownNodes)
+	for address := range static.KnownNodes {
+		if address != static.SelfNodeAddress {
+			SendAddr(address, &static.KnownNodes)
 		}
 	}
 }
 
-func handlePing(request []byte) bool {
+func HandlePing(request []byte) bool {
 	var buff bytes.Buffer
 	payload := ping{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	return SendPong(SelfNodeAddress, payload.AddrFrom, &KnownNodes)
+	return SendPong(static.SelfNodeAddress, payload.AddrFrom, &static.KnownNodes)
 }
 
-func handlePong(request []byte) {
+func HandlePong(request []byte) {
 	var buff bytes.Buffer
 	payload := pong{}
-	buff.Write(request[COMMAND_LENGTH:])
+	buff.Write(request[static.COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	if payload.AddrFrom != SelfNodeAddress {
-		KnownNodes[payload.AddrFrom] = true
+	if payload.AddrFrom != static.SelfNodeAddress {
+		static.KnownNodes[payload.AddrFrom] = true
 	}
-	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(KnownNodes)))
+	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(static.KnownNodes)))
 }
 
-func handleError(request []byte) {
+func HandleError(request []byte) {
 
 	// TODO: implement protocol error handling
 

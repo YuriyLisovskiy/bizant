@@ -2,7 +2,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package network
+package static
 
 import "github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 
@@ -14,6 +14,6 @@ var (
 		"localhost:3001": true,
 	}
 
-	blocksInTransit [][]byte
-	memPool         = make(map[string]primitives.Transaction)
+	BlocksInTransit [][]byte
+	MemPool         = make(map[string]primitives.Transaction)
 )

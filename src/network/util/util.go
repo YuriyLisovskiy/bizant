@@ -2,21 +2,22 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package network
+package util
 
 import (
 	"fmt"
 	"log"
 	"bytes"
 	"encoding/gob"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 )
 
 func ExtractCommand(request []byte) []byte {
-	return request[:COMMAND_LENGTH]
+	return request[:static.COMMAND_LENGTH]
 }
 
 func CommandToBytes(command string) []byte {
-	var b [COMMAND_LENGTH]byte
+	var b [static.COMMAND_LENGTH]byte
 	for i, c := range command {
 		b[i] = byte(c)
 	}
@@ -43,6 +44,6 @@ func GobEncode(data interface{}) []byte {
 	return buff.Bytes()
 }
 
-func makeRequest(data interface{}, cmd string) []byte {
+func MakeRequest(data interface{}, cmd string) []byte {
 	return append(CommandToBytes(cmd), GobEncode(data)...)
 }

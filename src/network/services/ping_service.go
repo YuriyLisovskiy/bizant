@@ -2,9 +2,12 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package network
+package services
 
-import "time"
+import (
+	"time"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
+)
 
 type PingService struct {}
 
@@ -16,7 +19,7 @@ func (ps *PingService) Start(nodeAddress string, knownNodes *map[string]bool) {
 			case <-ticker.C:
 				for addr := range *knownNodes {
 					if addr != nodeAddress {
-						SendPing(nodeAddress, addr, knownNodes)
+						protocol.SendPing(nodeAddress, addr, knownNodes)
 					}
 				}
 			}

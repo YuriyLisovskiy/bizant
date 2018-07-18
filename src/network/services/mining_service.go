@@ -2,7 +2,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package network
+package services
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
 	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
 )
 
 type MiningService struct {
@@ -44,7 +45,7 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 				go func() {
 					for nodeAddr := range *knownNodes {
 						if nodeAddr != ms.MinerAddress {
-							SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
+							protocol.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
 						}
 					}
 				}()

@@ -2,7 +2,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package network
+package protocol
 
 import (
 	"io"
@@ -12,10 +12,12 @@ import (
 	"bytes"
 	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
 	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/util"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 )
 
 func sendData(addr string, request []byte, knownNodes *map[string]bool) bool {
-	conn, err := net.Dial(PROTOCOL, addr)
+	conn, err := net.Dial(static.PROTOCOL, addr)
 	if err != nil {
 		delete(*knownNodes, addr)
 		fmt.Printf("\nPeers %d\n", len(*knownNodes))
@@ -30,19 +32,19 @@ func sendData(addr string, request []byte, knownNodes *map[string]bool) bool {
 }
 
 func SendPing(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, makeRequest(ping{AddrFrom: addrFrom}, C_PING), knownNodes)
+	return sendData(addrTo, util.MakeRequest(ping{AddrFrom: addrFrom}, static.C_PING), knownNodes)
 }
 
 func SendPong(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, makeRequest(pong{AddrFrom: addrFrom}, C_PONG), knownNodes)
+	return sendData(addrTo, util.MakeRequest(pong{AddrFrom: addrFrom}, static.C_PONG), knownNodes)
 }
 
 func SendInv(addrFrom, addrTo, kind string, items [][]byte, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, makeRequest(inv{AddrFrom: addrFrom, Type: kind, Items: items}, C_INV), knownNodes)
+	return sendData(addrTo, util.MakeRequest(inv{AddrFrom: addrFrom, Type: kind, Items: items}, static.C_INV), knownNodes)
 }
 
 func SendBlock(addrFrom, addrTo string, newBlock primitives.Block, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, makeRequest(block{AddrFrom: addrFrom, Block: newBlock.Serialize()}, C_BLOCK), knownNodes)
+	return sendData(addrTo, util.MakeRequest(block{AddrFrom: addrFrom, Block: newBlock.Serialize()}, static.C_BLOCK), knownNodes)
 }
 
 func SendAddr(addrTo string, knownNodes *map[string]bool) bool {
@@ -52,25 +54,29 @@ func SendAddr(addrTo string, knownNodes *map[string]bool) bool {
 			nodes.AddrList = append(nodes.AddrList, knownNodeAddr)
 		}
 	}
-	return sendData(addrTo, makeRequest(nodes, C_ADDR), knownNodes)
+	return sendData(addrTo, util.MakeRequest(nodes, static.C_ADDR), knownNodes)
 }
 
 func SendGetBlocks(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, makeRequest(getblocks{AddrFrom: addrFrom}, C_GETBLOCKS), knownNodes)
+	return sendData(addrTo, util.MakeRequest(getblocks{AddrFrom: addrFrom}, static.C_GETBLOCKS), knownNodes)
 }
 
 func SendGetData(addrFrom, addrTo, kind string, id []byte, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, makeRequest(getdata{AddrFrom: addrFrom, Type: kind, ID: id}, C_GETDATA), knownNodes)
+	return sendData(addrTo, util.MakeRequest(getdata{AddrFrom: addrFrom, Type: kind, ID: id}, static.C_GETDATA), knownNodes)
 }
 
 func SendTx(addrFrom, addrTo string, tnx primitives.Transaction, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, makeRequest(tx{AddFrom: addrFrom, Transaction: tnx.Serialize()}, C_TX), knownNodes)
+	return sendData(addrTo, util.MakeRequest(tx{AddFrom: addrFrom, Transaction: tnx.Serialize()}, static.C_TX), knownNodes)
 }
 
 func SendVersion(addrFrom, addrTo string, bc blockchain.BlockChain, knownNodes *map[string]bool) bool {
 	return sendData(
 		addrTo,
-		makeRequest(version{Version: NODE_VERSION, BestHeight: bc.GetBestHeight(), AddrFrom: addrFrom}, C_VERSION),
+		util.MakeRequest(version{
+			Version: static.NODE_VERSION,
+			BestHeight: bc.GetBestHeight(),
+			AddrFrom: addrFrom,
+		}, static.C_VERSION),
 		knownNodes,
 	)
 }
