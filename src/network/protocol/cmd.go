@@ -14,7 +14,8 @@ type block struct {
 }
 
 type getblocks struct {
-	AddrFrom string
+	AddrFrom   string
+	BestHeight int
 }
 
 type getdata struct {

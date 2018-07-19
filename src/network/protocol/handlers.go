@@ -14,6 +14,7 @@ import (
 	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
 	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
+	"encoding/json"
 )
 
 func HandleAddr(request []byte) {
@@ -99,7 +100,7 @@ func HandleGetBlocks(request []byte, bc blockchain.BlockChain) {
 	if err != nil {
 		log.Panic(err)
 	}
-	blocks := bc.GetBlockHashes()
+	blocks := bc.GetBlockHashes(payload.BestHeight)
 	SendInv(static.SelfNodeAddress, payload.AddrFrom, static.C_BLOCK, blocks, &static.KnownNodes)
 }
 
@@ -140,6 +141,15 @@ func HandleTx(request []byte, bc blockchain.BlockChain) {
 	txData := payload.Transaction
 	tx := primitives.DeserializeTransaction(txData)
 	static.MemPool[hex.EncodeToString(tx.ID)] = tx
+
+	if !bc.VerifyTransaction(tx) {
+		utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.ID))
+		data, err := json.MarshalIndent(tx, "", "  ")
+		if err == nil {
+			fmt.Println(string(data))
+		}
+	}
+
 	/*
 		if selfNodeAddress == KnownNodes[0] {
 			for _, node := range KnownNodes {
@@ -194,7 +204,7 @@ func HandleVersion(request []byte, bc blockchain.BlockChain) {
 	myBestHeight := bc.GetBestHeight()
 	foreignerBestHeight := payload.BestHeight
 	if myBestHeight < foreignerBestHeight {
-		SendGetBlocks(static.SelfNodeAddress, payload.AddrFrom, &static.KnownNodes)
+		SendGetBlocks(static.SelfNodeAddress, payload.AddrFrom, bc, &static.KnownNodes)
 	} else if myBestHeight > foreignerBestHeight {
 		SendVersion(static.SelfNodeAddress, payload.AddrFrom, bc, &static.KnownNodes)
 	}

@@ -13,7 +13,7 @@ import (
 	"errors"
 	"encoding/hex"
 	"crypto/ecdsa"
-	"encoding/json"
+//	"encoding/json"
 	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	w "github.com/YuriyLisovskiy/blockchain-go/src/wallet"
@@ -146,11 +146,14 @@ func (bc *BlockChain) GetBlock(blockHash []byte) (primitives.Block, error) {
 	return block, nil
 }
 
-func (bc *BlockChain) GetBlockHashes() [][]byte {
+func (bc *BlockChain) GetBlockHashes(height int) [][]byte {
 	var blocks [][]byte
 	bci := bc.Iterator()
 	for !bci.End() {
 		block := bci.Next()
+		if block.Height <= height {
+			break
+		}
 		blocks = append(blocks, block.Hash)
 	}
 	return blocks
@@ -223,7 +226,7 @@ func NewUTXOTransaction(wallet *w.Wallet, to string, amount, fee float64, utxoSe
 	if acc > amount {
 		outputs = append(outputs, *tx_io.NewTXOutput(acc-amount, from)) // a change
 	}
-	tx := primitives.Transaction{nil, inputs, outputs, time.Now().Unix(), 0}
+	tx := primitives.Transaction{ID: nil, VIn: inputs, VOut: outputs, Timestamp: time.Now().Unix(), Fee: 0}
 	tx.ID = tx.Hash()
 	tx.Fee = tx.CalculateFee(fee)
 	return utxoSet.BlockChain.SignTransaction(tx, wallet.PrivateKey)
@@ -238,12 +241,7 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []primitives.T
 
 			// TODO: send an error to transaction's author
 
-			utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.ID))
 
-			data, err := json.MarshalIndent(tx, "", "  ")
-			if err == nil {
-				fmt.Println(string(data))
-			}
 
 		} else {
 			fees += tx.Fee

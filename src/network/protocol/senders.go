@@ -57,8 +57,8 @@ func SendAddr(addrTo string, knownNodes *map[string]bool) bool {
 	return sendData(addrTo, util.MakeRequest(nodes, static.C_ADDR), knownNodes)
 }
 
-func SendGetBlocks(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, util.MakeRequest(getblocks{AddrFrom: addrFrom}, static.C_GETBLOCKS), knownNodes)
+func SendGetBlocks(addrFrom, addrTo string, bc blockchain.BlockChain, knownNodes *map[string]bool) bool {
+	return sendData(addrTo, util.MakeRequest(getblocks{AddrFrom: addrFrom, BestHeight: bc.GetBestHeight()}, static.C_GETBLOCKS), knownNodes)
 }
 
 func SendGetData(addrFrom, addrTo, kind string, id []byte, knownNodes *map[string]bool) bool {
