@@ -6,15 +6,19 @@ Build
 ---------------------
 
 ```bash
-$ make OS-ARCH
+$ make configure && make OS-ARCH
 ```
 `OS` - is your current operating system, `ARCH` - your target os architecture. See [`supported-os.md`](supported-os.md) for more info.
 
 This will build [blockchain-go](https://github.com/YuriyLisovskiy/blockchain-go) as well if the dependencies are met.
 
-Dependencies
+Minimum version of Go language required: `go1.10`.
+
+See [golang installation](https://golang.org/doc/install) for more info.
+
+Go Libraries
 ---------------------
-These dependencies are required:
+These libraries are required:
 
  Library     | Purpose          | Description
  ------------|------------------|----------------------
@@ -35,7 +39,3 @@ This will retrieve the library and install the bolt command line utility into yo
 ```bash
 $ go get github.com/boltdb/bolt/...
 ```
-
-Minimum version of Go language required: `go1.10`.
-
-See [golang installation](https://golang.org/doc/install) for more info.
