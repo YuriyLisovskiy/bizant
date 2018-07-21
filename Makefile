@@ -1,60 +1,62 @@
 BINARY = blockchain
 
-ARCH32_386 = 386
-ARCH32_arm = arm
-ARCH64_amd64 = amd64
-ARCH64_arm64 = arm64
+ARCH_i386 = 386
+ARCH_arm = arm
+ARCH_amd64 = amd64
+ARCH_arm64 = arm64
 
 FLAGS = main.go
 
-all: test build
-
-build: linux windows darwin freebsd
-
-linux: linux-386 linux-arm linux-amd64 linux-arm64
-
-darwin: darwin-386 darwin-amd64
-
-windows: windows-386 windows-amd64
-
-freebsd: freebsd-386 freebsd-arm freebsd-amd64
+all: test
+	go build -o bin/${BINARY} ${FLAGS}
 
 
-linux-386: clean
-	GOOS=linux GOARCH=${ARCH32_386} go build -o bin/linux/${ARCH32_386}/${BINARY} ${FLAGS}
+cross: clean linux windows darwin freebsd
+
+linux: linux-i386 linux-arm linux-amd64 linux-arm64
+
+darwin: darwin-i386 darwin-amd64
+
+windows: windows-i386 windows-amd64
+
+freebsd: freebsd-i386 freebsd-arm freebsd-amd64
+
+
+linux-i386:
+	GOOS=linux GOARCH=${ARCH_i386} go build -o bin/linux/i${ARCH_i386}/${BINARY} ${FLAGS}
 
 linux-arm:
-	GOOS=linux GOARCH=${ARCH32_arm} go build -o bin/linux/${ARCH32_arm}/${BINARY} ${FLAGS}
+	GOOS=linux GOARCH=${ARCH_arm} go build -o bin/linux/${ARCH_arm}/${BINARY} ${FLAGS}
 
 linux-amd64:
-	GOOS=linux GOARCH=${ARCH64_amd64} go build -o bin/linux/${ARCH64_amd64}/${BINARY} ${FLAGS}
+	GOOS=linux GOARCH=${ARCH_amd64} go build -o bin/linux/${ARCH_amd64}/${BINARY} ${FLAGS}
 
 linux-arm64:
-	GOOS=linux GOARCH=${ARCH64_arm64} go build -o bin/linux/${ARCH64_arm64}/${BINARY} ${FLAGS}
+	GOOS=linux GOARCH=${ARCH_arm64} go build -o bin/linux/${ARCH_arm64}/${BINARY} ${FLAGS}
 
 
-darwin-386:
-	GOOS=darwin GOARCH=${ARCH32_386} go build -o bin/darwin/${ARCH32_386}/${BINARY} ${FLAGS}
+darwin-i386:
+	GOOS=darwin GOARCH=${ARCH_i386} go build -o bin/darwin/i${ARCH_i386}/${BINARY} ${FLAGS}
 
 darwin-amd64:
-	GOOS=darwin GOARCH=${ARCH64_amd64} go build -o bin/darwin/${ARCH64_amd64}/${BINARY} ${FLAGS}
+	GOOS=darwin GOARCH=${ARCH_amd64} go build -o bin/darwin/${ARCH_amd64}/${BINARY} ${FLAGS}
 
 
-windows-386:
-	GOOS=windows GOARCH=${ARCH32_386} go build -o bin/windows/${ARCH32_386}/${BINARY}.exe ${FLAGS}
+windows-i386:
+	GOOS=windows GOARCH=${ARCH_i386} go build -o bin/windows/i${ARCH_i386}/${BINARY}.exe ${FLAGS}
 
 windows-amd64:
-	GOOS=windows GOARCH=${ARCH64_amd64} go build -o bin/windows/${ARCH64_amd64}/${BINARY}.exe ${FLAGS}
+	GOOS=windows GOARCH=${ARCH_amd64} go build -o bin/windows/${ARCH_amd64}/${BINARY}.exe ${FLAGS}
 
 
-freebsd-386:
-	GOOS=freebsd GOARCH=${ARCH32_386} go build -o bin/freebsd/${ARCH32_386}/${BINARY}.out ${FLAGS}
+freebsd-i386:
+	GOOS=freebsd GOARCH=${ARCH_i386} go build -o bin/freebsd/i${ARCH_i386}/${BINARY}.out ${FLAGS}
 
 freebsd-arm:
-	GOOS=freebsd GOARCH=${ARCH32_arm} go build -o bin/freebsd/${ARCH32_arm}/${BINARY}.out ${FLAGS}
+	GOOS=freebsd GOARCH=${ARCH_arm} go build -o bin/freebsd/${ARCH_arm}/${BINARY}.out ${FLAGS}
 
 freebsd-amd64:
-	GOOS=freebsd GOARCH=${ARCH64_amd64} go build -o bin/freebsd/${ARCH64_amd64}/${BINARY}.out ${FLAGS}
+	GOOS=freebsd GOARCH=${ARCH_amd64} go build -o bin/freebsd/${ARCH_amd64}/${BINARY}.out ${FLAGS}
 
 
 test:
