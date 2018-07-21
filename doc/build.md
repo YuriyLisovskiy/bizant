@@ -6,9 +6,14 @@ Build
 ---------------------
 
 ```bash
-$ make configure && make OS-ARCH
+$ make
 ```
-`OS` - is your current operating system, `ARCH` - your target os architecture. See [`supported-os.md`](supported-os.md) for more info.
+See [`supported-platforms.md`](supported-platforms.md) for more info.
+
+Build binaries for all supported platforms:
+```bash
+$ make cross
+```
 
 This will build [blockchain-go](https://github.com/YuriyLisovskiy/blockchain-go) as well if the dependencies are met.
 

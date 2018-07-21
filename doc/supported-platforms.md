@@ -1,4 +1,4 @@
-### Supported Operating Systems and Architectures
+### Supported Platforms
 
 #### Linux:
 * arm
