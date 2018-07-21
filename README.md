@@ -7,6 +7,12 @@ Block Chain Go is my personal project to learn, experiment and build around bloc
 
 See [docs](doc) for build instructions.
 
+### Issues
+Read [issue template](.github/ISSUE_TEMPLATE.md) before opening a new issue.
+
+### Contributing
+Read [feature request template](.github/FEATURE_REQUEST.md).
+
 ### Author
 * [Yuriy Lisovskiy](https://github.com/YuriyLisovskiy)
 
