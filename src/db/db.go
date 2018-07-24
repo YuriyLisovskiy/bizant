@@ -1,3 +1,7 @@
+// Copyright (c) 2018 Yuriy Lisovskiy
+// Distributed under the BSD 3-Clause software license, see the accompanying
+// file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
+
 package db
 
 import (
@@ -45,9 +49,8 @@ type DB struct {
 	mmapSize        int /**< size of the data memory map */
 	size            int /**< current file size */
 	pbuf            []byte
-	transaction     *Transaction /**< current write transaction */
+	transaction     *RWTransaction /**< current write transaction */
 	maxPageNumber   int          /**< me_mapsize / me_psize */
-	pagestate       pagestate    /**< state of old pages from freeDB */
 	dpages          []*page      /**< list of malloc'd blocks for re-use */
 	freePages       []int        /** IDL of pages that became unused in a write txn */
 	dirtyPages      []int        /** ID2L of pages written during a write txn. Length MDB_IDL_UM_SIZE. */
@@ -223,6 +226,8 @@ func (db *DB) Transaction(writable bool) (*Transaction, error) {
 		db:       db,
 		meta:     db.meta(),
 		writable: writable,
+		buckets:  make(map[string]*Bucket),
+		cursors:  make(map[uint32]*Cursor),
 	}
 
 	// Save references to the sys•free and sys•buckets buckets.

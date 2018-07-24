@@ -4,26 +4,30 @@
 
 package db
 
-const (
-//	bigNode = 0x01
-//	subNode = 0x02
-//	dupNode = 0x04
+import (
+	"unsafe"
 )
 
-type node struct {
-	lo      int
-	hi      int
-	flags   int
-	keySize int
-	data    []byte
+const (
+	bigNode = 0x01
+	subNode = 0x02
+	dupNode = 0x04
+)
+
+// branchNode represents a node on a branch page.
+type branchNode struct {
+	pgno    uint32
+	flags   uint16
+	keySize uint16
+	data    uintptr // Pointer to the beginning of the data.
 }
 
-func (n *node) setFlags(f int) {
-	// Valid flags: (F_DUPDATA|F_SUBDATA|MDB_RESERVE|MDB_APPEND)
-	// TODO
+// key returns a byte slice that of the key data.
+func (n *branchNode) key() []byte {
+	return (*[MaxKeySize]byte)(unsafe.Pointer(&n.data))[:n.keySize]
 }
 
-func (n *node) size() int {
+func (n *branchNode) size() int {
 	return 0 // TODO: offsetof(MDB_node, mn_data)
 }
 
