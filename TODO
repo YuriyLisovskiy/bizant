@@ -1,0 +1,6 @@
+# TODO List
+
+- implement database
+- add checking balances only of user's own addresses
+- add database resynchronization while reading blocks error
+- fix transaction verification after receiving it
