@@ -4,33 +4,41 @@
 
 package db
 
-const (
-	MDB_DUPSORT = 0x04
+var (
+	InvalidBucketError = &Error{"invalid bucket", nil}
 )
 
-// TODO: #define MDB_VALID	0x8000		/**< DB handle is valid, for me_dbflags */
-// TODO: #define PERSISTENT_FLAGS	(0xffff & ~(MDB_VALID))
-// TODO: #define VALID_FLAGS	(MDB_REVERSEKEY|MDB_DUPSORT|MDB_INTEGERKEY|MDB_DUPFIXED|MDB_INTEGERDUP|MDB_REVERSEDUP|MDB_CREATE)
-// TODO: #define FREE_DBI 0
+type bucketid uint32
 
 type Bucket struct {
 	*bucket
-	transaction *Transaction
 	name        string
-	isNew       bool
-	dirty       bool
-	valid       bool
+	transaction *Transaction
+	cursors     []*Cursor
 }
 
 type bucket struct {
-	id        uint32
-	pad       uint32
-	flags     uint16
-	depth     uint16
-	branches  pgno
-	leafs     pgno
-	overflows pgno
-	entries   uint64
-	root      pgno
+	id    bucketid
+	flags uint32
+	root  pgid
 }
 
+// Get retrieves the value for a key in the bucket.
+func (b *Bucket) Get(key []byte) []byte {
+	return b.cursor().Get(key)
+}
+
+// Cursor creates a new cursor for this bucket.
+func (b *Bucket) Cursor() *Cursor {
+	c := b.cursor()
+	b.cursors = append(b.cursors, c)
+	return c
+}
+
+// cursor creates a new untracked cursor for this bucket.
+func (b *Bucket) cursor() *Cursor {
+	return &Cursor{
+		bucket: b,
+		stack:  make([]elem, 0),
+	}
+}

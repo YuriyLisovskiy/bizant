@@ -4,7 +4,7 @@
 
 package db
 
-type stat struct {
+type Stat struct {
 	PageSize          int
 	Depth             int
 	BranchPageCount   int
