@@ -1,8 +1,8 @@
-package db
+package bolt
 
 import (
-	"os"
 	"fmt"
+	"os"
 )
 
 func warn(v ...interface{}) {

@@ -1,4 +1,4 @@
-package db
+package bolt
 
 const Version = 1
 

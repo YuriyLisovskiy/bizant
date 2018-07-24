@@ -1,4 +1,4 @@
-package db
+package bolt
 
 // TODO: #define MDB_VALID	0x8000		/**< DB handle is valid, for me_dbflags */
 // TODO: #define PERSISTENT_FLAGS	(0xffff & ~(MDB_VALID))
@@ -7,12 +7,12 @@ package db
 // TODO: #define MAIN_DBI 1
 
 type Bucket struct {
-	pad          uint32
-	flags        uint16
-	depth        uint16
-	branches     pgno
-	leafs        pgno
-	overflows    pgno
-	entries      uint64
-	root         pgno
+	pad       uint32
+	flags     uint16
+	depth     uint16
+	branches  pgno
+	leafs     pgno
+	overflows pgno
+	entries   uint64
+	root      pgno
 }

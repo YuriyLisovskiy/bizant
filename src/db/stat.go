@@ -1,4 +1,4 @@
-package db
+package bolt
 
 type Stat struct {
 	PageSize          int

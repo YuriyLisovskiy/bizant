@@ -1,4 +1,4 @@
-package db
+package bolt
 
 // Info contains information about the database.
 type Info struct {
