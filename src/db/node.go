@@ -1,4 +1,4 @@
-package bolt
+package db
 
 const (
 	bigNode = 0x01

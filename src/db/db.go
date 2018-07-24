@@ -1,4 +1,4 @@
-package bolt
+package db
 
 import (
 	"os"
@@ -15,7 +15,9 @@ const (
 	IntegerDupKey
 )
 
-var DatabaseAlreadyOpenedError = &Error{"Database already open", nil}
+var DatabaseNotOpenError = &Error{"db is not open", nil}
+var DatabaseAlreadyOpenedError = &Error{"db already open", nil}
+var TransactionInProgressError = &Error{"writable transaction is already in progress", nil}
 
 // TODO: #define	MDB_FATAL_ERROR	0x80000000U /** Failed to update the meta page. Probably an I/O error. */
 // TODO: #define	MDB_ENV_ACTIVE	0x20000000U /** Some fields are initialized. */
@@ -26,25 +28,26 @@ type DB struct {
 	sync.Mutex
 	opened bool
 
-	file     *os.File
-	metafile *os.File
+	os       _os
+	syscall  _syscall
+	file     file
+	metafile file
 	data     []byte
 	buf      []byte
 	meta0    *meta
 	meta1    *meta
 
-	pageSize int
-	readers  []*reader
-	buckets  []*Bucket
-	// xbuckets       []*bucketx /**< array of static DB info */
+	pageSize        int
+	readers         []*reader
+	buckets         []*Bucket
 	bucketFlags     []int /**< array of flags from MDB_db.md_flags */
 	path            string
 	mmapSize        int /**< size of the data memory map */
 	size            int /**< current file size */
 	pbuf            []byte
-	transaction     *transaction /**< current write transaction */
+	transaction     *Transaction /**< current write transaction */
 	maxPageNumber   int          /**< me_mapsize / me_psize */
-	pageState       pageState    /**< state of old pages from freeDB */
+	pagestate       pagestate    /**< state of old pages from freeDB */
 	dpages          []*page      /**< list of malloc'd blocks for re-use */
 	freePages       []int        /** IDL of pages that became unused in a write txn */
 	dirtyPages      []int        /** ID2L of pages written during a write txn. Length MDB_IDL_UM_SIZE. */
@@ -67,6 +70,13 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 	db.Lock()
 	defer db.Unlock()
 
+	if db.os == nil {
+		db.os = &sysos{}
+	}
+	if db.syscall == nil {
+		db.syscall = &syssyscall{}
+	}
+
 	// Exit if the database is currently open.
 	if db.opened {
 		return DatabaseAlreadyOpenedError
@@ -74,11 +84,11 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 
 	// Open data file and separate sync handler for metadata writes.
 	db.path = path
-	if db.file, err = os.OpenFile(db.path, os.O_RDWR|os.O_CREATE, mode); err != nil {
+	if db.file, err = db.os.OpenFile(db.path, os.O_RDWR|os.O_CREATE, mode); err != nil {
 		db.close()
 		return err
 	}
-	if db.metafile, err = os.OpenFile(db.path, os.O_RDWR|os.O_SYNC, mode); err != nil {
+	if db.metafile, err = db.os.OpenFile(db.path, os.O_RDWR|os.O_SYNC, mode); err != nil {
 		db.close()
 		return err
 	}
@@ -140,7 +150,7 @@ func (db *DB) mmap() error {
 
 	// Determine the map size based on the file size.
 	var size int
-	if info, err := os.Stat(db.file.Name()); err != nil {
+	if info, err := db.file.Stat(); err != nil {
 		return err
 	} else if info.Size() < int64(db.pageSize*2) {
 		return &Error{"file size too small", nil}
@@ -149,7 +159,7 @@ func (db *DB) mmap() error {
 	}
 
 	// Memory-map the data file as a byte slice.
-	if db.data, err = syscall.Mmap(int(db.file.Fd()), 0, size, syscall.PROT_READ, syscall.MAP_SHARED); err != nil {
+	if db.data, err = db.syscall.Mmap(int(db.file.Fd()), 0, size, syscall.PROT_READ, syscall.MAP_SHARED); err != nil {
 		return err
 	}
 
@@ -169,7 +179,7 @@ func (db *DB) mmap() error {
 // init creates a new database file and initializes its meta pages.
 func (db *DB) init() error {
 	// Set the page size to the OS page size unless that is larger than max page size.
-	db.pageSize = os.Getpagesize()
+	db.pageSize = db.os.Getpagesize()
 	if db.pageSize > maxPageSize {
 		db.pageSize = maxPageSize
 	}
@@ -179,7 +189,7 @@ func (db *DB) init() error {
 	for i := 0; i < 2; i++ {
 		p := db.page(buf[:], i)
 		p.id = pgno(i)
-		p.initMeta(db.pageSize)
+		p.init(db.pageSize)
 	}
 
 	// Write the buffer to our data file.
@@ -194,12 +204,65 @@ func (db *DB) close() {
 	// TODO
 }
 
+// Transaction creates a transaction that's associated with this database.
+func (db *DB) Transaction(writable bool) (*Transaction, error) {
+	db.Lock()
+	defer db.Unlock()
+
+	// Exit if the database is not open yet.
+	if !db.opened {
+		return nil, DatabaseNotOpenError
+	}
+	// Exit if a writable transaction is currently in progress.
+	if writable && db.transaction != nil {
+		return nil, TransactionInProgressError
+	}
+
+	// Create a transaction associated with the database.
+	t := &Transaction{
+		db:       db,
+		meta:     db.meta(),
+		writable: writable,
+	}
+
+	// Save references to the sys•free and sys•buckets buckets.
+	t.sysfree.transaction = t
+	t.sysfree.bucket = &t.meta.free
+	t.sysbuckets.transaction = t
+	t.sysbuckets.bucket = &t.meta.buckets
+
+	// We only allow one writable transaction at a time so save the reference.
+	if writable {
+		db.transaction = t
+	}
+
+	return t, nil
+}
+
 // page retrieves a page reference from a given byte array based on the current page size.
 func (db *DB) page(b []byte, id int) *page {
 	return (*page)(unsafe.Pointer(&b[id*db.pageSize]))
 }
 
+// meta retrieves the current meta page reference.
+func (db *DB) meta() *meta {
+	if db.meta0.txnid > db.meta1.txnid {
+		return db.meta0
+	}
+	return db.meta1
+}
+
+//                                                                            //
+//                                                                            //
+//                                                                            //
+//                                                                            //
+//                                                                            //
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CONVERTED ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ //
+//                                                                            //
+//                                                                            //
+//                                                                            //
+//                                                                            //
+//                                                                            //
 
 func (db *DB) freePage(p *page) {
 	/*
@@ -255,103 +318,6 @@ func (db *DB) sync(force bool) error {
 			return rc;
 	*/
 	return nil
-}
-
-func (db *DB) Transaction(parent *transaction, flags int) (*transaction, error) {
-	/*
-		MDB_txn *txn;
-		MDB_ntxn *ntxn;
-		int rc, size, tsize = sizeof(MDB_txn);
-
-		if (env->me_flags & MDB_FATAL_ERROR) {
-			DPUTS("environment had fatal error, must shutdown!");
-			return MDB_PANIC;
-		}
-		if ((env->me_flags & MDB_RDONLY) && !(flags & MDB_RDONLY))
-			return EACCES;
-		if (parent) {
-			// Nested transactions: Max 1 child, write txns only, no writemap
-			if (parent->mt_child ||
-				(flags & MDB_RDONLY) ||
-				(parent->mt_flags & (MDB_TXN_RDONLY|MDB_TXN_ERROR)) ||
-				(env->me_flags & MDB_WRITEMAP))
-			{
-				return (parent->mt_flags & MDB_TXN_RDONLY) ? EINVAL : MDB_BAD_TXN;
-			}
-			tsize = sizeof(MDB_ntxn);
-		}
-		size = tsize + env->me_maxdbs * (sizeof(MDB_db)+1);
-		if (!(flags & MDB_RDONLY))
-			size += env->me_maxdbs * sizeof(MDB_cursor *);
-
-		if ((txn = calloc(1, size)) == NULL) {
-			DPRINTF(("calloc: %s", strerror(ErrCode())));
-			return ENOMEM;
-		}
-		txn->mt_dbs = (MDB_db *) ((char *)txn + tsize);
-		if (flags & MDB_RDONLY) {
-			txn->mt_flags |= MDB_TXN_RDONLY;
-			txn->mt_dbflags = (unsigned char *)(txn->mt_dbs + env->me_maxdbs);
-		} else {
-			txn->mt_cursors = (MDB_cursor **)(txn->mt_dbs + env->me_maxdbs);
-			txn->mt_dbflags = (unsigned char *)(txn->mt_cursors + env->me_maxdbs);
-		}
-		txn->mt_env = env;
-
-		if (parent) {
-			unsigned int i;
-			txn->mt_u.dirty_list = malloc(sizeof(MDB_ID2)*MDB_IDL_UM_SIZE);
-			if (!txn->mt_u.dirty_list ||
-				!(txn->mt_free_pgs = mdb_midl_alloc(MDB_IDL_UM_MAX)))
-			{
-				free(txn->mt_u.dirty_list);
-				free(txn);
-				return ENOMEM;
-			}
-			txn->mt_txnid = parent->mt_txnid;
-			txn->mt_dirty_room = parent->mt_dirty_room;
-			txn->mt_u.dirty_list[0].mid = 0;
-			txn->mt_spill_pgs = NULL;
-			txn->mt_next_pgno = parent->mt_next_pgno;
-			parent->mt_child = txn;
-			txn->mt_parent = parent;
-			txn->mt_numdbs = parent->mt_numdbs;
-			txn->mt_flags = parent->mt_flags;
-			txn->mt_dbxs = parent->mt_dbxs;
-			memcpy(txn->mt_dbs, parent->mt_dbs, txn->mt_numdbs * sizeof(MDB_db));
-			// Copy parent's mt_dbflags, but clear DB_NEW
-			for (i=0; i<txn->mt_numdbs; i++)
-				txn->mt_dbflags[i] = parent->mt_dbflags[i] & ~DB_NEW;
-			rc = 0;
-			ntxn = (MDB_ntxn *)txn;
-			ntxn->mnt_pgstate = env->me_pgstate; // save parent me_pghead & co
-			if (env->me_pghead) {
-				size = MDB_IDL_SIZEOF(env->me_pghead);
-				env->me_pghead = mdb_midl_alloc(env->me_pghead[0]);
-				if (env->me_pghead)
-					memcpy(env->me_pghead, ntxn->mnt_pgstate.mf_pghead, size);
-				else
-					rc = ENOMEM;
-			}
-			if (!rc)
-				rc = mdb_cursor_shadow(parent, txn);
-			if (rc)
-				mdb_txn_reset0(txn, "beginchild-fail");
-		} else {
-			rc = mdb_txn_renew0(txn);
-		}
-		if (rc)
-			free(txn);
-		else {
-			*ret = txn;
-			DPRINTF(("begin txn %"Z"u%c %p on mdbenv %p, root page %"Z"u",
-				txn->mt_txnid, (txn->mt_flags & MDB_TXN_RDONLY) ? 'r' : 'w',
-				(void *) txn, (void *) env, txn->mt_dbs[MAIN_DBI].md_root));
-		}
-
-		return rc;
-	*/
-	return nil, nil
 }
 
 // Check both meta pages to see which one is newer.
@@ -765,7 +731,7 @@ func (db *DB) SetFlags(flag int, onoff bool) error {
 	return nil
 }
 
-func (db *DB) Stat() *Stat {
+func (db *DB) Stat() *stat {
 	/*
 		int toggle;
 

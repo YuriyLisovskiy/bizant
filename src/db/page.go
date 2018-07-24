@@ -1,4 +1,4 @@
-package bolt
+package db
 
 import (
 	"unsafe"
@@ -38,10 +38,12 @@ const maxWriteByteCount uint = 0x80000000 // TODO: #define MAX_WRITE 0x80000000U
 // #define MDB_COMMIT_PAGES	IOV_MAX
 // #endif
 
-// TODO: #define MDB_PS_MODIFY	1
-// TODO: #define MDB_PS_ROOTONLY	2
-// TODO: #define MDB_PS_FIRST	4
-// TODO: #define MDB_PS_LAST		8
+const (
+	MDB_PS_MODIFY   = 1
+	MDB_PS_ROOTONLY = 2
+	MDB_PS_FIRST    = 4
+	MDB_PS_LAST     = 8
+)
 
 // TODO: #define MDB_SPLIT_REPLACE	MDB_APPENDDUP	/**< newkey is not new */
 
@@ -58,7 +60,7 @@ type page struct {
 	ptr      int
 }
 
-type pageState struct {
+type pagestate struct {
 	head int /**< Reclaimed freeDB pages, or NULL before use */
 	last int /**< ID of last used record, or 0 if !mf_pghead */
 }
@@ -78,8 +80,8 @@ func (p *page) meta() (*meta, error) {
 	return m, nil
 }
 
-// initMeta initializes a page as a new meta page.
-func (p *page) initMeta(pageSize int) {
+// init initializes a page as a new meta page.
+func (p *page) init(pageSize int) {
 	p.flags = p_meta
 	m := (*meta)(unsafe.Pointer(&p.ptr))
 	m.magic = magic
@@ -87,7 +89,7 @@ func (p *page) initMeta(pageSize int) {
 	m.free.pad = uint32(pageSize)
 	m.pgno = 1
 	m.free.root = p_invalid
-	m.main.root = p_invalid
+	m.buckets.root = p_invalid
 }
 
 // nodeCount returns the number of nodes on the page.

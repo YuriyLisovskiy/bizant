@@ -1,4 +1,4 @@
-package bolt
+package db
 
 var (
 	KeyExistError        = &Error{"key/data pair already exists", nil}

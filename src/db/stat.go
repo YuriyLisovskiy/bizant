@@ -1,6 +1,6 @@
-package bolt
+package db
 
-type Stat struct {
+type stat struct {
 	PageSize          int
 	Depth             int
 	BranchPageCount   int

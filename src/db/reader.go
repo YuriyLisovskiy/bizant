@@ -1,4 +1,4 @@
-package bolt
+package db
 
 type reader struct {
 	txnid int
