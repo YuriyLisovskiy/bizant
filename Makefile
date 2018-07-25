@@ -9,6 +9,10 @@ FLAGS = main.go
 
 all: test target
 
+depends:
+	go get github.com/stretchr/testify
+	go get ./...
+
 target:
 	go build -o bin/${BINARY} ${FLAGS}
 
