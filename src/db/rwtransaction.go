@@ -42,18 +42,17 @@ func (t *RWTransaction) CreateBucket(name string) error {
 	p := t.allocate(1)
 	p.flags = p_leaf
 
-	// Add bucket to system page.
-	t.sys.put(name, &bucket{root: p.id})
+	// Add bucket to buckets page.
+	t.buckets.put(name, &bucket{root: p.id})
 
 	return nil
 }
 
 // DropBucket deletes a bucket.
 func (t *RWTransaction) DeleteBucket(name string) error {
-	// Remove from system page.
-	t.sys.del(name)
+	// Remove from buckets page.
+	t.buckets.del(name)
 
-	// TODO: Delete entry from system bucket.
 	// TODO: Free all pages.
 	// TODO: Remove cursor.
 	return nil
@@ -79,7 +78,7 @@ func (t *RWTransaction) Put(name string, key []byte, value []byte) error {
 	c.Get(key)
 
 	// Insert the key/value.
-	t.node(c.stack).put(key, key, value, 0)
+	c.node(t).put(key, key, value, 0)
 
 	return nil
 }
@@ -95,7 +94,7 @@ func (t *RWTransaction) Delete(name string, key []byte) error {
 	c.Get(key)
 
 	// Delete the node if we have a matching key.
-	t.node(c.stack).del(key)
+	c.node(t).del(key)
 
 	return nil
 }
@@ -109,9 +108,9 @@ func (t *RWTransaction) Commit() error {
 	// Spill data onto dirty pages.
 	t.spill()
 
-	// Spill system page.
-	p := t.allocate((t.sys.size() / t.db.pageSize) + 1)
-	t.sys.write(p)
+	// Spill buckets page.
+	p := t.allocate((t.buckets.size() / t.db.pageSize) + 1)
+	t.buckets.write(p)
 
 	// Write dirty pages to disk.
 	if err := t.write(); err != nil {
@@ -119,7 +118,7 @@ func (t *RWTransaction) Commit() error {
 	}
 
 	// Update the meta.
-	t.meta.sys = p.id
+	t.meta.buckets = p.id
 
 	// Write meta to disk.
 	if err := t.writeMeta(); err != nil {
@@ -185,19 +184,14 @@ func (t *RWTransaction) spill() {
 			roots = append(roots, root{n, n.pgid})
 		}
 
-		// Split nodes and write them.
+		// Split nodes into appropriate sized nodes.
+		// The first node in this list will be a reference to n to preserve ancestry.
 		newNodes := n.split(t.db.pageSize)
 
 		// If this is a root node that split then create a parent node.
 		if n.parent == nil && len(newNodes) > 1 {
-			n.parent = &node{
-				isLeaf: false,
-				key:    newNodes[0].inodes[0].key,
-				depth:  n.depth - 1,
-				inodes: make(inodes, 0),
-			}
+			n.parent = &node{transaction: t, isLeaf: false}
 			nodes = append(nodes, n.parent)
-			sort.Sort(nodes)
 		}
 
 		// Write nodes to dirty pages.
@@ -227,13 +221,11 @@ func (t *RWTransaction) spill() {
 
 	// Update roots with new roots.
 	for _, root := range roots {
-		for _, b := range t.sys.buckets {
-			if b.root == root.pgid {
-				b.root = root.node.root().pgid
-				break
-			}
-		}
+		t.buckets.updateRoot(root.pgid, root.node.root().pgid)
 	}
+
+	// Clear out nodes now that they are all spilled.
+	t.nodes = make(map[pgid]*node)
 }
 
 // write writes any dirty pages to disk.
@@ -273,25 +265,24 @@ func (t *RWTransaction) writeMeta() error {
 	return nil
 }
 
-// node retrieves a node based a cursor stack.
-func (t *RWTransaction) node(stack []elem) *node {
-	if len(stack) == 0 {
-		return nil
-	}
+// TODO(benbjohnson): Look up node by page id instead of by stack. Determine depth recursively by parent.
+// TODO(benbjohnson): prevSibling()
+// TODO(benbjohnson): nextSibling()
 
-	// Retrieve branch if it has already been fetched.
-	e := &stack[len(stack)-1]
-	id := e.page.id
-	if n := t.nodes[id]; n != nil {
+// node creates a node from a page and associates it with a given parent.
+func (t *RWTransaction) node(pgid pgid, parent *node) *node {
+	// Retrieve node if it has already been fetched.
+	if n := t.nodes[pgid]; n != nil {
 		return n
 	}
 
 	// Otherwise create a branch and cache it.
-	n := &node{}
-	n.read(t.page(id))
-	n.depth = len(stack) - 1
-	n.parent = t.node(stack[:len(stack)-1])
-	t.nodes[id] = n
+	n := &node{transaction: t, parent: parent}
+	if n.parent != nil {
+		n.depth = n.parent.depth + 1
+	}
+	n.read(t.page(pgid))
+	t.nodes[pgid] = n
 
 	return n
 }

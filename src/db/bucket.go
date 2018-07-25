@@ -24,6 +24,6 @@ func (b *Bucket) cursor() *Cursor {
 	return &Cursor{
 		transaction: b.transaction,
 		root:        b.root,
-		stack:       make([]elem, 0),
+		stack:       make([]pageElementRef, 0),
 	}
 }

@@ -12,6 +12,7 @@ import (
 
 // node represents an in-memory, deserialized page.
 type node struct {
+	transaction *RWTransaction
 	isLeaf bool
 	key    []byte
 	depth  int
@@ -44,7 +45,13 @@ func (n *node) root() *node {
 	if n.parent == nil {
 		return n
 	}
-	return n.parent
+	return n.parent.root()
+}
+
+// childAt returns the child node at a given index.
+func (n *node) childAt(index uint16) *node {
+	__assert__(!n.isLeaf, "invalid childAt(%d) on a leaf node", index)
+	return n.transaction.node(n.inodes[index].pgid, n)
 }
 
 // put inserts a key/value.
@@ -164,7 +171,7 @@ func (n *node) split(pageSize int) []*node {
 		if len(current.inodes) >= minKeysPerPage && i < len(inodes)-minKeysPerPage && size+elemSize > threshold {
 			size = pageHeaderSize
 			nodes = append(nodes, current)
-			current = &node{isLeaf: n.isLeaf}
+			current = &node{transaction: n.transaction, isLeaf: n.isLeaf}
 		}
 
 		size += elemSize
