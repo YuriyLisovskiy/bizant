@@ -15,9 +15,10 @@ const minKeysPerPage = 2
 const maxNodesPerPage = 65535
 
 const (
-	p_branch = 0x01
-	p_leaf   = 0x02
-	p_meta   = 0x04
+	p_branch   = 0x01
+	p_leaf     = 0x02
+	p_meta     = 0x04
+	p_freelist = 0x08
 )
 
 type pgid uint64
@@ -31,32 +32,31 @@ type page struct {
 }
 
 // meta returns a pointer to the metadata section of the page.
-func (p *page) meta() (*meta, error) {
-	// Exit if page is not a meta page.
-	if (p.flags & p_meta) == 0 {
-		return nil, InvalidMetaPageError
-	}
-
-	// Cast the meta section and validate before returning.
-	m := (*meta)(unsafe.Pointer(&p.ptr))
-	if err := m.validate(); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-// init initializes a page as a new meta page.
-func (p *page) init(pageSize int) {
-	p.flags = p_meta
-	m := (*meta)(unsafe.Pointer(&p.ptr))
-	m.magic = magic
-	m.version = version
-	m.pageSize = uint32(pageSize)
-	m.pgid = 1
-	m.sys.root = 0
+func (p *page) meta() *meta {
+	return (*meta)(unsafe.Pointer(&p.ptr))
 }
 
 // lnode retrieves the leaf node by index
 func (p *page) lnode(index int) *lnode {
 	return &((*[maxNodesPerPage]lnode)(unsafe.Pointer(&p.ptr)))[index]
+}
+
+// lnodes retrieves a list of leaf nodes.
+func (p *page) lnodes() []lnode {
+	return ((*[maxNodesPerPage]lnode)(unsafe.Pointer(&p.ptr)))[:]
+}
+
+// bnode retrieves the branch node by index
+func (p *page) bnode(index int) *bnode {
+	return &((*[maxNodesPerPage]bnode)(unsafe.Pointer(&p.ptr)))[index]
+}
+
+// bnodes retrieves a list of branch nodes.
+func (p *page) bnodes() []bnode {
+	return ((*[maxNodesPerPage]bnode)(unsafe.Pointer(&p.ptr)))[:]
+}
+
+// freelist retrieves a list of page ids from a freelist page.
+func (p *page) freelist() []pgid {
+	return ((*[maxNodesPerPage]pgid)(unsafe.Pointer(&p.ptr)))[0:p.count]
 }

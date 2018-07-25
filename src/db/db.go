@@ -95,11 +95,11 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 		// Read the first meta page to determine the page size.
 		var buf [minPageSize]byte
 		if _, err := db.file.ReadAt(buf[:], 0); err == nil {
-			if m, err := db.pageInBuffer(buf[:], 0).meta(); err != nil {
-				return &Error{"meta bootstrap error", err}
-			} else if m != nil {
-				db.pageSize = int(m.pageSize)
+			m := db.pageInBuffer(buf[:], 0).meta()
+			if err := m.validate(); err != nil {
+				return &Error{"meta error", err}
 			}
+			db.pageSize = int(m.pageSize)
 		}
 	}
 
@@ -130,10 +130,14 @@ func (db *DB) mmap() error {
 	}
 
 	// Save references to the meta pages.
-	if db.meta0, err = db.page(0).meta(); err != nil {
+	db.meta0 = db.page(0).meta()
+	db.meta1 = db.page(1).meta()
+
+	// Validate the meta pages.
+	if err := db.meta0.validate(); err != nil {
 		return &Error{"meta0 error", err}
 	}
-	if db.meta1, err = db.page(1).meta(); err != nil {
+	if err := db.meta1.validate(); err != nil {
 		return &Error{"meta1 error", err}
 	}
 
@@ -146,12 +150,33 @@ func (db *DB) init() error {
 	db.pageSize = db.os.Getpagesize()
 
 	// Create two meta pages on a buffer.
-	buf := make([]byte, db.pageSize*2)
+	buf := make([]byte, db.pageSize*4)
 	for i := 0; i < 2; i++ {
 		p := db.pageInBuffer(buf[:], pgid(i))
 		p.id = pgid(i)
-		p.init(db.pageSize)
+		p.flags = p_meta
+
+		// Initialize the meta page.
+		m := p.meta()
+		m.magic = magic
+		m.version = Version
+		m.pageSize = uint32(db.pageSize)
+		m.version = Version
+		m.free = 2
+		m.sys.root = 3
 	}
+
+	// Write an empty freelist at page 3.
+	p := db.pageInBuffer(buf[:], pgid(2))
+	p.id = pgid(2)
+	p.flags = p_freelist
+	p.count = 0
+
+	// Write an empty leaf page at page 4.
+	p = db.pageInBuffer(buf[:], pgid(3))
+	p.id = pgid(3)
+	p.flags = p_leaf
+	p.count = 0
 
 	// Write the buffer to our data file.
 	if _, err := db.metafile.WriteAt(buf, 0); err != nil {
@@ -205,7 +230,10 @@ func (db *DB) RWTransaction() (*RWTransaction, error) {
 	}
 
 	// Create a transaction associated with the database.
-	t := &RWTransaction{}
+	t := &RWTransaction{
+		branches: make(map[pgid]*branch),
+		leafs: make(map[pgid]*leaf),
+	}
 	t.init(db, db.meta())
 
 	return t, nil
