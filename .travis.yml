@@ -8,20 +8,14 @@ go:
 notifications:
   email: false
 
-install:
+before_script:
+#  - go get github.com/stretchr/testify
+#  - go get ./...
   - echo %PATH%
   - echo %GOPATH%
   - go version
   - go env
   - go get -v -t ./...
 
-#before_script:
-#  - go get github.com/stretchr/testify
-#  - go get ./...
-
-#before_install:
-#  - go get github.com/mattn/goveralls
-
-build_script:
-#  - $GOPATH/bin/goveralls -service=travis-ci
+script:
   - make test
