@@ -18,12 +18,6 @@ const (
 
 const minPageSize = 0x1000
 
-var (
-	DatabaseNotOpenError       = &Error{"db is not open", nil}
-	DatabaseAlreadyOpenedError = &Error{"db already open", nil}
-	TransactionInProgressError = &Error{"writable transaction is already in progress", nil}
-)
-
 type DB struct {
 	sync.Mutex
 	opened bool
@@ -122,7 +116,9 @@ func (db *DB) mmap() error {
 	} else if int(info.Size()) < db.pageSize*2 {
 		return &Error{"file size too small", err}
 	}
-	size := int(info.Size())
+
+	// TEMP(benbjohnson): Set max size to 1MB.
+	size := 2 << 20
 
 	// Memory-map the data file as a byte slice.
 	if db.data, err = db.syscall.Mmap(int(db.file.Fd()), 0, size, syscall.PROT_READ, syscall.MAP_SHARED); err != nil {
@@ -159,11 +155,13 @@ func (db *DB) init() error {
 		// Initialize the meta page.
 		m := p.meta()
 		m.magic = magic
-		m.version = Version
+		m.version = version
 		m.pageSize = uint32(db.pageSize)
-		m.version = Version
+		m.version = version
 		m.free = 2
-		m.sys.root = 3
+		m.sys = 3
+		m.pgid = 4
+		m.txnid = txnid(i)
 	}
 
 	// Write an empty freelist at page 3.
@@ -175,7 +173,7 @@ func (db *DB) init() error {
 	// Write an empty leaf page at page 4.
 	p = db.pageInBuffer(buf[:], pgid(3))
 	p.id = pgid(3)
-	p.flags = p_leaf
+	p.flags = p_sys
 	p.count = 0
 
 	// Write the buffer to our data file.
@@ -210,7 +208,7 @@ func (db *DB) Transaction() (*Transaction, error) {
 
 	// Create a transaction associated with the database.
 	t := &Transaction{}
-	t.init(db, db.meta())
+	t.init(db)
 
 	return t, nil
 }
@@ -232,11 +230,97 @@ func (db *DB) RWTransaction() (*RWTransaction, error) {
 	// Create a transaction associated with the database.
 	t := &RWTransaction{
 		branches: make(map[pgid]*branch),
-		leafs: make(map[pgid]*leaf),
+		leafs:    make(map[pgid]*leaf),
 	}
-	t.init(db, db.meta())
+	t.init(db)
 
 	return t, nil
+}
+
+// Bucket retrieves a reference to a bucket.
+func (db *DB) Bucket(name string) (*Bucket, error) {
+	t, err := db.Transaction()
+	if err != nil {
+		return nil, err
+	}
+	defer t.Close()
+	return t.Bucket(name), nil
+}
+
+// Buckets retrieves a list of all buckets in the database.
+func (db *DB) Buckets() ([]*Bucket, error) {
+	t, err := db.Transaction()
+	if err != nil {
+		return nil, err
+	}
+	defer t.Close()
+	return t.Buckets(), nil
+}
+
+// CreateBucket creates a new bucket in the database.
+func (db *DB) CreateBucket(name string) error {
+	t, err := db.RWTransaction()
+	if err != nil {
+		return err
+	}
+
+	if err := t.CreateBucket(name); err != nil {
+		t.Rollback()
+		return err
+	}
+
+	return t.Commit()
+}
+
+// DeleteBucket removes a bucket from the database.
+func (db *DB) DeleteBucket(name string) error {
+	t, err := db.RWTransaction()
+	if err != nil {
+		return err
+	}
+
+	if err := t.DeleteBucket(name); err != nil {
+		t.Rollback()
+		return err
+	}
+
+	return t.Commit()
+}
+
+// Get retrieves the value for a key in a bucket.
+func (db *DB) Get(name string, key []byte) ([]byte, error) {
+	t, err := db.Transaction()
+	if err != nil {
+		return nil, err
+	}
+	defer t.Close()
+	return t.Get(name, key), nil
+}
+
+// Put sets the value for a key in a bucket.
+func (db *DB) Put(name string, key []byte, value []byte) error {
+	t, err := db.RWTransaction()
+	if err != nil {
+		return err
+	}
+	if err := t.Put(name, key, value); err != nil {
+		t.Rollback()
+		return err
+	}
+	return t.Commit()
+}
+
+// Delete removes a key from a bucket.
+func (db *DB) Delete(name string, key []byte) error {
+	t, err := db.RWTransaction()
+	if err != nil {
+		return err
+	}
+	if err := t.Delete(name, key); err != nil {
+		t.Rollback()
+		return err
+	}
+	return t.Commit()
 }
 
 // page retrieves a page reference from the mmap based on the current page size.
