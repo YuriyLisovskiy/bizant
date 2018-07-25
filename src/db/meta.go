@@ -4,15 +4,16 @@
 
 package db
 
-const magic uint32 = 0xDEADC0DE
+const magic uint32 = 0xED0CDAED
 
 type meta struct {
 	magic    uint32
 	version  uint32
 	pageSize uint32
-	pgid     pgid
-	free     pgid
+	flags    uint32
 	sys      pgid
+	free     pgid
+	pgid     pgid
 	txnid    txnid
 }
 

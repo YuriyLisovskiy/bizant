@@ -36,7 +36,9 @@ func (s *sys) put(key string, b *bucket) {
 
 // del deletes a bucket by name.
 func (s *sys) del(key string) {
-	delete(s.buckets, key)
+	if b := s.buckets[key]; b != nil {
+		delete(s.buckets, key)
+	}
 }
 
 // read initializes the data from an on-disk page.
@@ -65,7 +67,8 @@ func (s *sys) read(p *page) {
 
 	// Associate keys and buckets.
 	for index, key := range keys {
-		s.buckets[key] = buckets[index]
+		b := &bucket{buckets[index].root}
+		s.buckets[key] = b
 	}
 }
 
