@@ -24,7 +24,7 @@ func (t *RWTransaction) init(db *DB) {
 	t.Transaction.init(db)
 	t.pages = make(map[pgid]*page)
 
-	// Increment the transaction id. 
+	// Increment the transaction id.
 	t.meta.txnid += txnid(1)
 }
 
@@ -118,7 +118,7 @@ func (t *RWTransaction) Put(name string, key []byte, value []byte) error {
 
 	// Move cursor to correct position.
 	c := b.cursor()
-	c.Get(key)
+	c.Seek(key)
 
 	// Insert the key/value.
 	c.node(t).put(key, key, value, 0)
@@ -137,7 +137,7 @@ func (t *RWTransaction) Delete(name string, key []byte) error {
 
 	// Move cursor to correct position.
 	c := b.cursor()
-	c.Get(key)
+	c.Seek(key)
 
 	// Delete the node if we have a matching key.
 	c.node(t).del(key)

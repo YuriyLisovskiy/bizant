@@ -4,6 +4,10 @@
 
 package db
 
+import (
+	"bytes"
+)
+
 // Transaction represents a read-only transaction on the database.
 // It can be used for retrieving values for keys as well as creating cursors for
 // iterating over the data.
@@ -94,7 +98,12 @@ func (t *Transaction) Get(name string, key []byte) (value []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return c.Get(key), nil
+	k, v := c.Seek(key)
+	// If our target node isn't the same key as what's passed in then return nil.
+	if !bytes.Equal(key, k) {
+		return nil, nil
+	}
+	return v, nil
 }
 
 // ForEach executes a function for each key/value pair in a bucket.

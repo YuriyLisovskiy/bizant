@@ -18,18 +18,31 @@ type Cursor struct {
 }
 
 // First moves the cursor to the first item in the bucket and returns its key and value.
-// If the bucket is empty then a nil key is returned.
+// If the bucket is empty then a nil key and value are returned.
 func (c *Cursor) First() (key []byte, value []byte) {
 	if len(c.stack) > 0 {
 		c.stack = c.stack[:0]
 	}
-	c.stack = append(c.stack, pageElementRef{page: c.transaction.page(c.root), index: 0})
+	p := c.transaction.page(c.root)
+	c.stack = append(c.stack, pageElementRef{page: p, index: 0})
 	c.first()
 	return c.keyValue()
 }
 
+// Last moves the cursor to the last item in the bucket and returns its key and value.
+// If the bucket is empty then a nil key and value are returned.
+func (c *Cursor) Last() (key []byte, value []byte) {
+	if len(c.stack) > 0 {
+		c.stack = c.stack[:0]
+	}
+	p := c.transaction.page(c.root)
+	c.stack = append(c.stack, pageElementRef{page: p, index: p.count - 1})
+	c.last()
+	return c.keyValue()
+}
+
 // Next moves the cursor to the next item in the bucket and returns its key and value.
-// If the cursor is at the end of the bucket then a nil key returned.
+// If the cursor is at the end of the bucket then a nil key and value are returned.
 func (c *Cursor) Next() (key []byte, value []byte) {
 	// Attempt to move over one element until we're successful.
 	// Move up the stack as we hit the end of each page in our stack.
@@ -52,32 +65,52 @@ func (c *Cursor) Next() (key []byte, value []byte) {
 	return c.keyValue()
 }
 
-// Get moves the cursor to a given key and returns its value.
-// If the key does not exist then the cursor is left at the closest key and a nil key is returned.
-func (c *Cursor) Get(key []byte) (value []byte) {
+// Prev moves the cursor to the previous item in the bucket and returns its key and value.
+// If the cursor is at the beginning of the bucket then a nil key and value are returned.
+func (c *Cursor) Prev() (key []byte, value []byte) {
+	// Attempt to move back one element until we're successful.
+	// Move up the stack as we hit the beginning of each page in our stack.
+	for i := len(c.stack) - 1; i >= 0; i-- {
+		elem := &c.stack[i]
+		if elem.index > 0 {
+			elem.index--
+			break
+		}
+		c.stack = c.stack[:i]
+	}
+
+	// If we've hit the end then return nil.
+	if len(c.stack) == 0 {
+		return nil, nil
+	}
+
+	// Move down the stack to find the last element of the last leaf under this branch.
+	c.last()
+	return c.keyValue()
+}
+
+// Seek moves the cursor to a given key and returns it.
+// If the key does not exist then the next key is used. If no keys
+// follow, a nil value is returned.
+func (c *Cursor) Seek(seek []byte) (key []byte, value []byte) {
 	// Start from root page and traverse to correct page.
 	c.stack = c.stack[:0]
-	c.search(key, c.transaction.page(c.root))
+	c.search(seek, c.transaction.page(c.root))
 	p, index := c.top()
 
 	// If the cursor is pointing to the end of page then return nil.
 	if index == p.count {
-		return nil
+		return nil, nil
 	}
 
-	// If our target node isn't the same key as what's passed in then return nil.
-	if !bytes.Equal(key, c.element().key()) {
-		return nil
-	}
-
-	return c.element().value()
+	return c.element().key(), c.element().value()
 }
 
 // first moves the cursor to the first leaf element under the last page in the stack.
 func (c *Cursor) first() {
 	p := c.stack[len(c.stack)-1].page
 	for {
-		// Exit when we hit a leaf page. 
+		// Exit when we hit a leaf page.
 		if (p.flags & leafPageFlag) != 0 {
 			break
 		}
@@ -85,6 +118,21 @@ func (c *Cursor) first() {
 		// Keep adding pages pointing to the first element to the stack.
 		p = c.transaction.page(p.branchPageElement(c.stack[len(c.stack)-1].index).pgid)
 		c.stack = append(c.stack, pageElementRef{page: p, index: 0})
+	}
+}
+
+// last moves the cursor to the last leaf element under the last page in the stack.
+func (c *Cursor) last() {
+	p := c.stack[len(c.stack)-1].page
+	for {
+		// Exit when we hit a leaf page.
+		if (p.flags & leafPageFlag) != 0 {
+			break
+		}
+
+		// Keep adding pages pointing to the last element in the stack.
+		p = c.transaction.page(p.branchPageElement(c.stack[len(c.stack)-1].index).pgid)
+		c.stack = append(c.stack, pageElementRef{page: p, index: p.count - 1})
 	}
 }
 
