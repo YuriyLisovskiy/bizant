@@ -2,7 +2,6 @@
 [![License](https://img.shields.io/badge/BSD-3--Clause-orange.svg)](LICENSE)
 [![Language](https://img.shields.io/badge/Go-1.10-blue.svg)](https://golang.org/)
 [![Build Status](https://travis-ci.org/YuriyLisovskiy/blockchain-go.svg?branch=master)](https://travis-ci.org/YuriyLisovskiy/blockchain-go)
-[![Coverage Status](https://coveralls.io/repos/github/YuriyLisovskiy/blockchain-go/badge.svg?branch=master)](https://coveralls.io/github/YuriyLisovskiy/blockchain-go?branch=master)
 
 Block Chain Go is my personal project to learn, experiment and build around block chain technology.
 
