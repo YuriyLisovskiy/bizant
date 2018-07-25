@@ -53,8 +53,7 @@ func (t *RWTransaction) DeleteBucket(name string) error {
 	// Remove from buckets page.
 	t.buckets.del(name)
 
-	// TODO: Free all pages.
-	// TODO: Remove cursor.
+	// TODO(benbjohnson): Free all pages.
 	return nil
 }
 
@@ -101,11 +100,14 @@ func (t *RWTransaction) Delete(name string, key []byte) error {
 
 // Commit writes all changes to disk.
 func (t *RWTransaction) Commit() error {
+	defer t.close()
+
 	// TODO(benbjohnson): Use vectorized I/O to write out dirty pages.
 
-	// TODO: Rebalance.
+	// TODO(benbjohnson): Move rebalancing to occur immediately after deletion (?).
 
-	// Spill data onto dirty pages.
+	// Rebalance and spill data onto dirty pages.
+	t.rebalance()
 	t.spill()
 
 	// Spill buckets page.
@@ -133,29 +135,24 @@ func (t *RWTransaction) Rollback() {
 }
 
 func (t *RWTransaction) close() {
-	// Clear nodes.
-	t.nodes = nil
-
-	// TODO: Release writer lock.
+	t.db.rwlock.Unlock()
 }
 
 // allocate returns a contiguous block of memory starting at a given page.
 func (t *RWTransaction) allocate(count int) *page {
-	// TODO(benbjohnson): Use pages from the freelist.
+	p := t.db.allocate(count)
 
-	// Allocate a set of contiguous pages from the end of the file.
-	buf := make([]byte, count*t.db.pageSize)
-	p := (*page)(unsafe.Pointer(&buf[0]))
-	p.id = t.meta.pgid
-	p.overflow = uint32(count - 1)
-
-	// Increment the last page id.
-	t.meta.pgid += pgid(count)
-
-	// Save it in our page cache.
+	// Save to our page cache.
 	t.pages[p.id] = p
 
 	return p
+}
+
+// rebalance attempts to balance all nodes.
+func (t *RWTransaction) rebalance() {
+	for _, n := range t.nodes {
+		n.rebalance()
+	}
 }
 
 // spill writes all the nodes to dirty pages.
@@ -192,6 +189,11 @@ func (t *RWTransaction) spill() {
 		if n.parent == nil && len(newNodes) > 1 {
 			n.parent = &node{transaction: t, isLeaf: false}
 			nodes = append(nodes, n.parent)
+		}
+
+		// Add node's page to the freelist.
+		if n.pgid > 0 {
+			t.db.freelist.free(t.id(), t.page(n.pgid))
 		}
 
 		// Write nodes to dirty pages.
@@ -264,10 +266,6 @@ func (t *RWTransaction) writeMeta() error {
 
 	return nil
 }
-
-// TODO(benbjohnson): Look up node by page id instead of by stack. Determine depth recursively by parent.
-// TODO(benbjohnson): prevSibling()
-// TODO(benbjohnson): nextSibling()
 
 // node creates a node from a page and associates it with a given parent.
 func (t *RWTransaction) node(pgid pgid, parent *node) *node {

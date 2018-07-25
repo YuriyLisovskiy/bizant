@@ -21,11 +21,12 @@ func TestRWTransaction(t *testing.T) {
 		txn, err := db.RWTransaction()
 		assert.NotNil(t, txn)
 		assert.NoError(t, err)
+		assert.Equal(t, txn.DB(), db)
 	})
 }
 
 // Ensure that a bucket can be created and retrieved.
-func TestTransactionCreateBucket(t *testing.T) {
+func TestRWTransactionCreateBucket(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		// Create a bucket.
 		err := db.CreateBucket("widgets")
@@ -39,7 +40,7 @@ func TestTransactionCreateBucket(t *testing.T) {
 }
 
 // Ensure that a bucket cannot be created twice.
-func TestTransactionRecreateBucket(t *testing.T) {
+func TestRWTransactionRecreateBucket(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		// Create a bucket.
 		err := db.CreateBucket("widgets")
@@ -52,7 +53,7 @@ func TestTransactionRecreateBucket(t *testing.T) {
 }
 
 // Ensure that a bucket is created with a non-blank name.
-func TestTransactionCreateBucketWithoutName(t *testing.T) {
+func TestRWTransactionCreateBucketWithoutName(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		err := db.CreateBucket("")
 		assert.Equal(t, err, &Error{"bucket name cannot be blank", nil})
@@ -60,7 +61,7 @@ func TestTransactionCreateBucketWithoutName(t *testing.T) {
 }
 
 // Ensure that a bucket name is not too long.
-func TestTransactionCreateBucketWithLongName(t *testing.T) {
+func TestRWTransactionCreateBucketWithLongName(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		err := db.CreateBucket(strings.Repeat("X", 255))
 		assert.NoError(t, err)
@@ -68,6 +69,36 @@ func TestTransactionCreateBucketWithLongName(t *testing.T) {
 		err = db.CreateBucket(strings.Repeat("X", 256))
 		assert.Equal(t, err, &Error{"bucket name too long", nil})
 	})
+}
+
+// Ensure that a bucket can be deleted.
+func TestRWTransactionDeleteBucket(t *testing.T) {
+	t.Skip("pending") // TODO(benbjohnson)
+}
+
+// Ensure that an error is returned when inserting into a bucket that doesn't exist.
+func TestRWTransactionPutBucketNotFound(t *testing.T) {
+	t.Skip("pending") // TODO(benbjohnson)
+}
+
+// Ensure that an error is returned when inserting with an empty key.
+func TestRWTransactionPutEmptyKey(t *testing.T) {
+	t.Skip("pending") // TODO(benbjohnson)
+}
+
+// Ensure that an error is returned when inserting with a key that's too large.
+func TestRWTransactionPutKeyTooLarge(t *testing.T) {
+	t.Skip("pending") // TODO(benbjohnson)
+}
+
+// Ensure that an error is returned when inserting with data that's too large.
+func TestRWTransactionPutDataTooLarge(t *testing.T) {
+	t.Skip("pending") // TODO(benbjohnson)
+}
+
+// Ensure that an error is returned when deleting from a bucket that doesn't exist.
+func TestRWTransactionDeleteBucketNotFound(t *testing.T) {
+	t.Skip("pending") // TODO(benbjohnson)
 }
 
 // Ensure that a bucket can write random keys and values across multiple txns.
@@ -131,6 +162,47 @@ func TestRWTransactionPutMultiple(t *testing.T) {
 				}
 			}
 			txn.Close()
+		})
+		fmt.Fprint(os.Stderr, ".")
+		return true
+	}
+	if err := quick.Check(f, qconfig()); err != nil {
+		t.Error(err)
+	}
+	fmt.Fprint(os.Stderr, "\n")
+}
+
+// Ensure that a transaction can delete all key/value pairs and return to a single leaf page.
+func TestRWTransactionDelete(t *testing.T) {
+	f := func(items testdata) bool {
+		withOpenDB(func(db *DB, path string) {
+			// Bulk insert all values.
+			db.CreateBucket("widgets")
+			rwtxn, _ := db.RWTransaction()
+			for _, item := range items {
+				assert.NoError(t, rwtxn.Put("widgets", item.Key, item.Value))
+			}
+			assert.NoError(t, rwtxn.Commit())
+
+			// Remove items one at a time and check consistency.
+			for i, item := range items {
+				assert.NoError(t, db.Delete("widgets", item.Key))
+
+				// Anything before our deletion index should be nil.
+				txn, _ := db.Transaction()
+				for j, exp := range items {
+					if j > i {
+						if !assert.Equal(t, exp.Value, txn.Get("widgets", exp.Key)) {
+							t.FailNow()
+						}
+					} else {
+						if !assert.Nil(t, txn.Get("widgets", exp.Key)) {
+							t.FailNow()
+						}
+					}
+				}
+				txn.Close()
+			}
 		})
 		fmt.Fprint(os.Stderr, ".")
 		return true
