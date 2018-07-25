@@ -65,17 +65,7 @@ freebsd-amd64:
 
 
 test:
-	go test ./src/cli
-	go test ./src/consensus
-	go test ./src/db
-	go test ./src/network/protocol
-	go test ./src/network/services
-	go test ./src/network/static
-	go test ./src/network/util
-	go test ./src/primitives
-	go test ./src/primitives/tx_io
-	go test ./src/utils
-	go test ./src/wallet
+	go test -v ./src/...
 
 clean:
 	-rm -rf bin/
