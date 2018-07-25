@@ -2,7 +2,8 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package db
+/*
+
 Package bolt implements a low-level key/value store in pure Go. It supports
 fully serializable transactions, ACID semantics, and lock-free MVCC with
 multiple readers and a single writer. Bolt can be used for projects that
@@ -40,4 +41,5 @@ need to first copy it to a new byte slice.
 Bolt currently works on Mac OS and Linux. Windows support is coming soon.
 
 */
-package bolt
+
+package db
