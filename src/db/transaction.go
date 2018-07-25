@@ -24,9 +24,13 @@ type txnid uint64
 // init initializes the transaction and associates it with a database.
 func (t *Transaction) init(db *DB) {
 	t.db = db
-	t.meta = db.meta()
 	t.pages = nil
 
+	// Copy the meta page since it can be changed by the writer.
+	t.meta = &meta{}
+	db.meta().copy(t.meta)
+
+	// Read in the buckets page.
 	t.buckets = &buckets{}
 	t.buckets.read(t.page(t.meta.buckets))
 }
@@ -63,8 +67,12 @@ func (t *Transaction) Bucket(name string) *Bucket {
 
 // Buckets retrieves a list of all buckets.
 func (t *Transaction) Buckets() []*Bucket {
-	warn("[pending] Transaction.Buckets()") // TODO
-	return nil
+	buckets := make([]*Bucket, 0, len(t.buckets.items))
+	for name, b := range t.buckets.items {
+		bucket := &Bucket{bucket: b, transaction: t, name: name}
+		buckets = append(buckets, bucket)
+	}
+	return buckets
 }
 
 // Cursor creates a cursor associated with a given bucket.
@@ -73,7 +81,7 @@ func (t *Transaction) Buckets() []*Bucket {
 func (t *Transaction) Cursor(name string) (*Cursor, error) {
 	b := t.Bucket(name)
 	if b == nil {
-		return nil, BucketNotFoundError
+		return nil, ErrBucketNotFound
 	}
 	return b.cursor(), nil
 }
@@ -87,6 +95,25 @@ func (t *Transaction) Get(name string, key []byte) (value []byte, err error) {
 		return nil, err
 	}
 	return c.Get(key), nil
+}
+
+// ForEach executes a function for each key/value pair in a bucket.
+// An error is returned if the bucket cannot be found.
+func (t *Transaction) ForEach(name string, fn func(k, v []byte) error) error {
+	// Open a cursor on the bucket.
+	c, err := t.Cursor(name)
+	if err != nil {
+		return err
+	}
+
+	// Iterate over each key/value pair in the bucket.
+	for k, v := c.First(); k != nil; k, v = c.Next() {
+		if err := fn(k, v); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // page returns a reference to the page with a given id.

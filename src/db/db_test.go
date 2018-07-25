@@ -5,6 +5,7 @@
 package db
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"os"
@@ -31,7 +32,7 @@ func TestDBReopen(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		db.Open(path, 0666)
 		err := db.Open(path, 0666)
-		assert.Equal(t, err, DatabaseOpenError)
+		assert.Equal(t, err, ErrDatabaseOpen)
 	})
 }
 
@@ -131,16 +132,16 @@ func TestDBCorruptMeta0(t *testing.T) {
 
 		// Open the database.
 		err := db.Open(path, 0666)
-		assert.Equal(t, err, &Error{"meta error", InvalidError})
+		assert.Equal(t, err, &Error{"meta error", ErrInvalid})
 	})
 }
 
 // Ensure that a database cannot open a transaction when it's not open.
-func TestDBTransactionDatabaseNotOpenError(t *testing.T) {
+func TestDBTransactionErrDatabaseNotOpen(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		txn, err := db.Transaction()
 		assert.Nil(t, txn)
-		assert.Equal(t, err, DatabaseNotOpenError)
+		assert.Equal(t, err, ErrDatabaseNotOpen)
 	})
 }
 
@@ -182,6 +183,14 @@ func TestDBDelete(t *testing.T) {
 	})
 }
 
+// Ensure that a delete on a missing bucket returns an error.
+func TestDBDeleteFromMissingBucket(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		err := db.Delete("widgets", []byte("foo"))
+		assert.Equal(t, err, ErrBucketNotFound)
+	})
+}
+
 // Ensure a database can provide a transactional block.
 func TestDBTransactionBlock(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
@@ -200,19 +209,128 @@ func TestDBTransactionBlock(t *testing.T) {
 	})
 }
 
-// Ensure that the database can be copied to a writer.
-func TestDBCopy(t *testing.T) {
-	t.Skip("pending") // TODO(benbjohnson)
+// Ensure a closed database returns an error while running a transaction block
+func TestDBTransactionBlockWhileClosed(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		err := db.Do(func(txn *RWTransaction) error {
+			txn.CreateBucket("widgets")
+			return nil
+		})
+		assert.Equal(t, err, ErrDatabaseNotOpen)
+	})
+}
+
+// Ensure a database can loop over all key/value pairs in a bucket.
+func TestDBForEach(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		db.CreateBucket("widgets")
+		db.Put("widgets", []byte("foo"), []byte("0000"))
+		db.Put("widgets", []byte("baz"), []byte("0001"))
+		db.Put("widgets", []byte("bar"), []byte("0002"))
+
+		var index int
+		err := db.ForEach("widgets", func(k, v []byte) error {
+			switch index {
+			case 0:
+				assert.Equal(t, k, []byte("bar"))
+				assert.Equal(t, v, []byte("0002"))
+			case 1:
+				assert.Equal(t, k, []byte("baz"))
+				assert.Equal(t, v, []byte("0001"))
+			case 2:
+				assert.Equal(t, k, []byte("foo"))
+				assert.Equal(t, v, []byte("0000"))
+			}
+			index++
+			return nil
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, index, 3)
+	})
+}
+
+// Ensure a database can stop iteration early.
+func TestDBForEachShortCircuit(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		db.CreateBucket("widgets")
+		db.Put("widgets", []byte("bar"), []byte("0000"))
+		db.Put("widgets", []byte("baz"), []byte("0000"))
+		db.Put("widgets", []byte("foo"), []byte("0000"))
+
+		var index int
+		err := db.ForEach("widgets", func(k, v []byte) error {
+			index++
+			if bytes.Equal(k, []byte("baz")) {
+				return &Error{"marker", nil}
+			}
+			return nil
+		})
+		assert.Equal(t, err, &Error{"marker", nil})
+		assert.Equal(t, index, 2)
+	})
+}
+
+// Ensure a database returns an error when trying to attempt a for each on a missing bucket.
+func TestDBForEachBucketNotFound(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		err := db.ForEach("widgets", func(k, v []byte) error { return nil })
+		assert.Equal(t, err, ErrBucketNotFound)
+	})
+}
+
+// Ensure a closed database returns an error when executing a for each.
+func TestDBForEachWhileClosed(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		err := db.ForEach("widgets", func(k, v []byte) error { return nil })
+		assert.Equal(t, err, ErrDatabaseNotOpen)
+	})
+}
+
+// Ensure a closed database returns an error when finding a bucket.
+func TestDBBucketWhileClosed(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		b, err := db.Bucket("widgets")
+		assert.Equal(t, err, ErrDatabaseNotOpen)
+		assert.Nil(t, b)
+	})
+}
+
+// Ensure a closed database returns an error when finding all buckets.
+func TestDBBucketsWhileClosed(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		b, err := db.Buckets()
+		assert.Equal(t, err, ErrDatabaseNotOpen)
+		assert.Nil(t, b)
+	})
+}
+
+// Ensure a closed database returns an error when getting a key.
+func TestDBGetWhileClosed(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		value, err := db.Get("widgets", []byte("foo"))
+		assert.Equal(t, err, ErrDatabaseNotOpen)
+		assert.Nil(t, value)
+	})
 }
 
 // Ensure that the database can be copied to a file path.
 func TestDBCopyFile(t *testing.T) {
-	t.Skip("pending") // TODO(benbjohnson)
-}
+	withOpenDB(func(db *DB, path string) {
+		db.CreateBucket("widgets")
+		db.Put("widgets", []byte("foo"), []byte("bar"))
+		db.Put("widgets", []byte("baz"), []byte("bat"))
+		assert.NoError(t, os.RemoveAll("/tmp/bolt.copyfile.db"))
+		assert.NoError(t, db.CopyFile("/tmp/bolt.copyfile.db", 0666))
 
-// Ensure that the database can sync to the file system.
-func TestDBSync(t *testing.T) {
-	t.Skip("pending") // TODO(benbjohnson)
+		var db2 DB
+		assert.NoError(t, db2.Open("/tmp/bolt.copyfile.db", 0666))
+		defer db2.Close()
+
+		value, _ := db2.Get("widgets", []byte("foo"))
+		assert.Equal(t, value, []byte("bar"))
+		value, _ = db2.Get("widgets", []byte("baz"))
+		assert.Equal(t, value, []byte("bat"))
+	})
 }
 
 // Ensure that an error is returned when a database write fails.
@@ -262,4 +380,11 @@ func withOpenDB(fn func(*DB, string)) {
 		defer db.Close()
 		fn(db, path)
 	})
+}
+
+func trunc(b []byte, length int) []byte {
+	if length < len(b) {
+		return b[:length]
+	}
+	return b
 }

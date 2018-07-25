@@ -5,6 +5,7 @@
 package db
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -20,7 +21,7 @@ const maxMmapStep = 1 << 30 // 1GB
 
 // DB represents a collection of buckets persisted to a file on disk.
 // All data access is performed through transactions which can be obtained through the DB.
-// All the functions on DB will return a DatabaseNotOpenError if accessed before Open() is called.
+// All the functions on DB will return a ErrDatabaseNotOpen if accessed before Open() is called.
 type DB struct {
 	os            _os
 	syscall       _syscall
@@ -46,6 +47,16 @@ func (db *DB) Path() string {
 	return db.path
 }
 
+// GoString returns the Go string representation of the database.
+func (db *DB) GoString() string {
+	return fmt.Sprintf("bolt.DB{path:%q}", db.path)
+}
+
+// String returns the string representation of the database.
+func (db *DB) String() string {
+	return fmt.Sprintf("DB<%q>", db.path)
+}
+
 // Open opens a data file at the given path and initializes the database.
 // If the file does not exist then it will be created automatically.
 func (db *DB) Open(path string, mode os.FileMode) error {
@@ -64,7 +75,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 
 	// Exit if the database is currently open.
 	if db.opened {
-		return DatabaseOpenError
+		return ErrDatabaseOpen
 	}
 
 	// Open data file and separate sync handler for metadata writes.
@@ -243,9 +254,7 @@ func (db *DB) Close() {
 }
 
 func (db *DB) close() {
-	// Wait for pending transactions before closing and unmapping the data.
-	// db.mmaplock.Lock()
-	// defer db.mmaplock.Unlock()
+	db.opened = false
 
 	// TODO(benbjohnson): Undo everything in Open().
 	db.freelist = nil
@@ -269,7 +278,7 @@ func (db *DB) Transaction() (*Transaction, error) {
 
 	// Exit if the database is not open yet.
 	if !db.opened {
-		return nil, DatabaseNotOpenError
+		return nil, ErrDatabaseNotOpen
 	}
 
 	// Create a transaction associated with the database.
@@ -295,7 +304,7 @@ func (db *DB) RWTransaction() (*RWTransaction, error) {
 	// Exit if the database is not open yet.
 	if !db.opened {
 		db.rwlock.Unlock()
-		return nil, DatabaseNotOpenError
+		return nil, ErrDatabaseNotOpen
 	}
 
 	// Create a transaction associated with the database.
@@ -354,6 +363,17 @@ func (db *DB) Do(fn func(*RWTransaction) error) error {
 	return t.Commit()
 }
 
+// ForEach executes a function for each key/value pair in a bucket.
+// An error is returned if the bucket cannot be found.
+func (db *DB) ForEach(name string, fn func(k, v []byte) error) error {
+	t, err := db.Transaction()
+	if err != nil {
+		return err
+	}
+	defer t.Close()
+	return t.ForEach(name, fn)
+}
+
 // Bucket retrieves a reference to a bucket.
 // This is typically useful for checking the existence of a bucket.
 func (db *DB) Bucket(name string) (*Bucket, error) {
@@ -384,6 +404,14 @@ func (db *DB) CreateBucket(name string) error {
 	})
 }
 
+// CreateBucketIfNotExists creates a new bucket with the given name if it doesn't already exist.
+// This function can return an error if the name is blank, or the bucket name is too long.
+func (db *DB) CreateBucketIfNotExists(name string) error {
+	return db.Do(func(t *RWTransaction) error {
+		return t.CreateBucketIfNotExists(name)
+	})
+}
+
 // DeleteBucket removes a bucket from the database.
 // Returns an error if the bucket does not exist.
 func (db *DB) DeleteBucket(name string) error {
@@ -395,7 +423,7 @@ func (db *DB) DeleteBucket(name string) error {
 // NextSequence returns an autoincrementing integer for the bucket.
 // This function can return an error if the bucket does not exist.
 func (db *DB) NextSequence(name string) (int, error) {
-	var seq int 
+	var seq int
 	err := db.Do(func(t *RWTransaction) error {
 		var err error
 		seq, err = t.NextSequence(name)
@@ -438,10 +466,6 @@ func (db *DB) Delete(name string, key []byte) error {
 // A reader transaction is maintained during the copy so it is safe to continue
 // using the database while a copy is in progress.
 func (db *DB) Copy(w io.Writer) error {
-	if !db.opened {
-		return DatabaseNotOpenError
-	}
-
 	// Maintain a reader transaction so pages don't get reclaimed.
 	t, err := db.Transaction()
 	if err != nil {
@@ -519,15 +543,4 @@ func (db *DB) allocate(count int) (*page, error) {
 	db.rwtransaction.meta.pgid += pgid(count)
 
 	return p, nil
-}
-
-// sync flushes the file descriptor to disk.
-func (db *DB) sync(force bool) error {
-	if db.opened {
-		return DatabaseNotOpenError
-	}
-	if err := syscall.Fsync(int(db.file.Fd())); err != nil {
-		return err
-	}
-	return nil
 }
