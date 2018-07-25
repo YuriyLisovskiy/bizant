@@ -31,7 +31,7 @@ func TestDBReopen(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		db.Open(path, 0666)
 		err := db.Open(path, 0666)
-		assert.Equal(t, err, DatabaseAlreadyOpenedError)
+		assert.Equal(t, err, DatabaseOpenError)
 	})
 }
 
@@ -144,6 +144,17 @@ func TestDBTransactionDatabaseNotOpenError(t *testing.T) {
 	})
 }
 
+// Ensure that a bucket that gets a non-existent key returns nil.
+func TestDBGetNonExistent(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		db.CreateBucket("widgets")
+		value, err := db.Get("widgets", []byte("foo"))
+		if assert.NoError(t, err) {
+			assert.Nil(t, value)
+		}
+	})
+}
+
 // Ensure that a bucket can write a key/value.
 func TestDBPut(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
@@ -191,6 +202,18 @@ func TestDBWriteFail(t *testing.T) {
 	t.Skip("pending") // TODO(benbjohnson)
 }
 
+// Ensure that the mmap grows appropriately.
+func TestDBMmapSize(t *testing.T) {
+	db := &DB{pageSize: 4096}
+	assert.Equal(t, db.mmapSize(0), minMmapSize)
+	assert.Equal(t, db.mmapSize(16384), minMmapSize)
+	assert.Equal(t, db.mmapSize(minMmapSize-1), minMmapSize)
+	assert.Equal(t, db.mmapSize(minMmapSize), minMmapSize*2)
+	assert.Equal(t, db.mmapSize(10000000), 20000768)
+	assert.Equal(t, db.mmapSize((1<<30)-1), 2147483648)
+	assert.Equal(t, db.mmapSize(1<<30), 1<<31)
+}
+
 // withDB executes a function with a database reference.
 func withDB(fn func(*DB, string)) {
 	f, _ := ioutil.TempFile("", "bolt-")
@@ -199,17 +222,17 @@ func withDB(fn func(*DB, string)) {
 	os.Remove(path)
 	defer os.RemoveAll(path)
 
-	db := NewDB()
-	fn(db, path)
+	var db DB
+	fn(&db, path)
 }
 
 // withMockDB executes a function with a database reference and a mock filesystem.
 func withMockDB(fn func(*DB, *mockos, *mocksyscall, string)) {
 	os, syscall := &mockos{}, &mocksyscall{}
-	db := NewDB()
+	var db DB
 	db.os = os
 	db.syscall = syscall
-	fn(db, os, syscall, "/mock/db")
+	fn(&db, os, syscall, "/mock/db")
 }
 
 // withOpenDB executes a function with an already opened database.

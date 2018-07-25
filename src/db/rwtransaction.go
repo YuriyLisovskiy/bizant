@@ -10,10 +10,13 @@ import (
 )
 
 // RWTransaction represents a transaction that can read and write data.
-// Only one read/write transaction can be active for a DB at a time.
+// Only one read/write transaction can be active for a database at a time.
+// RWTransaction is composed of a read-only Transaction so it can also use
+// functions provided by Transaction.
 type RWTransaction struct {
 	Transaction
-	nodes map[pgid]*node
+	nodes   map[pgid]*node
+	pending []*node
 }
 
 // init initializes the transaction.
@@ -28,19 +31,23 @@ func (t *RWTransaction) init(db *DB) {
 }
 
 // CreateBucket creates a new bucket.
+// Returns an error if the bucket already exists, if the bucket name is blank, or if the bucket name is too long.
 func (t *RWTransaction) CreateBucket(name string) error {
 	// Check if bucket already exists.
 	if b := t.Bucket(name); b != nil {
-		return &Error{"bucket already exists", nil}
+		return BucketExistsError
 	} else if len(name) == 0 {
-		return &Error{"bucket name cannot be blank", nil}
+		return BucketNameRequiredError
 	} else if len(name) > MaxBucketNameSize {
-		return &Error{"bucket name too long", nil}
+		return BucketNameTooLargeError
 	}
 
 	// Create a blank root leaf page.
-	p := t.allocate(1)
-	p.flags = p_leaf
+	p, err := t.allocate(1)
+	if err != nil {
+		return err
+	}
+	p.flags = leafPageFlag
 
 	// Add bucket to buckets page.
 	t.buckets.put(name, &bucket{root: p.id})
@@ -48,28 +55,37 @@ func (t *RWTransaction) CreateBucket(name string) error {
 	return nil
 }
 
-// DropBucket deletes a bucket.
+// DeleteBucket deletes a bucket.
+// Returns an error if the bucket cannot be found.
 func (t *RWTransaction) DeleteBucket(name string) error {
+	if b := t.Bucket(name); b == nil {
+		return BucketNotFoundError
+	}
+
 	// Remove from buckets page.
 	t.buckets.del(name)
 
 	// TODO(benbjohnson): Free all pages.
+
 	return nil
 }
 
+// Put sets the value for a key inside of the named bucket.
+// If the key exist then its previous value will be overwritten.
+// Returns an error if the bucket is not found, if the key is blank, if the key is too large, or if the value is too large.
 func (t *RWTransaction) Put(name string, key []byte, value []byte) error {
 	b := t.Bucket(name)
 	if b == nil {
-		return &Error{"bucket not found", nil}
+		return BucketNotFoundError
 	}
 
 	// Validate the key and data size.
 	if len(key) == 0 {
-		return &Error{"key required", nil}
+		return KeyRequiredError
 	} else if len(key) > MaxKeySize {
-		return &Error{"key too large", nil}
-	} else if len(value) > MaxDataSize {
-		return &Error{"data too large", nil}
+		return KeyTooLargeError
+	} else if len(value) > MaxValueSize {
+		return ValueTooLargeError
 	}
 
 	// Move cursor to correct position.
@@ -82,10 +98,13 @@ func (t *RWTransaction) Put(name string, key []byte, value []byte) error {
 	return nil
 }
 
+// Delete removes a key from the named bucket.
+// If the key does not exist then nothing is done and a nil error is returned.
+// Returns an error if the bucket cannot be found.
 func (t *RWTransaction) Delete(name string, key []byte) error {
 	b := t.Bucket(name)
 	if b == nil {
-		return &Error{"bucket not found", nil}
+		return BucketNotFoundError
 	}
 
 	// Move cursor to correct position.
@@ -98,20 +117,22 @@ func (t *RWTransaction) Delete(name string, key []byte) error {
 	return nil
 }
 
-// Commit writes all changes to disk.
+// Commit writes all changes to disk and updates the meta page.
+// Returns an error if a disk write error occurs.
 func (t *RWTransaction) Commit() error {
 	defer t.close()
 
 	// TODO(benbjohnson): Use vectorized I/O to write out dirty pages.
-
-	// TODO(benbjohnson): Move rebalancing to occur immediately after deletion (?).
 
 	// Rebalance and spill data onto dirty pages.
 	t.rebalance()
 	t.spill()
 
 	// Spill buckets page.
-	p := t.allocate((t.buckets.size() / t.db.pageSize) + 1)
+	p, err := t.allocate((t.buckets.size() / t.db.pageSize) + 1)
+	if err != nil {
+		return err
+	}
 	t.buckets.write(p)
 
 	// Write dirty pages to disk.
@@ -130,6 +151,7 @@ func (t *RWTransaction) Commit() error {
 	return nil
 }
 
+// Rollback closes the transaction and ignores all previous updates.
 func (t *RWTransaction) Rollback() {
 	t.close()
 }
@@ -139,13 +161,16 @@ func (t *RWTransaction) close() {
 }
 
 // allocate returns a contiguous block of memory starting at a given page.
-func (t *RWTransaction) allocate(count int) *page {
-	p := t.db.allocate(count)
+func (t *RWTransaction) allocate(count int) (*page, error) {
+	p, err := t.db.allocate(count)
+	if err != nil {
+		return nil, err
+	}
 
 	// Save to our page cache.
 	t.pages[p.id] = p
 
-	return p
+	return p, nil
 }
 
 // rebalance attempts to balance all nodes.
@@ -156,7 +181,7 @@ func (t *RWTransaction) rebalance() {
 }
 
 // spill writes all the nodes to dirty pages.
-func (t *RWTransaction) spill() {
+func (t *RWTransaction) spill() error {
 	// Keep track of the current root nodes.
 	// We will update this at the end once all nodes are created.
 	type root struct {
@@ -184,6 +209,7 @@ func (t *RWTransaction) spill() {
 		// Split nodes into appropriate sized nodes.
 		// The first node in this list will be a reference to n to preserve ancestry.
 		newNodes := n.split(t.db.pageSize)
+		t.pending = newNodes
 
 		// If this is a root node that split then create a parent node.
 		if n.parent == nil && len(newNodes) > 1 {
@@ -199,7 +225,10 @@ func (t *RWTransaction) spill() {
 		// Write nodes to dirty pages.
 		for i, newNode := range newNodes {
 			// Allocate contiguous space for the node.
-			p := t.allocate((newNode.size() / t.db.pageSize) + 1)
+			p, err := t.allocate((newNode.size() / t.db.pageSize) + 1)
+			if err != nil {
+				return err
+			}
 
 			// Write the node to the page.
 			newNode.write(p)
@@ -219,6 +248,8 @@ func (t *RWTransaction) spill() {
 				newNode.parent.put(oldKey, newNode.inodes[0].key, nil, newNode.pgid)
 			}
 		}
+
+		t.pending = nil
 	}
 
 	// Update roots with new roots.
@@ -228,12 +259,12 @@ func (t *RWTransaction) spill() {
 
 	// Clear out nodes now that they are all spilled.
 	t.nodes = make(map[pgid]*node)
+
+	return nil
 }
 
 // write writes any dirty pages to disk.
 func (t *RWTransaction) write() error {
-	// TODO(benbjohnson): If our last page id is greater than the mmap size then lock the DB and resize.
-
 	// Sort pages by id.
 	pages := make(pages, 0, len(t.pages))
 	for _, p := range t.pages {
@@ -250,6 +281,9 @@ func (t *RWTransaction) write() error {
 			return err
 		}
 	}
+
+	// Clear out page cache.
+	t.pages = make(map[pgid]*page)
 
 	return nil
 }
@@ -283,4 +317,15 @@ func (t *RWTransaction) node(pgid pgid, parent *node) *node {
 	t.nodes[pgid] = n
 
 	return n
+}
+
+// dereference removes all references to the old mmap.
+func (t *RWTransaction) dereference() {
+	for _, n := range t.nodes {
+		n.dereference()
+	}
+
+	for _, n := range t.pending {
+		n.dereference()
+	}
 }

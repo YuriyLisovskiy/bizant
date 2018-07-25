@@ -32,9 +32,9 @@ func (n *node) minKeys() int {
 
 // size returns the size of the node after serialization.
 func (n *node) size() int {
-	var elementSize int = n.pageElementSize()
+	var elementSize = n.pageElementSize()
 
-	var size int = pageHeaderSize
+	var size = pageHeaderSize
 	for _, item := range n.inodes {
 		size += elementSize + len(item.key) + len(item.value)
 	}
@@ -136,7 +136,7 @@ func (n *node) del(key []byte) {
 // read initializes the node from a page.
 func (n *node) read(p *page) {
 	n.pgid = p.id
-	n.isLeaf = ((p.flags & p_leaf) != 0)
+	n.isLeaf = ((p.flags & leafPageFlag) != 0)
 	n.inodes = make(inodes, int(p.count))
 
 	for i := 0; i < int(p.count); i++ {
@@ -164,11 +164,9 @@ func (n *node) read(p *page) {
 func (n *node) write(p *page) {
 	// Initialize page.
 	if n.isLeaf {
-		p.flags |= p_leaf
-		// warn("∑", p.id, "leaf")
+		p.flags |= leafPageFlag
 	} else {
-		p.flags |= p_branch
-		// warn("∑", p.id, "branch")
+		p.flags |= branchPageFlag
 	}
 	p.count = uint16(len(n.inodes))
 
@@ -181,13 +179,11 @@ func (n *node) write(p *page) {
 			elem.pos = uint32(uintptr(unsafe.Pointer(&b[0])) - uintptr(unsafe.Pointer(elem)))
 			elem.ksize = uint32(len(item.key))
 			elem.vsize = uint32(len(item.value))
-			// warn("  »", string(item.key), "->", string(item.value))
 		} else {
 			elem := p.branchPageElement(uint16(i))
 			elem.pos = uint32(uintptr(unsafe.Pointer(&b[0])) - uintptr(unsafe.Pointer(elem)))
 			elem.ksize = uint32(len(item.key))
 			elem.pgid = item.pgid
-			// warn("  »", string(item.key))
 		}
 
 		// Write data for the element to the end of the page.
@@ -343,6 +339,26 @@ func (n *node) rebalance() {
 
 	// Either this node or the target node was deleted from the parent so rebalance it.
 	n.parent.rebalance()
+}
+
+// dereference causes the node to copy all its inode key/value references to heap memory.
+// This is required when the mmap is reallocated so inodes are not pointing to stale data.
+func (n *node) dereference() {
+	key := make([]byte, len(n.key))
+	copy(key, n.key)
+	n.key = key
+
+	for i := range n.inodes {
+		inode := &n.inodes[i]
+
+		key := make([]byte, len(inode.key))
+		copy(key, inode.key)
+		inode.key = key
+
+		value := make([]byte, len(inode.value))
+		copy(value, inode.value)
+		inode.value = value
+	}
 }
 
 // nodesByDepth sorts a list of branches by deepest first.

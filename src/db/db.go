@@ -12,13 +12,15 @@ import (
 	"unsafe"
 )
 
-const (
-	db_nosync = iota
-	db_nometasync
-)
+// The smallest size that the mmap can be.
+const minMmapSize = 1 << 22 // 4MB
 
-const minPageSize = 0x1000
+// The largest step that can be taken when remapping the mmap.
+const maxMmapStep = 1 << 30 // 1GB
 
+// DB represents a collection of buckets persisted to a file on disk.
+// All data access is performed through transactions which can be obtained through the DB.
+// All the functions on DB will return a DatabaseNotOpenError if accessed before Open() is called.
 type DB struct {
 	os            _os
 	syscall       _syscall
@@ -37,11 +39,6 @@ type DB struct {
 	rwlock   sync.Mutex   // Allows only one writer at a time.
 	metalock sync.Mutex   // Protects meta page access.
 	mmaplock sync.RWMutex // Protects mmap access during remapping.
-}
-
-// NewDB creates a new DB instance.
-func NewDB() *DB {
-	return &DB{}
 }
 
 // Path returns the path to currently open database file.
@@ -67,7 +64,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 
 	// Exit if the database is currently open.
 	if db.opened {
-		return DatabaseAlreadyOpenedError
+		return DatabaseOpenError
 	}
 
 	// Open data file and separate sync handler for metadata writes.
@@ -91,7 +88,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 		}
 	} else {
 		// Read the first meta page to determine the page size.
-		var buf [minPageSize]byte
+		var buf [0x1000]byte
 		if _, err := db.file.ReadAt(buf[:], 0); err == nil {
 			m := db.pageInBuffer(buf[:], 0).meta()
 			if err := m.validate(); err != nil {
@@ -102,7 +99,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 	}
 
 	// Memory map the data file.
-	if err := db.mmap(); err != nil {
+	if err := db.mmap(0); err != nil {
 		db.close()
 		return err
 	}
@@ -117,7 +114,19 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 }
 
 // mmap opens the underlying memory-mapped file and initializes the meta references.
-func (db *DB) mmap() error {
+// minsz is the minimum size that the new mmap can be.
+func (db *DB) mmap(minsz int) error {
+	db.mmaplock.Lock()
+	defer db.mmaplock.Unlock()
+
+	// Dereference all mmap references before unmapping.
+	if db.rwtransaction != nil {
+		db.rwtransaction.dereference()
+	}
+
+	// Unmap existing data before continuing.
+	db.munmap()
+
 	info, err := db.file.Stat()
 	if err != nil {
 		return &Error{"mmap stat error", err}
@@ -125,8 +134,12 @@ func (db *DB) mmap() error {
 		return &Error{"file size too small", err}
 	}
 
-	// TODO(benbjohnson): Determine appropriate mmap size by db size.
-	size := 2 << 30
+	// Ensure the size is at least the minimum size.
+	var size = int(info.Size())
+	if size < minsz {
+		size = minsz
+	}
+	size = db.mmapSize(minsz)
 
 	// Memory-map the data file as a byte slice.
 	if db.data, err = db.syscall.Mmap(int(db.file.Fd()), 0, size, syscall.PROT_READ, syscall.MAP_SHARED); err != nil {
@@ -148,6 +161,35 @@ func (db *DB) mmap() error {
 	return nil
 }
 
+// munmap unmaps the data file from memory.
+func (db *DB) munmap() {
+	if db.data != nil {
+		if err := db.syscall.Munmap(db.data); err != nil {
+			panic("unmap error: " + err.Error())
+		}
+		db.data = nil
+	}
+}
+
+// mmapSize determines the appropriate size for the mmap given the current size
+// of the database. The minimum size is 4MB and doubles until it reaches 1GB.
+func (db *DB) mmapSize(size int) int {
+	if size < minMmapSize {
+		return minMmapSize
+	} else if size < maxMmapStep {
+		size *= 2
+	} else {
+		size += maxMmapStep
+	}
+
+	// Ensure that the mmap size is a multiple of the page size.
+	if (size % db.pageSize) != 0 {
+		size = ((size / db.pageSize) + 1) * db.pageSize
+	}
+
+	return size
+}
+
 // init creates a new database file and initializes its meta pages.
 func (db *DB) init() error {
 	// Set the page size to the OS page size.
@@ -158,7 +200,7 @@ func (db *DB) init() error {
 	for i := 0; i < 2; i++ {
 		p := db.pageInBuffer(buf[:], pgid(i))
 		p.id = pgid(i)
-		p.flags = p_meta
+		p.flags = metaPageFlag
 
 		// Initialize the meta page.
 		m := p.meta()
@@ -175,13 +217,13 @@ func (db *DB) init() error {
 	// Write an empty freelist at page 3.
 	p := db.pageInBuffer(buf[:], pgid(2))
 	p.id = pgid(2)
-	p.flags = p_freelist
+	p.flags = freelistPageFlag
 	p.count = 0
 
 	// Write an empty leaf page at page 4.
 	p = db.pageInBuffer(buf[:], pgid(3))
 	p.id = pgid(3)
-	p.flags = p_buckets
+	p.flags = bucketsPageFlag
 	p.count = 0
 
 	// Write the buffer to our data file.
@@ -192,7 +234,8 @@ func (db *DB) init() error {
 	return nil
 }
 
-// Close releases all resources related to the database.
+// Close releases all database resources.
+// All transactions must be closed before closing the database.
 func (db *DB) Close() {
 	db.metalock.Lock()
 	defer db.metalock.Unlock()
@@ -200,15 +243,29 @@ func (db *DB) Close() {
 }
 
 func (db *DB) close() {
-	// TODO: Undo everything in Open().
+	// Wait for pending transactions before closing and unmapping the data.
+	// db.mmaplock.Lock()
+	// defer db.mmaplock.Unlock()
+
+	// TODO(benbjohnson): Undo everything in Open().
 	db.freelist = nil
+	db.path = ""
+
+	db.munmap()
 }
 
 // Transaction creates a read-only transaction.
 // Multiple read-only transactions can be used concurrently.
+//
+// IMPORTANT: You must close the transaction after you are finished or else the database will not reclaim old pages.
 func (db *DB) Transaction() (*Transaction, error) {
 	db.metalock.Lock()
 	defer db.metalock.Unlock()
+
+	// Obtain a read-only lock on the mmap. When the mmap is remapped it will
+	// obtain a write lock so all transactions must finish before it can be
+	// remapped.
+	db.mmaplock.RLock()
 
 	// Exit if the database is not open yet.
 	if !db.opened {
@@ -227,6 +284,7 @@ func (db *DB) Transaction() (*Transaction, error) {
 
 // RWTransaction creates a read/write transaction.
 // Only one read/write transaction is allowed at a time.
+// You must call Commit() or Rollback() on the transaction to close it.
 func (db *DB) RWTransaction() (*RWTransaction, error) {
 	db.metalock.Lock()
 	defer db.metalock.Unlock()
@@ -264,6 +322,9 @@ func (db *DB) removeTransaction(t *Transaction) {
 	db.metalock.Lock()
 	defer db.metalock.Unlock()
 
+	// Release the read lock on the mmap.
+	db.mmaplock.RUnlock()
+
 	// Remove the transaction.
 	for i, txn := range db.transactions {
 		if txn == t {
@@ -274,6 +335,7 @@ func (db *DB) removeTransaction(t *Transaction) {
 }
 
 // Bucket retrieves a reference to a bucket.
+// This is typically useful for checking the existence of a bucket.
 func (db *DB) Bucket(name string) (*Bucket, error) {
 	t, err := db.Transaction()
 	if err != nil {
@@ -293,7 +355,9 @@ func (db *DB) Buckets() ([]*Bucket, error) {
 	return t.Buckets(), nil
 }
 
-// CreateBucket creates a new bucket in the database.
+// CreateBucket creates a new bucket with the given name.
+// This function can return an error if the bucket already exists, if the name
+// is blank, or the bucket name is too long.
 func (db *DB) CreateBucket(name string) error {
 	t, err := db.RWTransaction()
 	if err != nil {
@@ -309,6 +373,7 @@ func (db *DB) CreateBucket(name string) error {
 }
 
 // DeleteBucket removes a bucket from the database.
+// Returns an error if the bucket does not exist.
 func (db *DB) DeleteBucket(name string) error {
 	t, err := db.RWTransaction()
 	if err != nil {
@@ -324,16 +389,18 @@ func (db *DB) DeleteBucket(name string) error {
 }
 
 // Get retrieves the value for a key in a bucket.
+// Returns an error if the key does not exist.
 func (db *DB) Get(name string, key []byte) ([]byte, error) {
 	t, err := db.Transaction()
 	if err != nil {
 		return nil, err
 	}
 	defer t.Close()
-	return t.Get(name, key), nil
+	return t.Get(name, key)
 }
 
 // Put sets the value for a key in a bucket.
+// Returns an error if the bucket is not found, if key is blank, if the key is too large, or if the value is too large.
 func (db *DB) Put(name string, key []byte, value []byte) error {
 	t, err := db.RWTransaction()
 	if err != nil {
@@ -347,6 +414,7 @@ func (db *DB) Put(name string, key []byte, value []byte) error {
 }
 
 // Delete removes a key from a bucket.
+// Returns an error if the bucket cannot be found.
 func (db *DB) Delete(name string, key []byte) error {
 	t, err := db.RWTransaction()
 	if err != nil {
@@ -360,6 +428,8 @@ func (db *DB) Delete(name string, key []byte) error {
 }
 
 // Copy writes the entire database to a writer.
+// A reader transaction is maintained during the copy so it is safe to continue
+// using the database while a copy is in progress.
 func (db *DB) Copy(w io.Writer) error {
 	if !db.opened {
 		return DatabaseNotOpenError
@@ -387,8 +457,10 @@ func (db *DB) Copy(w io.Writer) error {
 }
 
 // CopyFile copies the entire database to file at the given path.
-func (db *DB) CopyFile(path string) error {
-	f, err := os.Create(path)
+// A reader transaction is maintained during the copy so it is safe to continue
+// using the database while a copy is in progress.
+func (db *DB) CopyFile(path string, mode os.FileMode) error {
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
@@ -416,7 +488,7 @@ func (db *DB) meta() *meta {
 }
 
 // allocate returns a contiguous block of memory starting at a given page.
-func (db *DB) allocate(count int) *page {
+func (db *DB) allocate(count int) (*page, error) {
 	// Allocate a temporary buffer for the page.
 	buf := make([]byte, count*db.pageSize)
 	p := (*page)(unsafe.Pointer(&buf[0]))
@@ -424,22 +496,28 @@ func (db *DB) allocate(count int) *page {
 
 	// Use pages from the freelist if they are available.
 	if p.id = db.freelist.allocate(count); p.id != 0 {
-		return p
+		return p, nil
 	}
 
-	// TODO(benbjohnson): Resize mmap().
-
-	// If there are no free pages then allocate from the end of the file.
+	// Resize mmap() if we're at the end.
 	p.id = db.rwtransaction.meta.pgid
+	var minsz = int((p.id+pgid(count))+1) * db.pageSize
+	if minsz >= len(db.data) {
+		if err := db.mmap(minsz); err != nil {
+			return nil, &Error{"mmap allocate error", err}
+		}
+	}
+
+	// Move the page id high water mark.
 	db.rwtransaction.meta.pgid += pgid(count)
 
-	return p
+	return p, nil
 }
 
 // sync flushes the file descriptor to disk.
 func (db *DB) sync(force bool) error {
 	if db.opened {
-		return DatabaseAlreadyOpenedError
+		return DatabaseNotOpenError
 	}
 	if err := syscall.Fsync(int(db.file.Fd())); err != nil {
 		return err

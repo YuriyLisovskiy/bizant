@@ -33,7 +33,7 @@ func (f *freelist) all() []pgid {
 // If a contiguous block cannot be found then 0 is returned.
 func (f *freelist) allocate(n int) pgid {
 	var count int
-	var previd pgid = 0
+	var previd pgid
 	for i, id := range f.ids {
 		// Reset count if this is not contiguous.
 		if previd == 0 || previd-id != 1 {
@@ -86,7 +86,7 @@ func (f *freelist) read(p *page) {
 // become free.
 func (f *freelist) write(p *page) {
 	ids := f.all()
-	p.flags |= p_freelist
+	p.flags |= freelistPageFlag
 	p.count = uint16(len(ids))
 	copy(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:], ids)
 }
