@@ -7,9 +7,10 @@ ARCH_arm64 = arm64
 
 FLAGS = main.go
 
-all: test
-	go build -o bin/${BINARY} ${FLAGS}
+all: test target
 
+target:
+	go build -o bin/${BINARY} ${FLAGS}
 
 cross: clean linux windows darwin freebsd
 
