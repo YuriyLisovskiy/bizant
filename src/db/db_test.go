@@ -5,7 +5,6 @@
 package db
 
 import (
-	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -57,36 +56,18 @@ func TestDBOpenMetaFileError(t *testing.T) {
 	})
 }
 
-// Ensure that the database limits the upper bound of the page size.
-func TestDBLimitPageSize(t *testing.T) {
-	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
-		b := make([]byte, 0x10000)
-		p0, p1 := (*page)(unsafe.Pointer(&b[0x0000])), (*page)(unsafe.Pointer(&b[0x8000]))
-		p0.init(0x8000)
-		p1.init(0x8000)
-		file, metafile := &mockfile{}, &mockfile{}
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
-		mockos.On("Getpagesize").Return(0x10000)
-		file.On("ReadAt", mock.Anything, int64(0)).Return(0, nil)
-		file.On("Stat").Return(&mockfileinfo{"", 0x10000, 0666, time.Now(), false, nil}, nil)
-		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, nil)
-		mocksyscall.On("Mmap", 0, int64(0), 0x10000, syscall.PROT_READ, syscall.MAP_SHARED).Return(b, nil)
-		db.Open(path, 0666)
-		assert.Equal(t, db.pageSize, maxPageSize)
-	})
-}
-
 // Ensure that write errors to the meta file handler during initialization are returned.
 func TestDBMetaInitWriteError(t *testing.T) {
 	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
+		// Mock the file system.
 		file, metafile := &mockfile{}, &mockfile{}
 		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
 		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
 		mockos.On("Getpagesize").Return(0x10000)
-		file.On("ReadAt", mock.Anything, int64(0)).Return(0, nil)
-		file.On("Stat").Return(&mockfileinfo{"", 0x10000, 0666, time.Now(), false, nil}, nil)
+		file.On("Stat").Return(&mockfileinfo{"", 0, 0666, time.Now(), false, nil}, nil)
 		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, io.ErrShortWrite)
+
+		// Open the database.
 		err := db.Open(path, 0666)
 		assert.Equal(t, err, io.ErrShortWrite)
 	})
@@ -99,8 +80,7 @@ func TestDBFileTooSmall(t *testing.T) {
 		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
 		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
 		mockos.On("Getpagesize").Return(0x1000)
-		file.On("ReadAt", mock.Anything, int64(0)).Return(0, nil)
-		file.On("Stat").Return(&mockfileinfo{"", 0x1000, 0666, time.Now(), false, nil}, nil)
+		file.On("Stat").Return(&mockfileinfo{"", 0, 0666, time.Now(), false, nil}, nil)
 		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, nil)
 		err := db.Open(path, 0666)
 		assert.Equal(t, err, &Error{"file size too small", nil})
@@ -119,11 +99,12 @@ func TestDBMmapStatError(t *testing.T) {
 		file.On("Stat").Return((*mockfileinfo)(nil), exp)
 		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, nil)
 		err := db.Open(path, 0666)
-		assert.Equal(t, err, exp)
+		assert.Equal(t, err, &Error{"stat error", exp})
 	})
 }
 
 // Ensure that mmap errors get returned.
+/*
 func TestDBMmapError(t *testing.T) {
 	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
 		exp := errors.New("")
@@ -139,38 +120,20 @@ func TestDBMmapError(t *testing.T) {
 		assert.Equal(t, err, exp)
 	})
 }
+*/
 
 // Ensure that corrupt meta0 page errors get returned.
 func TestDBCorruptMeta0(t *testing.T) {
 	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
+		// Create a file with bad magic.
 		b := make([]byte, 0x10000)
 		p0, p1 := (*page)(unsafe.Pointer(&b[0x0000])), (*page)(unsafe.Pointer(&b[0x8000]))
 		p0.init(0x8000)
 		p1.init(0x8000)
 		m, _ := p0.meta()
 		m.magic = 0
-		file, metafile := &mockfile{}, &mockfile{}
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
-		mockos.On("Getpagesize").Return(0x10000)
-		file.On("ReadAt", mock.Anything, int64(0)).Return(0, nil)
-		file.On("Stat").Return(&mockfileinfo{"", 0x10000, 0666, time.Now(), false, nil}, nil)
-		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, nil)
-		mocksyscall.On("Mmap", 0, int64(0), 0x10000, syscall.PROT_READ, syscall.MAP_SHARED).Return(b, nil)
-		err := db.Open(path, 0666)
-		assert.Equal(t, err, &Error{"meta0 error", InvalidError})
-	})
-}
 
-// Ensure that corrupt meta1 page errors get returned.
-func TestDBCorruptMeta1(t *testing.T) {
-	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
-		b := make([]byte, 0x10000)
-		p0, p1 := (*page)(unsafe.Pointer(&b[0x0000])), (*page)(unsafe.Pointer(&b[0x8000]))
-		p0.init(0x8000)
-		p1.init(0x8000)
-		m, _ := p1.meta()
-		m.version = 100
+		// Mock file access.
 		file, metafile := &mockfile{}, &mockfile{}
 		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
 		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
@@ -179,8 +142,10 @@ func TestDBCorruptMeta1(t *testing.T) {
 		file.On("Stat").Return(&mockfileinfo{"", 0x10000, 0666, time.Now(), false, nil}, nil)
 		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, nil)
 		mocksyscall.On("Mmap", 0, int64(0), 0x10000, syscall.PROT_READ, syscall.MAP_SHARED).Return(b, nil)
+
+		// Open the database.
 		err := db.Open(path, 0666)
-		assert.Equal(t, err, &Error{"meta1 error", VersionMismatchError})
+		assert.Equal(t, err, &Error{"meta bootstrap error", InvalidMetaPageError})
 	})
 }
 
@@ -191,31 +156,9 @@ func TestDBCorruptMeta1(t *testing.T) {
 // Ensure that a database cannot open a transaction when it's not open.
 func TestDBTransactionDatabaseNotOpenError(t *testing.T) {
 	withDB(func(db *DB, path string) {
-		txn, err := db.Transaction(false)
+		txn, err := db.Transaction()
 		assert.Nil(t, txn)
 		assert.Equal(t, err, DatabaseNotOpenError)
-	})
-}
-
-// Ensure that a database cannot open a writable transaction while one is in progress.
-func TestDBTransactionInProgressError(t *testing.T) {
-	withOpenDB(func(db *DB, path string) {
-		db.Transaction(true)
-		txn, err := db.Transaction(true)
-		assert.Nil(t, txn)
-		assert.Equal(t, err, TransactionInProgressError)
-	})
-}
-
-// Ensure that a database can create a new writable transaction.
-func TestDBTransactionWriter(t *testing.T) {
-	withOpenDB(func(db *DB, path string) {
-		txn, err := db.Transaction(true)
-		if assert.NotNil(t, txn) {
-			assert.Equal(t, txn.db, db)
-			assert.Equal(t, txn.writable, true)
-		}
-		assert.NoError(t, err)
 	})
 }
 

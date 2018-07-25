@@ -4,5 +4,9 @@
 
 package db
 
-type bnodes []bnode
+type tnodes []tnode
 
+type tnode struct {
+	key   []byte
+	value []byte
+}
