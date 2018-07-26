@@ -9,14 +9,15 @@ FLAGS = main.go
 
 all: test target
 
-depends:
-	go get github.com/stretchr/testify
-	go get ./...
+install-deps:
+	@bash install-deps.sh
 
 target:
-	go build -o bin/${BINARY} ${FLAGS}
+	@go build -o bin/${BINARY} ${FLAGS}
+	@echo Done.
 
 cross: clean linux windows darwin freebsd
+	@echo Done.
 
 linux: linux-i386 linux-arm linux-amd64 linux-arm64
 
@@ -28,48 +29,47 @@ freebsd: freebsd-i386 freebsd-arm freebsd-amd64
 
 
 linux-i386:
-	GOOS=linux GOARCH=${ARCH_i386} go build -o bin/linux/i${ARCH_i386}/${BINARY} ${FLAGS}
+	@CGO_ENABLED=1 GOOS=linux GOARCH=${ARCH_i386} go build -o bin/linux/i${ARCH_i386}/${BINARY} ${FLAGS}
 
 linux-arm:
-	GOOS=linux GOARCH=${ARCH_arm} go build -o bin/linux/${ARCH_arm}/${BINARY} ${FLAGS}
+	@GOOS=linux GOARCH=${ARCH_arm} go build -o bin/linux/${ARCH_arm}/${BINARY} ${FLAGS}
 
 linux-amd64:
-	GOOS=linux GOARCH=${ARCH_amd64} go build -o bin/linux/${ARCH_amd64}/${BINARY} ${FLAGS}
+	@GOOS=linux GOARCH=${ARCH_amd64} go build -o bin/linux/${ARCH_amd64}/${BINARY} ${FLAGS}
 
 linux-arm64:
-	GOOS=linux GOARCH=${ARCH_arm64} go build -o bin/linux/${ARCH_arm64}/${BINARY} ${FLAGS}
+	@GOOS=linux GOARCH=${ARCH_arm64} go build -o bin/linux/${ARCH_arm64}/${BINARY} ${FLAGS}
 
 
 darwin-i386:
-	GOOS=darwin GOARCH=${ARCH_i386} go build -o bin/darwin/i${ARCH_i386}/${BINARY} ${FLAGS}
+	@GOOS=darwin GOARCH=${ARCH_i386} go build -o bin/darwin/i${ARCH_i386}/${BINARY} ${FLAGS}
 
 darwin-amd64:
-	GOOS=darwin GOARCH=${ARCH_amd64} go build -o bin/darwin/${ARCH_amd64}/${BINARY} ${FLAGS}
+	@GOOS=darwin GOARCH=${ARCH_amd64} go build -o bin/darwin/${ARCH_amd64}/${BINARY} ${FLAGS}
 
 
 windows-i386:
-	GOOS=windows GOARCH=${ARCH_i386} go build -o bin/windows/i${ARCH_i386}/${BINARY}.exe ${FLAGS}
+	@GOOS=windows GOARCH=${ARCH_i386} go build -o bin/windows/i${ARCH_i386}/${BINARY}.exe ${FLAGS}
 
 windows-amd64:
-	GOOS=windows GOARCH=${ARCH_amd64} go build -o bin/windows/${ARCH_amd64}/${BINARY}.exe ${FLAGS}
+	@GOOS=windows GOARCH=${ARCH_amd64} go build -o bin/windows/${ARCH_amd64}/${BINARY}.exe ${FLAGS}
 
 
 freebsd-i386:
-	GOOS=freebsd GOARCH=${ARCH_i386} go build -o bin/freebsd/i${ARCH_i386}/${BINARY}.out ${FLAGS}
+	@GOOS=freebsd GOARCH=${ARCH_i386} go build -o bin/freebsd/i${ARCH_i386}/${BINARY}.out ${FLAGS}
 
 freebsd-arm:
-	GOOS=freebsd GOARCH=${ARCH_arm} go build -o bin/freebsd/${ARCH_arm}/${BINARY}.out ${FLAGS}
+	@GOOS=freebsd GOARCH=${ARCH_arm} go build -o bin/freebsd/${ARCH_arm}/${BINARY}.out ${FLAGS}
 
 freebsd-amd64:
-	GOOS=freebsd GOARCH=${ARCH_amd64} go build -o bin/freebsd/${ARCH_amd64}/${BINARY}.out ${FLAGS}
+	@GOOS=freebsd GOARCH=${ARCH_amd64} go build -o bin/freebsd/${ARCH_amd64}/${BINARY}.out ${FLAGS}
 
 
 test:
-	go test ./src/...
-#	go test -v ./src/...
+	@go test ./src/...
 
 clean:
-	-rm -rf bin/
+	@-rm -rf bin/
 
 renewchain:
 	make build
