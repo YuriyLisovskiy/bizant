@@ -10,17 +10,15 @@ import (
 	"fmt"
 	"log"
 	"bytes"
-	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
-	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/util"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 )
 
-func sendData(addr string, request []byte, knownNodes *map[string]bool) bool {
-	conn, err := net.Dial(static.PROTOCOL, addr)
+func (self *Protocol) sendData(addr string, request []byte) bool {
+	conn, err := net.Dial(PROTOCOL, addr)
 	if err != nil {
-		delete(*knownNodes, addr)
-		fmt.Printf("\nPeers %d\n", len(*knownNodes))
+		delete(*self.Config.Nodes, addr)
+		fmt.Printf("\nPeers %d\n", len(*self.Config.Nodes))
 		return false
 	}
 	defer conn.Close()
@@ -31,52 +29,86 @@ func sendData(addr string, request []byte, knownNodes *map[string]bool) bool {
 	return true
 }
 
-func SendPing(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, util.MakeRequest(ping{AddrFrom: addrFrom}, static.C_PING), knownNodes)
+func (self *Protocol) SendPing(addrFrom, addrTo string) bool {
+	return self.sendData(addrTo, MakeRequest(ping{AddrFrom: addrFrom}, C_PING))
 }
 
-func SendPong(addrFrom, addrTo string, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, util.MakeRequest(pong{AddrFrom: addrFrom}, static.C_PONG), knownNodes)
+func (self *Protocol) SendPong(addrFrom, addrTo string) bool {
+	return self.sendData(addrTo, MakeRequest(pong{AddrFrom: addrFrom}, C_PONG))
 }
 
-func SendInv(addrFrom, addrTo, kind string, items [][]byte, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, util.MakeRequest(inv{AddrFrom: addrFrom, Type: kind, Items: items}, static.C_INV), knownNodes)
+func (self *Protocol) SendInv(addrFrom, addrTo, kind string, items [][]byte) bool {
+	return self.sendData(addrTo, MakeRequest(
+		inv{
+			AddrFrom: addrFrom,
+			Type:     kind,
+			Items:    items,
+		},
+		C_INV,
+	))
 }
 
-func SendBlock(addrFrom, addrTo string, newBlock primitives.Block, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, util.MakeRequest(block{AddrFrom: addrFrom, Block: newBlock.Serialize()}, static.C_BLOCK), knownNodes)
+func (self *Protocol) SendBlock(addrFrom, addrTo string, newBlock types.Block) bool {
+	return self.sendData(addrTo, MakeRequest(
+		block{
+			AddrFrom: addrFrom,
+			Block:    newBlock.Serialize(),
+		},
+		C_BLOCK,
+	))
 }
 
-func SendAddr(addrTo string, knownNodes *map[string]bool) bool {
+func (self *Protocol) SendAddr(addrTo string) bool {
 	nodes := addr{}
-	for knownNodeAddr := range *knownNodes {
+	for knownNodeAddr := range *self.Config.Nodes {
 		if knownNodeAddr != addrTo {
 			nodes.AddrList = append(nodes.AddrList, knownNodeAddr)
 		}
 	}
-	return sendData(addrTo, util.MakeRequest(nodes, static.C_ADDR), knownNodes)
+	return self.sendData(addrTo, MakeRequest(nodes, C_ADDR))
 }
 
-func SendGetBlocks(addrFrom, addrTo string, bc blockchain.BlockChain, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, util.MakeRequest(getblocks{AddrFrom: addrFrom, BestHeight: bc.GetBestHeight()}, static.C_GETBLOCKS), knownNodes)
+func (self *Protocol) SendGetBlocks(addrFrom, addrTo string) bool {
+	return self.sendData(addrTo, MakeRequest(
+		getblocks{
+			AddrFrom:   addrFrom,
+			BestHeight: self.Config.Chain.GetBestHeight(),
+		},
+		C_GETBLOCKS,
+	))
 }
 
-func SendGetData(addrFrom, addrTo, kind string, id []byte, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, util.MakeRequest(getdata{AddrFrom: addrFrom, Type: kind, ID: id}, static.C_GETDATA), knownNodes)
-}
-
-func SendTx(addrFrom, addrTo string, tnx primitives.Transaction, knownNodes *map[string]bool) bool {
-	return sendData(addrTo, util.MakeRequest(tx{AddFrom: addrFrom, Transaction: tnx.Serialize()}, static.C_TX), knownNodes)
-}
-
-func SendVersion(addrFrom, addrTo string, bc blockchain.BlockChain, knownNodes *map[string]bool) bool {
-	return sendData(
-		addrTo,
-		util.MakeRequest(version{
-			Version: static.NODE_VERSION,
-			BestHeight: bc.GetBestHeight(),
+func (self *Protocol) SendGetData(addrFrom, addrTo, kind string, id []byte) bool {
+	return self.sendData(addrTo, MakeRequest(
+		getdata{
 			AddrFrom: addrFrom,
-		}, static.C_VERSION),
-		knownNodes,
+			Type:     kind,
+			ID:       id,
+		},
+		C_GETDATA,
+	))
+}
+
+func (self *Protocol) SendTx(addrFrom, addrTo string, tnx types.Transaction) bool {
+	return self.sendData(addrTo, MakeRequest(
+		tx{
+			AddFrom:     addrFrom,
+			Transaction: tnx.Serialize(),
+		},
+		C_TX,
+	))
+}
+
+func (self *Protocol) SendVersion(addrFrom, addrTo string) bool {
+	return self.sendData(
+		addrTo,
+		MakeRequest(
+			version{
+				Version:    NODE_VERSION,
+				BestHeight: self.Config.Chain.GetBestHeight(),
+				AddrFrom:   addrFrom,
+			},
+			C_VERSION,
+		),
 	)
 }

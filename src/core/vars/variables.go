@@ -2,11 +2,11 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package primitives
+package vars
 
-import "math"
+import "sync"
 
 var (
-	maxNonce        = math.MaxInt32
-	InterruptMining = false
+	Mining   int32
+	DBMutex  = &sync.Mutex{}
 )

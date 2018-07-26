@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"encoding/hex"
 	"encoding/json"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
-	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
 )
 
@@ -18,12 +19,12 @@ type MiningService struct {
 	MinerAddress string
 }
 
-func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]bool, memPool *map[string]primitives.Transaction) {
+func (ms *MiningService) Start(proto *protocol.Protocol, memPool *map[string]types.Transaction) {
 	go func() {
 		for {
-			var txs []primitives.Transaction
+			var txs []types.Transaction
 			for _, tx := range *memPool {
-				if bc.VerifyTransaction(tx) {
+				if proto.Config.Chain.VerifyTransaction(tx) {
 
 					txs = append(txs, tx)
 
@@ -39,17 +40,17 @@ func (ms *MiningService) Start(bc blockchain.BlockChain, knownNodes *map[string]
 				}
 				delete(*memPool, hex.EncodeToString(tx.ID))
 			}
-			newBlock, err := bc.MineBlock(ms.MinerAddress, txs)
+			newBlock, err := proto.Config.Chain.MineBlock(ms.MinerAddress, txs)
 			if err == nil {
 				utils.PrintLog("New block is mined!\n")
 				go func() {
-					for nodeAddr := range *knownNodes {
+					for nodeAddr := range *proto.Config.Nodes {
 						if nodeAddr != ms.MinerAddress {
-							protocol.SendBlock(ms.MinerAddress, nodeAddr, newBlock, knownNodes)
+							proto.SendBlock(ms.MinerAddress, nodeAddr, newBlock)
 						}
 					}
 				}()
-				UTXOSet := blockchain.UTXOSet{BlockChain: bc}
+				UTXOSet := core.UTXOSet{BlockChain: *proto.Config.Chain}
 			//	UTXOSet.Reindex()
 				UTXOSet.Update(newBlock)
 			}

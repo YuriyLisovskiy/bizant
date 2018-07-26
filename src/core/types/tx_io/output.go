@@ -6,6 +6,7 @@ package tx_io
 
 import (
 	"bytes"
+
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 

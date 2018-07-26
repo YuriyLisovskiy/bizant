@@ -9,42 +9,42 @@ import (
 	"log"
 	"net"
 	"io/ioutil"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/util"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
-	p "github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
 )
 
-func handleConnection(conn net.Conn, bc blockchain.BlockChain) {
+func handleConnection(conn net.Conn, proto *protocol.Protocol) {
 	request, err := ioutil.ReadAll(conn)
 	if err != nil {
 		log.Panic(err)
 	}
-	command := util.BytesToCommand(request[:static.COMMAND_LENGTH])
+	command := protocol.BytesToCommand(request[:protocol.COMMAND_LENGTH])
 	utils.PrintLog(fmt.Sprintf("Received %s command\n", command))
 	switch command {
-	case static.C_ADDR:
-		p.HandleAddr(request)
-	case static.C_BLOCK:
-		p.HandleBlock(request, bc)
-	case static.C_INV:
-		p.HandleInv(request, bc)
-	case static.C_GETBLOCKS:
-		p.HandleGetBlocks(request, bc)
-	case static.C_GETDATA:
-		p.HandleGetData(request, bc)
-	case static.C_TX:
-		p.HandleTx(request, bc)
-	case static.C_VERSION:
-		p.HandleVersion(request, bc)
-	case static.C_PING:
-		p.HandlePing(request)
-	case static.C_PONG:
-		p.HandlePong(request)
-	case static.C_ERROR:
-		p.HandleError(request)
+	case protocol.C_ADDR:
+		proto.HandleAddr(request)
+	case protocol.C_BLOCK:
+		proto.HandleBlock(request)
+	case protocol.C_INV:
+		proto.HandleInv(request)
+	case protocol.C_GETBLOCKS:
+		proto.HandleGetBlocks(request)
+	case protocol.C_GETDATA:
+		proto.HandleGetData(request)
+	case protocol.C_TX:
+		proto.HandleTx(request)
+	case protocol.C_VERSION:
+		proto.HandleVersion(request)
+	case protocol.C_PING:
+		proto.HandlePing(request)
+	case protocol.C_PONG:
+		proto.HandlePong(request)
+	case protocol.C_ERROR:
+		proto.HandleError(request)
 	default:
 		utils.PrintLog("Unknown command!\n")
 	}
@@ -56,22 +56,30 @@ func StartServer(nodeID, minerAddress string) {
 	if _, ok := static.KnownNodes[static.SelfNodeAddress]; ok {
 		delete(static.KnownNodes, static.SelfNodeAddress)
 	}
-	ln, err := net.Listen(static.PROTOCOL, static.SelfNodeAddress)
+	ln, err := net.Listen(protocol.PROTOCOL, static.SelfNodeAddress)
 	if err != nil {
 		log.Panic(err)
 	}
 	defer ln.Close()
-	bc := blockchain.NewBlockChain(nodeID)
+	bc := core.NewBlockChain(nodeID)
+
+	newProtocol := protocol.Protocol{
+		Config: &protocol.Configuration{
+			Chain: &bc,
+			Nodes: &static.KnownNodes,
+		},
+	}
+
 	pingService := &services.PingService{}
-	pingService.Start(static.SelfNodeAddress, &static.KnownNodes)
+	pingService.Start(static.SelfNodeAddress, &newProtocol)
 	if len(minerAddress) > 0 {
 		miningService := &services.MiningService{MinerAddress: minerAddress}
-		miningService.Start(bc, &static.KnownNodes, &static.MemPool)
+		miningService.Start(&newProtocol, &static.MemPool)
 	}
 	go func() {
 		for nodeAddr := range static.KnownNodes {
 			if nodeAddr != static.SelfNodeAddress {
-				if p.SendVersion(static.SelfNodeAddress, nodeAddr, bc, &static.KnownNodes) {
+				if newProtocol.SendVersion(static.SelfNodeAddress, nodeAddr) {
 					break
 				}
 			}
@@ -82,6 +90,6 @@ func StartServer(nodeID, minerAddress string) {
 		if err != nil {
 			log.Panic(err)
 		}
-		go handleConnection(conn, bc)
+		go handleConnection(conn, &newProtocol)
 	}
 }

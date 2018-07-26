@@ -7,16 +7,17 @@ package cli
 import (
 	"fmt"
 	"errors"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
-	"github.com/YuriyLisovskiy/blockchain-go/src"
 )
 
 func (cli *CLI) createBlockChain(address, nodeId string) error {
 	if !wallet.ValidateAddress(address) {
 		return errors.New(fmt.Sprintf("ERROR: Address '%s' is not valid", address))
 	}
-	bc := src.CreateBlockChain(address, nodeId)
-	UTXOSet := src.UTXOSet{BlockChain: bc}
+	bc := core.CreateBlockChain(address, nodeId)
+	UTXOSet := core.UTXOSet{BlockChain: bc}
 	UTXOSet.Reindex()
 	bc.CloseDB(true)
 	fmt.Println("Done!")

@@ -6,20 +6,21 @@ package services
 
 import (
 	"time"
+
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
 )
 
 type PingService struct {}
 
-func (ps *PingService) Start(nodeAddress string, knownNodes *map[string]bool) {
+func (ps *PingService) Start(nodeAddress string, proto *protocol.Protocol) {
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
 		for {
 			select {
 			case <-ticker.C:
-				for addr := range *knownNodes {
+				for addr := range *proto.Config.Nodes {
 					if addr != nodeAddress {
-						protocol.SendPing(nodeAddress, addr, knownNodes)
+						proto.SendPing(nodeAddress, addr)
 					}
 				}
 			}

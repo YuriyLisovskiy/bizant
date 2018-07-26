@@ -2,22 +2,21 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package util
+package protocol
 
 import (
 	"fmt"
 	"log"
 	"bytes"
 	"encoding/gob"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 )
 
 func ExtractCommand(request []byte) []byte {
-	return request[:static.COMMAND_LENGTH]
+	return request[:COMMAND_LENGTH]
 }
 
 func CommandToBytes(command string) []byte {
-	var b [static.COMMAND_LENGTH]byte
+	var b [COMMAND_LENGTH]byte
 	for i, c := range command {
 		b[i] = byte(c)
 	}

@@ -8,19 +8,21 @@ import (
 	"log"
 	"fmt"
 	"bytes"
+	"sync/atomic"
 	"encoding/gob"
 	"encoding/hex"
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	blockchain "github.com/YuriyLisovskiy/blockchain-go/src"
-	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 	"encoding/json"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/core"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 )
 
-func HandleAddr(request []byte) {
+func (self *Protocol) HandleAddr(request []byte) {
 	var buff bytes.Buffer
 	payload := addr{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -34,36 +36,36 @@ func HandleAddr(request []byte) {
 	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(static.KnownNodes)))
 }
 
-func HandleBlock(request []byte, bc blockchain.BlockChain) {
-	primitives.InterruptMining = true
+func (self *Protocol) HandleBlock(request []byte) {
+	atomic.StoreInt32(&vars.Mining, 1)
 	var buff bytes.Buffer
 	payload := block{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	blockData := payload.Block
-	block := primitives.DeserializeBlock(blockData)
-	utils.PrintLog("Recevied a new block!\n")
-	bc.AddBlock(block)
+	block := core.DeserializeBlock(blockData)
+	utils.PrintLog("Received a new block!\n")
+	self.Config.Chain.AddBlock(block)
 	utils.PrintLog(fmt.Sprintf("Added block %x\n", block.Hash))
 	if len(static.BlocksInTransit) > 0 {
 		blockHash := static.BlocksInTransit[0]
-		SendGetData(static.SelfNodeAddress, payload.AddrFrom, static.C_BLOCK, blockHash, &static.KnownNodes)
+		self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash)
 		static.BlocksInTransit = static.BlocksInTransit[1:]
 	} else {
-		UTXOSet := blockchain.UTXOSet{BlockChain: bc}
+		UTXOSet := core.UTXOSet{BlockChain: *self.Config.Chain}
 		UTXOSet.Reindex()
 	}
-	primitives.InterruptMining = false
+	atomic.StoreInt32(&vars.Mining, 0)
 }
 
-func HandleInv(request []byte, bc blockchain.BlockChain) {
+func (self *Protocol) HandleInv(request []byte) {
 	var buff bytes.Buffer
 	payload := inv{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -71,10 +73,10 @@ func HandleInv(request []byte, bc blockchain.BlockChain) {
 	}
 	utils.PrintLog(fmt.Sprintf("Recevied inventory with %d %s\n", len(payload.Items), payload.Type))
 	switch payload.Type {
-	case static.C_BLOCK:
+	case C_BLOCK:
 		static.BlocksInTransit = payload.Items
 		blockHash := payload.Items[0]
-		SendGetData(static.SelfNodeAddress, payload.AddrFrom, static.C_BLOCK, blockHash, &static.KnownNodes)
+		self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash)
 		var newInTransit [][]byte
 		for _, b := range static.BlocksInTransit {
 			if bytes.Compare(b, blockHash) != 0 {
@@ -82,67 +84,67 @@ func HandleInv(request []byte, bc blockchain.BlockChain) {
 			}
 		}
 		static.BlocksInTransit = newInTransit
-	case static.C_TX:
+	case C_TX:
 		txID := payload.Items[0]
 		if static.MemPool[hex.EncodeToString(txID)].ID == nil {
-			SendGetData(static.SelfNodeAddress, payload.AddrFrom, static.C_TX, txID, &static.KnownNodes)
+			self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_TX, txID)
 		}
 	default:
 	}
 }
 
-func HandleGetBlocks(request []byte, bc blockchain.BlockChain) {
+func (self *Protocol) HandleGetBlocks(request []byte) {
 	var buff bytes.Buffer
 	payload := getblocks{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	blocks := bc.GetBlockHashes(payload.BestHeight)
-	SendInv(static.SelfNodeAddress, payload.AddrFrom, static.C_BLOCK, blocks, &static.KnownNodes)
+	blocks := self.Config.Chain.GetBlockHashes(payload.BestHeight)
+	self.SendInv(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blocks)
 }
 
-func HandleGetData(request []byte, bc blockchain.BlockChain) {
+func (self *Protocol) HandleGetData(request []byte) {
 	var buff bytes.Buffer
 	payload := getdata{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	switch payload.Type {
-	case static.C_BLOCK:
-		block, err := bc.GetBlock([]byte(payload.ID))
+	case C_BLOCK:
+		block, err := self.Config.Chain.GetBlock([]byte(payload.ID))
 		if err != nil {
 			return
 		}
-		SendBlock(static.SelfNodeAddress, payload.AddrFrom, block, &static.KnownNodes)
-	case static.C_TX:
+		self.SendBlock(static.SelfNodeAddress, payload.AddrFrom, block)
+	case C_TX:
 		txID := hex.EncodeToString(payload.ID)
 		tx := static.MemPool[txID]
-		SendTx(static.SelfNodeAddress, payload.AddrFrom, tx, &static.KnownNodes)
+		self.SendTx(static.SelfNodeAddress, payload.AddrFrom, tx)
 		// delete(mempool, txID)
 	default:
 	}
 }
 
-func HandleTx(request []byte, bc blockchain.BlockChain) {
+func (self *Protocol) HandleTx(request []byte) {
 	var buff bytes.Buffer
 	payload := tx{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
 	txData := payload.Transaction
-	tx := primitives.DeserializeTransaction(txData)
+	tx := core.DeserializeTransaction(txData)
 	static.MemPool[hex.EncodeToString(tx.ID)] = tx
 
-	if !bc.VerifyTransaction(tx) {
+	if !self.Config.Chain.VerifyTransaction(tx) {
 		utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.ID))
 		data, err := json.MarshalIndent(tx, "", "  ")
 		if err == nil {
@@ -192,21 +194,21 @@ func HandleTx(request []byte, bc blockchain.BlockChain) {
 	*/
 }
 
-func HandleVersion(request []byte, bc blockchain.BlockChain) {
+func (self *Protocol) HandleVersion(request []byte) {
 	var buff bytes.Buffer
 	payload := version{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	myBestHeight := bc.GetBestHeight()
+	myBestHeight := self.Config.Chain.GetBestHeight()
 	foreignerBestHeight := payload.BestHeight
 	if myBestHeight < foreignerBestHeight {
-		SendGetBlocks(static.SelfNodeAddress, payload.AddrFrom, bc, &static.KnownNodes)
+		self.SendGetBlocks(static.SelfNodeAddress, payload.AddrFrom)
 	} else if myBestHeight > foreignerBestHeight {
-		SendVersion(static.SelfNodeAddress, payload.AddrFrom, bc, &static.KnownNodes)
+		self.SendVersion(static.SelfNodeAddress, payload.AddrFrom)
 	}
 	static.KnownNodes[payload.AddrFrom] = true
 	//	if !utils.NodeIsKnown(payload.AddrFrom, KnownNodes) {
@@ -214,27 +216,27 @@ func HandleVersion(request []byte, bc blockchain.BlockChain) {
 	//	}
 	for address := range static.KnownNodes {
 		if address != static.SelfNodeAddress {
-			SendAddr(address, &static.KnownNodes)
+			self.SendAddr(address)
 		}
 	}
 }
 
-func HandlePing(request []byte) bool {
+func (self *Protocol) HandlePing(request []byte) bool {
 	var buff bytes.Buffer
 	payload := ping{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
 		log.Panic(err)
 	}
-	return SendPong(static.SelfNodeAddress, payload.AddrFrom, &static.KnownNodes)
+	return self.SendPong(static.SelfNodeAddress, payload.AddrFrom)
 }
 
-func HandlePong(request []byte) {
+func (self *Protocol) HandlePong(request []byte) {
 	var buff bytes.Buffer
 	payload := pong{}
-	buff.Write(request[static.COMMAND_LENGTH:])
+	buff.Write(request[COMMAND_LENGTH:])
 	dec := gob.NewDecoder(&buff)
 	err := dec.Decode(&payload)
 	if err != nil {
@@ -246,7 +248,7 @@ func HandlePong(request []byte) {
 	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(static.KnownNodes)))
 }
 
-func HandleError(request []byte) {
+func (self *Protocol) HandleError(request []byte) {
 
 	// TODO: implement protocol error handling
 

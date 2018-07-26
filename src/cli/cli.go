@@ -7,7 +7,8 @@ package cli
 import (
 	"os"
 	"fmt"
-	"github.com/YuriyLisovskiy/blockchain-go/src/primitives"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 )
 
 type CLI struct{}
@@ -43,7 +44,7 @@ func (cli *CLI) Run() {
 	sendFrom := sendCmd.String("from", "", "Source wallet address")
 	sendTo := sendCmd.String("to", "", "Destination wallet address")
 	sendAmount := sendCmd.Float64("amount", 0, "Amount to send")
-	sendFee := sendCmd.Float64("fee", primitives.MIN_FEE_PER_BYTE, "Mine immediately on the same node")
+	sendFee := sendCmd.Float64("fee", vars.MIN_FEE_PER_BYTE, "Mine immediately on the same node")
 	startNodeMiner := startNodeCmd.String("mine", "", "Enable mining mode")
 	switch os.Args[1] {
 	case "balance":

@@ -4,7 +4,7 @@
 
 package static
 
-import "github.com/YuriyLisovskiy/blockchain-go/src/primitives"
+import "github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 
 var (
 	SelfNodeAddress string
@@ -15,5 +15,5 @@ var (
 	}
 
 	BlocksInTransit [][]byte
-	MemPool         = make(map[string]primitives.Transaction)
+	MemPool         = make(map[string]types.Transaction)
 )

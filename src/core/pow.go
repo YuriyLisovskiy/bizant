@@ -2,25 +2,29 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package primitives
+package core
 
 import (
 	"fmt"
 	"bytes"
 	"errors"
 	"math/big"
+	"sync/atomic"
 	"crypto/sha256"
+
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 )
 
 type ProofOfWork struct {
-	block  Block
+	block  types.Block
 	target *big.Int
 }
 
-func NewProofOfWork(block Block) ProofOfWork {
+func NewProofOfWork(block types.Block) ProofOfWork {
 	target := big.NewInt(1)
-	target.Lsh(target, uint(256-TARGET_BITS))
+	target.Lsh(target, uint(256-vars.TARGET_BITS))
 	pow := ProofOfWork{block, target}
 	return pow
 }
@@ -31,7 +35,7 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 			pow.block.PrevBlockHash,
 			pow.block.HashTransactions(),
 			utils.IntToHex(pow.block.Timestamp),
-			utils.IntToHex(int64(TARGET_BITS)),
+			utils.IntToHex(int64(vars.TARGET_BITS)),
 			utils.IntToHex(int64(nonce)),
 		},
 		[]byte{},
@@ -43,8 +47,8 @@ func (pow *ProofOfWork) Run() (int, []byte, error) {
 	var hashInt big.Int
 	var hash [32]byte
 	nonce := 0
-	for nonce < maxNonce {
-		if InterruptMining {
+	for nonce < vars.MAX_NONCE {
+		if atomic.LoadInt32(&vars.Mining) == 1 {
 			return 0, []byte{}, errors.New("mining interrupt")
 		}
 		data := pow.prepareData(nonce)

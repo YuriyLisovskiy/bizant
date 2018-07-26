@@ -2,12 +2,11 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package primitives
+package types
 
 import (
 	"fmt"
 	"log"
-	"time"
 	"bytes"
 	"math/big"
 	"crypto/rand"
@@ -16,7 +15,9 @@ import (
 	"encoding/hex"
 	"crypto/sha256"
 	"crypto/elliptic"
-	"github.com/YuriyLisovskiy/blockchain-go/src/primitives/tx_io"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
 )
 
 type Transaction struct {
@@ -135,38 +136,12 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 	return true
 }
 
-func NewCoinBaseTX(to string, fees float64, data string) Transaction {
-	if data == "" {
-		randData := make([]byte, 20)
-		_, err := rand.Read(randData)
-		if err != nil {
-			log.Panic(err)
-		}
-		data = fmt.Sprintf("%x", randData)
-	}
-	txIn := tx_io.TXInput{TxId: []byte{}, VOut: -1, Signature: nil, PubKey: []byte(data)}
-	txOut := tx_io.NewTXOutput(MINING_REWARD+fees, to)
-	tx := Transaction{nil, []tx_io.TXInput{txIn}, []tx_io.TXOutput{*txOut}, time.Now().Unix(), 0}
-	tx.ID = tx.Hash()
-	return tx
-}
-
 func (tx *Transaction) CalculateFee(feePerByte float64) float64 {
 	if tx.IsCoinBase() {
 		return 0.0
 	}
-	if feePerByte < MIN_FEE_PER_BYTE {
-		feePerByte = MIN_FEE_PER_BYTE
+	if feePerByte < vars.MIN_FEE_PER_BYTE {
+		feePerByte = vars.MIN_FEE_PER_BYTE
 	}
-	return float64(len(tx.VIn)*148+len(tx.VOut)*34+10) * MIN_FEE_PER_BYTE
-}
-
-func DeserializeTransaction(data []byte) Transaction {
-	var transaction Transaction
-	decoder := gob.NewDecoder(bytes.NewReader(data))
-	err := decoder.Decode(&transaction)
-	if err != nil {
-		log.Panic(err)
-	}
-	return transaction
+	return float64(len(tx.VIn)*148+len(tx.VOut)*34+10) * vars.MIN_FEE_PER_BYTE
 }
