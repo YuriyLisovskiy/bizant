@@ -3,4 +3,5 @@ The following are developer notes on how to build Block Chain Go on your native 
 
 * [Build](build.md)
 * [Dependencies](dependencies.md)
-* [Supported Operating Systems and Architectures](supported-os.md)
+* [Manual installation of project dependencies](manual-installation.md)
+* [Supported Operating Systems and Architectures](supported-platforms.md)
