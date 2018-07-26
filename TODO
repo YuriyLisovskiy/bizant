@@ -5,3 +5,4 @@
 - add database resynchronization while reading blocks error
 - fix transaction verification after receiving it
 - add block verification before adding it to local blockchain database
+- implement secp256k1 elliptic curve
