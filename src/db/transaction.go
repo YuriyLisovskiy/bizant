@@ -4,10 +4,6 @@
 
 package db
 
-import (
-	"bytes"
-)
-
 // Transaction represents a read-only transaction on the database.
 // It can be used for retrieving values for keys as well as creating cursors for
 // iterating over the data.
@@ -16,10 +12,11 @@ import (
 // can not be reclaimed by the writer until no more transactions are using them.
 // A long running read transaction can cause the database to quickly grow.
 type Transaction struct {
-	db      *DB
-	meta    *meta
-	buckets *buckets
-	pages   map[pgid]*page
+	db            *DB
+	rwtransaction *RWTransaction
+	meta          *meta
+	buckets       *buckets
+	pages         map[pgid]*page
 }
 
 // txnid represents the internal transaction identifier.
@@ -46,6 +43,9 @@ func (t *Transaction) id() txnid {
 
 // Close closes the transaction and releases any pages it is using.
 func (t *Transaction) Close() {
+	if t.rwtransaction != nil {
+		t.rwtransaction.Rollback()
+	}
 	t.db.removeTransaction(t)
 }
 
@@ -63,9 +63,10 @@ func (t *Transaction) Bucket(name string) *Bucket {
 	}
 
 	return &Bucket{
-		bucket:      b,
-		name:        name,
-		transaction: t,
+		bucket:        b,
+		name:          name,
+		transaction:   t,
+		rwtransaction: t.rwtransaction,
 	}
 }
 
@@ -73,56 +74,15 @@ func (t *Transaction) Bucket(name string) *Bucket {
 func (t *Transaction) Buckets() []*Bucket {
 	buckets := make([]*Bucket, 0, len(t.buckets.items))
 	for name, b := range t.buckets.items {
-		bucket := &Bucket{bucket: b, transaction: t, name: name}
+		bucket := &Bucket{
+			bucket:        b,
+			name:          name,
+			transaction:   t,
+			rwtransaction: t.rwtransaction,
+		}
 		buckets = append(buckets, bucket)
 	}
 	return buckets
-}
-
-// Cursor creates a cursor associated with a given bucket.
-// The cursor is only valid as long as the Transaction is open.
-// Do not use a cursor after the transaction is closed.
-func (t *Transaction) Cursor(name string) (*Cursor, error) {
-	b := t.Bucket(name)
-	if b == nil {
-		return nil, ErrBucketNotFound
-	}
-	return b.cursor(), nil
-}
-
-// Get retrieves the value for a key in a named bucket.
-// Returns a nil value if the key does not exist.
-// Returns an error if the bucket does not exist.
-func (t *Transaction) Get(name string, key []byte) (value []byte, err error) {
-	c, err := t.Cursor(name)
-	if err != nil {
-		return nil, err
-	}
-	k, v := c.Seek(key)
-	// If our target node isn't the same key as what's passed in then return nil.
-	if !bytes.Equal(key, k) {
-		return nil, nil
-	}
-	return v, nil
-}
-
-// ForEach executes a function for each key/value pair in a bucket.
-// An error is returned if the bucket cannot be found.
-func (t *Transaction) ForEach(name string, fn func(k, v []byte) error) error {
-	// Open a cursor on the bucket.
-	c, err := t.Cursor(name)
-	if err != nil {
-		return err
-	}
-
-	// Iterate over each key/value pair in the bucket.
-	for k, v := c.First(); k != nil; k, v = c.Next() {
-		if err := fn(k, v); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // page returns a reference to the page with a given id.
@@ -137,4 +97,20 @@ func (t *Transaction) page(id pgid) *page {
 
 	// Otherwise return directly from the mmap.
 	return t.db.page(id)
+}
+
+// forEachPage iterates over every page within a given page and executes a function.
+func (t *Transaction) forEachPage(pgid pgid, depth int, fn func(*page, int)) {
+	p := t.page(pgid)
+
+	// Execute function.
+	fn(p, depth)
+
+	// Recursively loop over children.
+	if (p.flags & branchPageFlag) != 0 {
+		for i := 0; i < int(p.count); i++ {
+			elem := p.branchPageElement(uint16(i))
+			t.forEachPage(elem.pgid, depth+1, fn)
+		}
+	}
 }

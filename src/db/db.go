@@ -380,7 +380,11 @@ func (db *DB) With(fn func(*Transaction) error) error {
 // An error is returned if the bucket cannot be found.
 func (db *DB) ForEach(name string, fn func(k, v []byte) error) error {
 	return db.With(func(t *Transaction) error {
-		return t.ForEach(name, fn)
+		b := t.Bucket(name)
+		if b == nil {
+			return ErrBucketNotFound
+		}
+		return b.ForEach(fn)
 	})
 }
 
@@ -435,8 +439,13 @@ func (db *DB) DeleteBucket(name string) error {
 func (db *DB) NextSequence(name string) (int, error) {
 	var seq int
 	err := db.Do(func(t *RWTransaction) error {
+		b := t.Bucket(name)
+		if b == nil {
+			return ErrBucketNotFound
+		}
+
 		var err error
-		seq, err = t.NextSequence(name)
+		seq, err = b.NextSequence()
 		return err
 	})
 	if err != nil {
@@ -453,14 +462,36 @@ func (db *DB) Get(name string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer t.Close()
-	return t.Get(name, key)
+
+	// Open bucket and retrieve value for key.
+	b := t.Bucket(name)
+	if b == nil {
+		return nil, ErrBucketNotFound
+	}
+	value, err := b.Get(key), nil
+	if err != nil {
+		return nil, err
+	} else if value == nil {
+		return nil, nil
+	}
+
+	// Copy the value out since the transaction will be closed after this
+	// function ends. The data can get reclaimed between now and when the
+	// value is used.
+	tmp := make([]byte, len(value))
+	copy(tmp, value)
+	return tmp, nil
 }
 
 // Put sets the value for a key in a bucket.
 // Returns an error if the bucket is not found, if key is blank, if the key is too large, or if the value is too large.
 func (db *DB) Put(name string, key []byte, value []byte) error {
 	return db.Do(func(t *RWTransaction) error {
-		return t.Put(name, key, value)
+		b := t.Bucket(name)
+		if b == nil {
+			return ErrBucketNotFound
+		}
+		return b.Put(key, value)
 	})
 }
 
@@ -468,7 +499,11 @@ func (db *DB) Put(name string, key []byte, value []byte) error {
 // Returns an error if the bucket cannot be found.
 func (db *DB) Delete(name string, key []byte) error {
 	return db.Do(func(t *RWTransaction) error {
-		return t.Delete(name, key)
+		b := t.Bucket(name)
+		if b == nil {
+			return ErrBucketNotFound
+		}
+		return b.Delete(key)
 	})
 }
 
@@ -508,6 +543,34 @@ func (db *DB) CopyFile(path string, mode os.FileMode) error {
 	defer f.Close()
 
 	return db.Copy(f)
+}
+
+// Stat retrieves stats on the database and its page usage.
+// Returns an error if the database is not open.
+func (db *DB) Stat() (*Stat, error) {
+	// Obtain meta & mmap locks.
+	db.metalock.Lock()
+	db.mmaplock.RLock()
+
+	var s = &Stat{
+		MmapSize:         len(db.data),
+		TransactionCount: len(db.transactions),
+	}
+
+	// Release locks.
+	db.mmaplock.RUnlock()
+	db.metalock.Unlock()
+
+	err := db.Do(func(t *RWTransaction) error {
+		s.PageCount = int(t.meta.pgid)
+		s.FreePageCount = len(db.freelist.all())
+		s.PageSize = db.pageSize
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // page retrieves a page reference from the mmap based on the current page size.
@@ -553,4 +616,27 @@ func (db *DB) allocate(count int) (*page, error) {
 	db.rwtransaction.meta.pgid += pgid(count)
 
 	return p, nil
+}
+
+// Stat represents stats on the database such as free pages and sizes.
+type Stat struct {
+	// PageCount is the total number of allocated pages. This is a high water
+	// mark in the database that represents how many pages have actually been
+	// used. This will be smaller than the MmapSize / PageSize.
+	PageCount int
+
+	// FreePageCount is the total number of pages which have been previously
+	// allocated but are no longer used.
+	FreePageCount int
+
+	// PageSize is the size, in bytes, of individual database pages.
+	PageSize int
+
+	// MmapSize is the mmap-allocated size of the data file. When the data file
+	// grows beyond this size, the database will obtain a lock on the mmap and
+	// resize it.
+	MmapSize int
+
+	// TransactionCount is the total number of reader transactions.
+	TransactionCount int
 }
