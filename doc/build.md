@@ -38,7 +38,7 @@ secp256k1   | secp256k1 elliptic curve | Optimized C library for EC operations o
 
 #### Install dependencies
 You can install required go libraries and submodules manually, see [manual-installation.md](manual-installation.md),
-or use [install.sh](../install.sh) script:
+or use [install-deps.sh](../install-deps.sh) script:
 ```bash
 $ make install-deps
 ```
