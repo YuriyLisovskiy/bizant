@@ -15,7 +15,6 @@ import (
 // functions provided by Transaction.
 type RWTransaction struct {
 	Transaction
-	nodes   map[pgid]*node
 	pending []*node
 }
 
@@ -24,6 +23,7 @@ func (t *RWTransaction) init(db *DB) {
 	t.Transaction.init(db)
 	t.Transaction.rwtransaction = t
 	t.pages = make(map[pgid]*page)
+	t.nodes = make(map[pgid]*node)
 
 	// Increment the transaction id.
 	t.meta.txnid += txnid(1)
@@ -67,14 +67,18 @@ func (t *RWTransaction) CreateBucketIfNotExists(name string) error {
 // DeleteBucket deletes a bucket.
 // Returns an error if the bucket cannot be found.
 func (t *RWTransaction) DeleteBucket(name string) error {
-	if b := t.Bucket(name); b == nil {
+	b := t.Bucket(name)
+	if b == nil {
 		return ErrBucketNotFound
 	}
 
 	// Remove from buckets page.
 	t.buckets.del(name)
 
-	// TODO(benbjohnson): Free all pages.
+	// Free all pages.
+	t.forEachPage(b.root, 0, func(p *page, depth int) {
+		t.db.freelist.free(t.id(), p)
+	})
 
 	return nil
 }
@@ -266,7 +270,7 @@ func (t *RWTransaction) writeMeta() error {
 // node creates a node from a page and associates it with a given parent.
 func (t *RWTransaction) node(pgid pgid, parent *node) *node {
 	// Retrieve node if it has already been fetched.
-	if n := t.nodes[pgid]; n != nil {
+	if n := t.Transaction.node(pgid); n != nil {
 		return n
 	}
 

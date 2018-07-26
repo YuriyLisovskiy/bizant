@@ -33,6 +33,7 @@ func init() {
 	flag.IntVar(&qmaxvsize, "quick.maxvsize", 1024, "")
 	flag.Parse()
 	warn("seed:", qseed)
+	warnf("quick settings: count=%v, items=%v, ksize=%v, vsize=%v", qcount, qmaxitems, qmaxksize, qmaxvsize)
 }
 
 func qconfig() *quick.Config {
