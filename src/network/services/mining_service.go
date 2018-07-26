@@ -31,14 +31,14 @@ func (ms *MiningService) Start(proto *protocol.Protocol, memPool *map[string]typ
 				} else {
 					// TODO: send an error to transaction's author
 
-					utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.ID))
+					utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.Hash))
 
 					data, err := json.MarshalIndent(tx, "", "  ")
 					if err == nil {
 						fmt.Println(string(data))
 					}
 				}
-				delete(*memPool, hex.EncodeToString(tx.ID))
+				delete(*memPool, hex.EncodeToString(tx.Hash))
 			}
 			newBlock, err := proto.Config.Chain.MineBlock(ms.MinerAddress, txs)
 			if err == nil {

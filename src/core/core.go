@@ -6,10 +6,8 @@ package core
 
 import (
 	"log"
-	"fmt"
 	"time"
 	"bytes"
-	"crypto/rand"
 	"encoding/gob"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
@@ -47,25 +45,17 @@ func DeserializeBlock(d []byte) types.Block {
 	return block
 }
 
-func NewCoinBaseTX(to string, fees float64, data string) types.Transaction {
-	if data == "" {
-		randData := make([]byte, 20)
-		_, err := rand.Read(randData)
-		if err != nil {
-			log.Panic(err)
-		}
-		data = fmt.Sprintf("%x", randData)
-	}
-	txIn := tx_io.TXInput{TxId: []byte{}, VOut: -1, Signature: nil, PubKey: []byte(data)}
+func NewCoinBaseTX(to string, fees float64) types.Transaction {
+	txIn := tx_io.TXInput{PreviousTx: []byte{}, VOut: -1, Signature: nil}
 	txOut := tx_io.NewTXOutput(vars.MINING_REWARD+fees, to)
 	tx := types.Transaction{
-		ID:        nil,
+		Hash:        nil,
 		VIn:       []tx_io.TXInput{txIn},
 		VOut:      []tx_io.TXOutput{*txOut},
 		Timestamp: time.Now().Unix(),
 		Fee:       0,
 	}
-	tx.ID = tx.Hash()
+	tx.Hash = tx.CalcHash()
 	return tx
 }
 

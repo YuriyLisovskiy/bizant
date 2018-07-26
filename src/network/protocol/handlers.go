@@ -86,7 +86,7 @@ func (self *Protocol) HandleInv(request []byte) {
 		static.BlocksInTransit = newInTransit
 	case C_TX:
 		txID := payload.Items[0]
-		if static.MemPool[hex.EncodeToString(txID)].ID == nil {
+		if static.MemPool[hex.EncodeToString(txID)].Hash == nil {
 			self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_TX, txID)
 		}
 	default:
@@ -142,10 +142,10 @@ func (self *Protocol) HandleTx(request []byte) {
 	}
 	txData := payload.Transaction
 	tx := core.DeserializeTransaction(txData)
-	static.MemPool[hex.EncodeToString(tx.ID)] = tx
+	static.MemPool[hex.EncodeToString(tx.Hash)] = tx
 
 	if !self.Config.Chain.VerifyTransaction(tx) {
-		utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.ID))
+		utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.Hash))
 		data, err := json.MarshalIndent(tx, "", "  ")
 		if err == nil {
 			fmt.Println(string(data))

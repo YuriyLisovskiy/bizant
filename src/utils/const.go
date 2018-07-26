@@ -4,7 +4,9 @@
 
 package utils
 
+import "math/big"
+
 const (
-	BLOCKS_BUCKET         = "blocks"
-	GENESIS_COINBASE_DATA = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
+	WORD_BYTES    = (32 << (uint64(^big.Word(0)) >> 63)) / 8
+	BLOCKS_BUCKET = "blocks"
 )

@@ -12,7 +12,8 @@ import (
 	"errors"
 	"io/ioutil"
 	"encoding/gob"
-	"crypto/elliptic"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/secp256k1"
 )
 
 type Wallets struct {
@@ -59,7 +60,7 @@ func (ws *Wallets) LoadFromFile(nodeID string) error {
 		log.Panic(err)
 	}
 	var wallets Wallets
-	gob.Register(elliptic.P256())
+	gob.Register(secp256k1.S256())
 	decoder := gob.NewDecoder(bytes.NewReader(fileContent))
 	err = decoder.Decode(&wallets)
 	if err != nil {
@@ -72,7 +73,7 @@ func (ws *Wallets) LoadFromFile(nodeID string) error {
 func (ws Wallets) SaveToFile(nodeID string) {
 	var content bytes.Buffer
 	walletFile := fmt.Sprintf(walletFile, nodeID)
-	gob.Register(elliptic.P256())
+	gob.Register(secp256k1.S256())
 	encoder := gob.NewEncoder(&content)
 	err := encoder.Encode(ws)
 	if err != nil {

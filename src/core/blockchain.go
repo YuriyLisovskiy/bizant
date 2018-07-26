@@ -35,7 +35,7 @@ func CreateBlockChain(address, nodeID string) BlockChain {
 		os.Exit(1)
 	}
 	var tip []byte
-	cbTx := NewCoinBaseTX(address, 0, utils.GENESIS_COINBASE_DATA)
+	cbTx := NewCoinBaseTX(address, 0)
 	genesis, err := NewGenesisBlock(cbTx)
 	if err != nil {
 		log.Panic(err)
@@ -171,7 +171,7 @@ func (bc *BlockChain) FindUTXO() map[string]tx_io.TXOutputs {
 	for !bci.End() {
 		block := bci.Next()
 		for _, tx := range block.Transactions {
-			txID := hex.EncodeToString(tx.ID)
+			txID := hex.EncodeToString(tx.Hash)
 		Outputs:
 			for outIdx, out := range tx.VOut {
 				if spentTXOs[txID] != nil {
@@ -187,7 +187,7 @@ func (bc *BlockChain) FindUTXO() map[string]tx_io.TXOutputs {
 			}
 			if tx.IsCoinBase() == false {
 				for _, in := range tx.VIn {
-					inTxID := hex.EncodeToString(in.TxId)
+					inTxID := hex.EncodeToString(in.PreviousTx)
 					spentTXOs[inTxID] = append(spentTXOs[inTxID], in.VOut)
 				}
 			}
@@ -218,12 +218,12 @@ func NewUTXOTransaction(targetWallet *wallet.Wallet, to string, amount, fee floa
 		log.Panic("ERROR: Not enough funds")
 	}
 	for txId, outs := range validOutputs {
-		txID, err := hex.DecodeString(txId)
+		prevTx, err := hex.DecodeString(txId)
 		if err != nil {
 			log.Panic(err)
 		}
 		for _, out := range outs {
-			inputs = append(inputs, tx_io.TXInput{TxId: txID, VOut: out, Signature: nil, PubKey: targetWallet.PublicKey})
+			inputs = append(inputs, tx_io.TXInput{PreviousTx: prevTx, VOut: out, Signature: nil, PubKey: targetWallet.PublicKey})
 		}
 	}
 	from := fmt.Sprintf("%x", targetWallet.GetAddress())
@@ -232,13 +232,13 @@ func NewUTXOTransaction(targetWallet *wallet.Wallet, to string, amount, fee floa
 		outputs = append(outputs, *tx_io.NewTXOutput(acc-amount, from)) // a change
 	}
 	tx := types.Transaction{
-		ID:        nil,
+		Hash:        nil,
 		VIn:       inputs,
 		VOut:      outputs,
 		Timestamp: time.Now().Unix(),
 		Fee:       0,
 	}
-	tx.ID = tx.Hash()
+	tx.Hash = tx.CalcHash()
 	tx.Fee = tx.CalculateFee(fee)
 	return utxoSet.BlockChain.SignTransaction(tx, targetWallet.PrivateKey)
 }
@@ -267,7 +267,7 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []types.Transa
 	if err != nil {
 		log.Panic(err)
 	}
-	transactions = append(transactions, NewCoinBaseTX(minerAddress, fees, ""))
+	transactions = append(transactions, NewCoinBaseTX(minerAddress, fees))
 	newBlock, err := NewBlock(transactions, lastHash, lastHeight+1)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -298,7 +298,7 @@ func (bc *BlockChain) FindTransaction(ID []byte) (types.Transaction, error) {
 	for !bci.End() {
 		block := bci.Next()
 		for _, tx := range block.Transactions {
-			if bytes.Compare(tx.ID, ID) == 0 {
+			if bytes.Compare(tx.Hash, ID) == 0 {
 				return tx, nil
 			}
 		}
@@ -312,11 +312,11 @@ func (bc *BlockChain) VerifyTransaction(tx types.Transaction) bool {
 	}
 	prevTXs := make(map[string]types.Transaction)
 	for _, vin := range tx.VIn {
-		prevTX, err := bc.FindTransaction(vin.TxId)
+		prevTX, err := bc.FindTransaction(vin.PreviousTx)
 		if err != nil {
 			log.Panic(err)
 		}
-		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+		prevTXs[hex.EncodeToString(prevTX.Hash)] = prevTX
 	}
 	return tx.Verify(prevTXs)
 }
@@ -324,11 +324,11 @@ func (bc *BlockChain) VerifyTransaction(tx types.Transaction) bool {
 func (bc *BlockChain) SignTransaction(tx types.Transaction, privKey ecdsa.PrivateKey) types.Transaction {
 	prevTXs := make(map[string]types.Transaction)
 	for _, vin := range tx.VIn {
-		prevTX, err := bc.FindTransaction(vin.TxId)
+		prevTX, err := bc.FindTransaction(vin.PreviousTx)
 		if err != nil {
 			log.Panic(err)
 		}
-		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+		prevTXs[hex.EncodeToString(prevTX.Hash)] = prevTX
 	}
 	return tx.Sign(privKey, prevTXs)
 }

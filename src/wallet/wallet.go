@@ -10,9 +10,10 @@ import (
 	"crypto/rand"
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"crypto/elliptic"
 	"golang.org/x/crypto/ripemd160"
+
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/secp256k1"
 )
 
 type Wallet struct {
@@ -62,7 +63,7 @@ func checksum(payload []byte) []byte {
 }
 
 func newKeyPair() (ecdsa.PrivateKey, []byte) {
-	curve := elliptic.P256()
+	curve := secp256k1.S256()
 	private, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		log.Panic(err)
