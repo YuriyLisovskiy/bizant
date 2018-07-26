@@ -30,17 +30,15 @@ These libraries are required:
  crypto      | Cryptography     | Supplementary Go cryptography libraries
  bolt        | Bolt DB          | An embedded key/value database
 
-#### Cryptography:
+Submodules
+---------------------
+Module      | Purpose                  | Description
+------------|--------------------------|----------------------
+secp256k1   | secp256k1 elliptic curve | Optimized C library for EC operations on curve secp256k1
 
-The easiest way to install is to run
+#### Install dependencies
+You can install required go libraries and submodules manually, see [manual-installation.md](manual-installation.md),
+or use [install.sh](../install.sh) script:
 ```bash
-$ go get -u golang.org/x/crypto/...
-```
-You can also manually git clone the repository to `$GOPATH/src/golang.org/x/crypto`.
-
-#### Bolt DB:
-
-This will retrieve the library and install the bolt command line utility into your `GOBIN` path:
-```bash
-$ go get github.com/boltdb/bolt/...
+$ make install-deps
 ```
