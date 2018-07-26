@@ -1,0 +1,3 @@
+[submodule "src/secp256k1/libsecp256k1"]
+	path = src/secp256k1/libsecp256k1
+	url = https://github.com/YuriyLisovskiy/secp256k1.git

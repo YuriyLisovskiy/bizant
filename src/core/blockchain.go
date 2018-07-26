@@ -12,8 +12,6 @@ import (
 	"bytes"
 	"errors"
 	"encoding/hex"
-	"crypto/ecdsa"
-	//	"encoding/json"
 
 	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
@@ -321,7 +319,7 @@ func (bc *BlockChain) VerifyTransaction(tx types.Transaction) bool {
 	return tx.Verify(prevTXs)
 }
 
-func (bc *BlockChain) SignTransaction(tx types.Transaction, privKey ecdsa.PrivateKey) types.Transaction {
+func (bc *BlockChain) SignTransaction(tx types.Transaction, privKey []byte) types.Transaction {
 	prevTXs := make(map[string]types.Transaction)
 	for _, vin := range tx.VIn {
 		prevTX, err := bc.FindTransaction(vin.PreviousTx)

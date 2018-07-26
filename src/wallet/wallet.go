@@ -14,10 +14,11 @@ import (
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/secp256k1"
+	"crypto/elliptic"
 )
 
 type Wallet struct {
-	PrivateKey ecdsa.PrivateKey
+	PrivateKey []byte
 	PublicKey  []byte
 }
 
@@ -62,12 +63,14 @@ func checksum(payload []byte) []byte {
 	return secondSHA[:ADDRESS_CHECKSUM_LEN]
 }
 
-func newKeyPair() (ecdsa.PrivateKey, []byte) {
-	curve := secp256k1.S256()
-	private, err := ecdsa.GenerateKey(curve, rand.Reader)
+func newKeyPair() (publicKey []byte, privateKey []byte) {
+	key, err := ecdsa.GenerateKey(secp256k1.S256(), rand.Reader)
 	if err != nil {
-		log.Panic(err)
+		panic(err)
 	}
-	pubKey := append(private.PublicKey.X.Bytes(), private.PublicKey.Y.Bytes()...)
-	return *private, pubKey
+	publicKey = elliptic.Marshal(secp256k1.S256(), key.X, key.Y)
+	privateKey = make([]byte, 32)
+	blob := key.D.Bytes()
+	copy(privateKey[32-len(blob):], blob)
+	return
 }

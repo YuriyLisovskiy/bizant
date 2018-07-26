@@ -7,12 +7,10 @@ package types
 import (
 	"log"
 	"bytes"
-	"crypto/ecdsa"
 	"encoding/gob"
 	"encoding/hex"
 	"crypto/sha256"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/secp256k1"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
@@ -48,7 +46,7 @@ func (tx *Transaction) CalcHash() []byte {
 	return hash[:]
 }
 
-func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Transaction) Transaction {
+func (tx *Transaction) Sign(privateKey []byte, prevTXs map[string]Transaction) Transaction {
 	if tx.IsCoinBase() {
 		return *tx
 	}
@@ -57,7 +55,6 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 			log.Panic("ERROR: Previous transaction is not correct")
 		}
 	}
-	encPrivateKey := utils.PaddedBigBytes(privateKey.D, privateKey.Params().BitSize/8)
 
 //	fmt.Printf("\n\nPUB KEY (sign): %x\n", append(privateKey.PublicKey.X.Bytes(), privateKey.PublicKey.Y.Bytes()...))
 
@@ -68,7 +65,7 @@ func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTXs map[string]Tran
 		txCopy.VIn[inID].Signature = nil
 		txCopy.VIn[inID].PubKey = prevTx.VOut[vIn.VOut].PubKeyHash
 		//	dataToSign := fmt.Sprintf("%x\n", txCopy)
-		signature, err := secp256k1.Sign(tx.Hash, encPrivateKey)
+		signature, err := secp256k1.Sign(tx.Hash, privateKey)
 		if err != nil {
 			log.Panic(err)
 		}
