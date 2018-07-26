@@ -65,7 +65,8 @@ freebsd-amd64:
 
 
 test:
-	go test -v ./src/...
+	go test ./src/...
+#	go test -v ./src/...
 
 clean:
 	-rm -rf bin/
