@@ -36,7 +36,6 @@ var (
 type DB struct {
 	path     string
 	file     *os.File
-	metafile *os.File
 	data     []byte
 	meta0    *meta
 	meta1    *meta
@@ -51,8 +50,7 @@ type DB struct {
 	mmaplock sync.RWMutex // Protects mmap access during remapping.
 
 	ops struct {
-		writeAt     func(b []byte, off int64) (n int, err error)
-		metaWriteAt func(b []byte, off int64) (n int, err error)
+		writeAt func(b []byte, off int64) (n int, err error)
 	}
 }
 
@@ -71,44 +69,38 @@ func (db *DB) String() string {
 	return fmt.Sprintf("DB<%q>", db.path)
 }
 
-// Open opens a data file at the given path and initializes the database.
+// Open creates and opens a database at the given path.
 // If the file does not exist then it will be created automatically.
-func (db *DB) Open(path string, mode os.FileMode) error {
-	var err error
-	db.metalock.Lock()
-	defer db.metalock.Unlock()
-
-	// Exit if the database is currently open.
-	if db.opened {
-		return ErrDatabaseOpen
-	}
+func Open(path string, mode os.FileMode) (*DB, error) {
+	var db = &DB{opened: true}
 
 	// Open data file and separate sync handler for metadata writes.
 	db.path = path
+
+	var err error
 	if db.file, err = os.OpenFile(db.path, os.O_RDWR|os.O_CREATE, mode); err != nil {
 		_ = db.close()
-		return err
-	}
-	if db.metafile, err = os.OpenFile(db.path, os.O_RDWR|os.O_SYNC, mode); err != nil {
-		_ = db.close()
-		return err
+		return nil, err
 	}
 
-	// default values for test hooks
-	if db.ops.writeAt == nil {
-		db.ops.writeAt = db.file.WriteAt
+	// Lock file so that other processes using Bolt cannot use the database
+	// at the same time. This would cause corruption since the two processes
+	// would write meta pages and free pages separately.
+	if err := syscall.Flock(int(db.file.Fd()), syscall.LOCK_EX); err != nil {
+		_ = db.close()
+		return nil, err
 	}
-	if db.ops.metaWriteAt == nil {
-		db.ops.metaWriteAt = db.metafile.WriteAt
-	}
+
+	// Default values for test hooks
+	db.ops.writeAt = db.file.WriteAt
 
 	// Initialize the database if it doesn't exist.
 	if info, err := db.file.Stat(); err != nil {
-		return fmt.Errorf("stat error: %s", err)
+		return nil, fmt.Errorf("stat error: %s", err)
 	} else if info.Size() == 0 {
 		// Initialize new files with meta pages.
 		if err := db.init(); err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		// Read the first meta page to determine the page size.
@@ -116,7 +108,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 		if _, err := db.file.ReadAt(buf[:], 0); err == nil {
 			m := db.pageInBuffer(buf[:], 0).meta()
 			if err := m.validate(); err != nil {
-				return fmt.Errorf("meta error: %s", err)
+				return nil, fmt.Errorf("meta error: %s", err)
 			}
 			db.pageSize = int(m.pageSize)
 		}
@@ -125,7 +117,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 	// Memory map the data file.
 	if err := db.mmap(0); err != nil {
 		_ = db.close()
-		return err
+		return nil, err
 	}
 
 	// Read in the freelist.
@@ -133,8 +125,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 	db.freelist.read(db.page(db.meta().freelist))
 
 	// Mark the database as opened and return.
-	db.opened = true
-	return nil
+	return db, nil
 }
 
 // mmap opens the underlying memory-mapped file and initializes the meta references.
@@ -254,7 +245,10 @@ func (db *DB) init() error {
 	p.count = 0
 
 	// Write the buffer to our data file.
-	if _, err := db.ops.metaWriteAt(buf, 0); err != nil {
+	if _, err := db.ops.writeAt(buf, 0); err != nil {
+		return err
+	}
+	if err := fdatasync(db.file); err != nil {
 		return err
 	}
 
@@ -275,6 +269,9 @@ func (db *DB) close() error {
 	db.freelist = nil
 	db.path = ""
 
+	// Clear ops.
+	db.ops.writeAt = nil
+
 	// Close the mmap.
 	if err := db.munmap(); err != nil {
 		return err
@@ -282,16 +279,14 @@ func (db *DB) close() error {
 
 	// Close file handles.
 	if db.file != nil {
+		// Unlock the file.
+		_ = syscall.Flock(int(db.file.Fd()), syscall.LOCK_UN)
+
+		// Close the file descriptor.
 		if err := db.file.Close(); err != nil {
-			return fmt.Errorf("db file close error: %s", err)
+			return fmt.Errorf("db file close: %s", err)
 		}
 		db.file = nil
-	}
-	if db.metafile != nil {
-		if err := db.metafile.Close(); err != nil {
-			return fmt.Errorf("db metafile close error: %s", err)
-		}
-		db.metafile = nil
 	}
 
 	return nil
@@ -525,6 +520,67 @@ func (db *DB) Stat() (*Stat, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+// Check performs several consistency checks on the database.
+// An error is returned if any inconsistency is found.
+func (db *DB) Check() error {
+	return db.Update(func(tx *Tx) error {
+		var errors ErrorList
+
+		// Track every reachable page.
+		reachable := make(map[pgid]*page)
+		reachable[0] = tx.page(0) // meta0
+		reachable[1] = tx.page(1) // meta1
+		for i := uint32(0); i <= tx.page(tx.meta.buckets).overflow; i++ {
+			reachable[tx.meta.buckets+pgid(i)] = tx.page(tx.meta.buckets)
+		}
+		for i := uint32(0); i <= tx.page(tx.meta.freelist).overflow; i++ {
+			reachable[tx.meta.freelist+pgid(i)] = tx.page(tx.meta.freelist)
+		}
+
+		// Check each reachable page within each bucket.
+		for _, bucket := range tx.Buckets() {
+			// warnf("[bucket] %s", bucket.name)
+			tx.forEachPage(bucket.root, 0, func(p *page, _ int) {
+				// Ensure each page is only referenced once.
+				for i := pgid(0); i <= pgid(p.overflow); i++ {
+					var id = p.id + i
+					if _, ok := reachable[id]; ok {
+						errors = append(errors, fmt.Errorf("page %d: multiple references", int(id)))
+					}
+					reachable[id] = p
+				}
+
+				// Retrieve page info.
+				info, err := tx.Page(int(p.id))
+				// warnf("[page] %d + %d (%s)", p.id, p.overflow, info.Type)
+				if err != nil {
+					errors = append(errors, err)
+				} else if info == nil {
+					errors = append(errors, fmt.Errorf("page %d: out of bounds: %d", int(p.id), int(tx.meta.pgid)))
+				} else if info.Type != "branch" && info.Type != "leaf" {
+					errors = append(errors, fmt.Errorf("page %d: invalid type: %s", int(p.id), info.Type))
+				}
+			})
+		}
+
+		// Ensure all pages below high water mark are either reachable or freed.
+		for i := pgid(0); i < tx.meta.pgid; i++ {
+			_, isReachable := reachable[i]
+			if !isReachable && !db.freelist.isFree(i) {
+				errors = append(errors, fmt.Errorf("page %d: unreachable unfreed", int(i)))
+			}
+		}
+
+		// TODO(benbjohnson): Ensure that only one buckets page exists.
+
+		if len(errors) > 0 {
+			return errors
+		}
+
+		return nil
+	})
 }
 
 // page retrieves a page reference from the mmap based on the current page size.

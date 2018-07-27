@@ -203,6 +203,16 @@ func (t *Tx) Commit() error {
 	t.db.freelist.free(t.id(), t.page(t.meta.buckets))
 	t.meta.buckets = p.id
 
+	// Free the freelist and allocate new pages for it. This will overestimate
+	// the size of the freelist but not underestimate the size (which would be bad).
+	t.db.freelist.free(t.id(), t.page(t.meta.freelist))
+	p, err = t.allocate((t.db.freelist.size() / t.db.pageSize) + 1)
+	if err != nil {
+		return err
+	}
+	t.db.freelist.write(p)
+	t.meta.freelist = p.id
+
 	// Write dirty pages to disk.
 	if err := t.write(); err != nil {
 		return err
@@ -375,7 +385,10 @@ func (t *Tx) writeMeta() error {
 	t.meta.write(p)
 
 	// Write the meta page to file.
-	if _, err := t.db.ops.metaWriteAt(buf, int64(p.id)*int64(t.db.pageSize)); err != nil {
+	if _, err := t.db.ops.writeAt(buf, int64(p.id)*int64(t.db.pageSize)); err != nil {
+		return err
+	}
+	if err := fdatasync(t.db.file); err != nil {
 		return err
 	}
 
