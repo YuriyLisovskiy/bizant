@@ -17,6 +17,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Ensure that committing a closed transaction returns an error.
+func TestTxCommitClosed(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		tx, _ := db.RWTx()
+		tx.CreateBucket("foo")
+		assert.NoError(t, tx.Commit())
+		assert.Equal(t, tx.Commit(), ErrTxClosed)
+	})
+}
+
+// Ensure that rolling back a closed transaction returns an error.
+func TestTxRollbackClosed(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		tx, _ := db.RWTx()
+		assert.NoError(t, tx.Rollback())
+		assert.Equal(t, tx.Rollback(), ErrTxClosed)
+	})
+}
+
+// Ensure that committing a read-only transaction returns an error.
+func TestTxCommitReadOnly(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		tx, _ := db.Tx()
+		assert.Equal(t, tx.Commit(), ErrTxNotWritable)
+	})
+}
+
 // Ensure that the database can retrieve a list of buckets.
 func TestTxBuckets(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
@@ -42,6 +69,15 @@ func TestTxCreateBucketReadOnly(t *testing.T) {
 			assert.Equal(t, tx.CreateBucket("foo"), ErrTxNotWritable)
 			return nil
 		})
+	})
+}
+
+// Ensure that creating a bucket on a closed transaction returns an error.
+func TestTxCreateBucketClosed(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		tx, _ := db.RWTx()
+		tx.Commit()
+		assert.Equal(t, tx.CreateBucket("foo"), ErrTxClosed)
 	})
 }
 
@@ -205,6 +241,15 @@ func TestTxDeleteBucket(t *testing.T) {
 			assert.Nil(t, tx.Bucket("widgets").Get([]byte("foo")))
 			return nil
 		})
+	})
+}
+
+// Ensure that deleting a bucket on a closed transaction returns an error.
+func TestTxDeleteBucketClosed(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		tx, _ := db.RWTx()
+		tx.Commit()
+		assert.Equal(t, tx.DeleteBucket("foo"), ErrTxClosed)
 	})
 }
 

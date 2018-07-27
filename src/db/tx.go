@@ -22,6 +22,7 @@ type txid uint64
 // quickly grow.
 type Tx struct {
 	writable bool
+	managed  bool
 	db       *DB
 	meta     *meta
 	buckets  *buckets
@@ -100,7 +101,9 @@ func (t *Tx) Buckets() []*Bucket {
 // CreateBucket creates a new bucket.
 // Returns an error if the bucket already exists, if the bucket name is blank, or if the bucket name is too long.
 func (t *Tx) CreateBucket(name string) error {
-	if !t.writable {
+	if t.db == nil {
+		return ErrTxClosed
+	} else if !t.writable {
 		return ErrTxNotWritable
 	} else if b := t.Bucket(name); b != nil {
 		return ErrBucketExists
@@ -136,7 +139,9 @@ func (t *Tx) CreateBucketIfNotExists(name string) error {
 // DeleteBucket deletes a bucket.
 // Returns an error if the bucket cannot be found.
 func (t *Tx) DeleteBucket(name string) error {
-	if !t.writable {
+	if t.db == nil {
+		return ErrTxClosed
+	} else if !t.writable {
 		return ErrTxNotWritable
 	}
 
@@ -159,11 +164,12 @@ func (t *Tx) DeleteBucket(name string) error {
 // Commit writes all changes to disk and updates the meta page.
 // Returns an error if a disk write error occurs.
 func (t *Tx) Commit() error {
-	if t.db == nil {
-		return nil
+	if t.managed {
+		panic("managed tx commit not allowed")
+	} else if t.db == nil {
+		return ErrTxClosed
 	} else if !t.writable {
-		t.Rollback()
-		return nil
+		return ErrTxNotWritable
 	}
 	defer t.close()
 
@@ -171,7 +177,9 @@ func (t *Tx) Commit() error {
 
 	// Rebalance and spill data onto dirty pages.
 	t.rebalance()
-	t.spill()
+	if err := t.spill(); err != nil {
+		return err
+	}
 
 	// Spill buckets page.
 	p, err := t.allocate((t.buckets.size() / t.db.pageSize) + 1)
@@ -197,19 +205,23 @@ func (t *Tx) Commit() error {
 }
 
 // Rollback closes the transaction and ignores all previous updates.
-func (t *Tx) Rollback() {
+func (t *Tx) Rollback() error {
+	if t.managed {
+		panic("managed tx rollback not allowed")
+	} else if t.db == nil {
+		return ErrTxClosed
+	}
 	t.close()
+	return nil
 }
 
 func (t *Tx) close() {
-	if t.db != nil {
-		if t.writable {
-			t.db.rwlock.Unlock()
-		} else {
-			t.db.removeTx(t)
-		}
-		t.db = nil
+	if t.writable {
+		t.db.rwlock.Unlock()
+	} else {
+		t.db.removeTx(t)
 	}
+	t.db = nil
 }
 
 // allocate returns a contiguous block of memory starting at a given page.
@@ -333,6 +345,9 @@ func (t *Tx) write() error {
 			return err
 		}
 	}
+	if err := fdatasync(t.db.file); err != nil {
+		return err
+	}
 
 	// Clear out page cache.
 	t.pages = make(map[pgid]*page)
@@ -348,7 +363,9 @@ func (t *Tx) writeMeta() error {
 	t.meta.write(p)
 
 	// Write the meta page to file.
-	t.db.metafile.WriteAt(buf, int64(p.id)*int64(t.db.pageSize))
+	if _, err := t.db.metafile.WriteAt(buf, int64(p.id)*int64(t.db.pageSize)); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -428,7 +445,9 @@ func (t *Tx) forEachPage(pgid pgid, depth int, fn func(*page, int)) {
 // Page returns page information for a given page number.
 // This is only available from writable transactions.
 func (t *Tx) Page(id int) (*PageInfo, error) {
-	if !t.writable {
+	if t.db == nil {
+		return nil, ErrTxClosed
+	} else if !t.writable {
 		return nil, ErrTxNotWritable
 	} else if pgid(id) >= t.meta.pgid {
 		return nil, nil
