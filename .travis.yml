@@ -9,13 +9,13 @@ notifications:
   email: false
 
 before_script:
-#  - go get github.com/stretchr/testify
-#  - go get ./...
   - echo %PATH%
   - echo %GOPATH%
   - go version
   - go env
   - go get -v -t ./...
+  - go get github.com/mattn/goveralls
 
 script:
-  - make test
+  - go test -v -cover -race -coverprofile=~/coverage.out
+  - $GOPATH/bin/goveralls -coverprofile=~/coverage.out -service=circle-ci
