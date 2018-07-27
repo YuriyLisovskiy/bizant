@@ -440,7 +440,6 @@ func TestTxCursorIterate(t *testing.T) {
 			assert.Equal(t, len(items), index)
 			tx.Rollback()
 		})
-		fmt.Fprint(os.Stderr, ".")
 		return true
 	}
 	if err := quick.Check(f, qconfig()); err != nil {
@@ -481,7 +480,6 @@ func TestTxCursorIterateReverse(t *testing.T) {
 			assert.Equal(t, len(items), index)
 			tx.Rollback()
 		})
-		fmt.Fprint(os.Stderr, ".")
 		return true
 	}
 	if err := quick.Check(f, qconfig()); err != nil {

@@ -6,16 +6,22 @@ package db
 
 import (
 	"errors"
+	"flag"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
+
+var statsFlag = flag.Bool("stats", false, "show performance stats")
 
 // Ensure that a database can be opened without error.
 func TestOpen(t *testing.T) {
@@ -115,8 +121,41 @@ func TestDBCorruptMeta0(t *testing.T) {
 
 		// Open the database.
 		_, err = Open(path, 0666)
-		assert.Equal(t, err, errors.New("meta error: invalid database"))
+		assert.Equal(t, err, errors.New("meta0 error: invalid database"))
 	})
+}
+
+// Ensure that a corrupt meta page checksum causes the open to fail.
+func TestDBMetaChecksumError(t *testing.T) {
+	for i := 0; i < 2; i++ {
+		withTempPath(func(path string) {
+			db, err := Open(path, 0600)
+			pageSize := db.pageSize
+			db.Update(func(tx *Tx) error {
+				return tx.CreateBucket("widgets")
+			})
+			db.Update(func(tx *Tx) error {
+				return tx.CreateBucket("woojits")
+			})
+			db.Close()
+
+			// Change a single byte in the meta page.
+			f, _ := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0600)
+			f.WriteAt([]byte{1}, int64((i*pageSize)+(pageHeaderSize+12)))
+			f.Sync()
+			f.Close()
+
+			// Reopen the database.
+			_, err = Open(path, 0600)
+			if assert.Error(t, err) {
+				if i == 0 {
+					assert.Equal(t, "meta0 error: checksum error", err.Error())
+				} else {
+					assert.Equal(t, "meta1 error: checksum error", err.Error())
+				}
+			}
+		})
+	}
 }
 
 // Ensure that a database cannot open a transaction when it's not open.
@@ -216,55 +255,6 @@ func TestDBCopyFile(t *testing.T) {
 			return nil
 		})
 	})
-}
-
-// Ensure the database can return stats about itself.
-func TestDBStat(t *testing.T) {
-	withOpenDB(func(db *DB, path string) {
-		db.Update(func(tx *Tx) error {
-			tx.CreateBucket("widgets")
-			b := tx.Bucket("widgets")
-			for i := 0; i < 10000; i++ {
-				b.Put([]byte(strconv.Itoa(i)), []byte(strconv.Itoa(i)))
-			}
-			return nil
-		})
-
-		// Delete some keys.
-		db.Update(func(tx *Tx) error {
-			return tx.Bucket("widgets").Delete([]byte("10"))
-		})
-		db.Update(func(tx *Tx) error {
-			return tx.Bucket("widgets").Delete([]byte("1000"))
-		})
-
-		// Open some readers.
-		t0, _ := db.Begin(false)
-		t1, _ := db.Begin(false)
-		t2, _ := db.Begin(false)
-		t2.Rollback()
-
-		// Obtain stats.
-		stat, err := db.Stat()
-		assert.NoError(t, err)
-		assert.Equal(t, 127, stat.PageCount)
-		assert.Equal(t, 4, stat.FreePageCount)
-		assert.Equal(t, 4096, stat.PageSize)
-		assert.Equal(t, 4194304, stat.MmapSize)
-		assert.Equal(t, 2, stat.TxCount)
-
-		// Close readers.
-		t0.Rollback()
-		t1.Rollback()
-	})
-}
-
-// Ensure the getting stats on a closed database returns an error.
-func TestDBStatWhileClosed(t *testing.T) {
-	var db DB
-	stat, err := db.Stat()
-	assert.Equal(t, err, ErrDatabaseNotOpen)
-	assert.Nil(t, stat)
 }
 
 // Ensure that an error is returned when a database write fails.
@@ -388,6 +378,11 @@ func withOpenDB(fn func(*DB, string)) {
 		defer db.Close()
 		fn(db, path)
 
+		// Log statistics.
+		if *statsFlag {
+			logStats(db)
+		}
+
 		// Check database consistency after every test.
 		mustCheck(db)
 	})
@@ -414,4 +409,23 @@ func trunc(b []byte, length int) []byte {
 		return b[:length]
 	}
 	return b
+}
+
+// writes the current database stats to the testing log.
+func logStats(db *DB) {
+	var stats = db.Stats()
+	fmt.Printf("[db] %-20s %-20s %-20s\n",
+		fmt.Sprintf("pg(%d/%d)", stats.TxStats.PageCount, stats.TxStats.PageAlloc),
+		fmt.Sprintf("cur(%d)", stats.TxStats.CursorCount),
+		fmt.Sprintf("node(%d/%d)", stats.TxStats.NodeCount, stats.TxStats.NodeDeref),
+	)
+	fmt.Printf("     %-20s %-20s %-20s\n",
+		fmt.Sprintf("rebal(%d/%v)", stats.TxStats.Rebalance, truncDuration(stats.TxStats.RebalanceTime)),
+		fmt.Sprintf("spill(%d/%v)", stats.TxStats.Spill, truncDuration(stats.TxStats.SpillTime)),
+		fmt.Sprintf("w(%d/%v)", stats.TxStats.Write, truncDuration(stats.TxStats.WriteTime)),
+	)
+}
+
+func truncDuration(d time.Duration) string {
+	return regexp.MustCompile(`^(\d+)(\.\d+)`).ReplaceAllString(d.String(), "$1")
 }
