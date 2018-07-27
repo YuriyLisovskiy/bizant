@@ -5,7 +5,7 @@
 
 package db
 
-const version = 1
+const version = 2
 
 const (
 	maxUint = ^uint(0)
@@ -15,9 +15,6 @@ const (
 )
 
 const (
-	// MaxBucketNameSize is the maximum length of a bucket name, in bytes.
-	MaxBucketNameSize = 255
-
 	// MaxKeySize is the maximum length of a key, in bytes.
 	MaxKeySize = 32768
 
