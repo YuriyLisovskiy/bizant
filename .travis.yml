@@ -8,6 +8,9 @@ go:
 notifications:
   email: false
 
+env:
+  - "PATH=/home/travis/gopath/bin:$PATH"
+
 before_script:
   - echo %PATH%
   - echo %GOPATH%
@@ -15,7 +18,8 @@ before_script:
   - go env
   - go get -v -t ./...
   - go get github.com/mattn/goveralls
+  - go get code.google.com/p/go.tools/cmd/cover
 
 script:
-  - go test -v -cover -race -coverprofile=/home/ubuntu/coverage.out
-  - $GOPATH/bin/goveralls -coverprofile=/home/ubuntu/coverage.out -service=circle-ci
+  - go test -v -covermode=count -coverprofile=coverage.out ./...
+  - goveralls -coverprofile=coverage.out -service travis-ci -repotoken $COVERALLS_TOKEN
