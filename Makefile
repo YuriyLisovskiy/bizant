@@ -79,7 +79,9 @@ coverage:
 	@echo Done
 
 test:
+	@echo Running tests...
 	@go test -v ${PACKAGES}
+	@echo Done
 
 clean:
 	@-rm -rf bin/
