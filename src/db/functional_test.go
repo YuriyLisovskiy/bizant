@@ -17,6 +17,10 @@ import (
 
 // Ensure that multiple threads can use the DB without race detector errors.
 func TestParallelTxs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	var mutex sync.RWMutex
 
 	err := quick.Check(func(numReaders, batchSize uint, items testdata) bool {
@@ -28,7 +32,9 @@ func TestParallelTxs(t *testing.T) {
 		var current testdata
 
 		withOpenDB(func(db *DB, path string) {
-			db.CreateBucket("widgets")
+			db.Do(func(tx *Tx) error {
+				return tx.CreateBucket("widgets")
+			})
 
 			// Maintain a set of concurrent readers.
 			var wg sync.WaitGroup

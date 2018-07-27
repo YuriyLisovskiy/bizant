@@ -119,7 +119,8 @@ func (b *Bucket) NextSequence() (int, error) {
 }
 
 // ForEach executes a function for each key/value pair in a bucket.
-// An error is returned if the bucket cannot be found.
+// If the provided function returns an error then the iteration is stopped and
+// the error is returned to the caller.
 func (b *Bucket) ForEach(fn func(k, v []byte) error) error {
 	c := b.Cursor()
 	for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -158,3 +159,9 @@ type BucketStat struct {
 	KeyCount          int
 	MaxDepth          int
 }
+
+type bucketsByName []*Bucket
+
+func (s bucketsByName) Len() int           { return len(s) }
+func (s bucketsByName) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s bucketsByName) Less(i, j int) bool { return s[i].name < s[j].name }

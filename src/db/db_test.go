@@ -5,19 +5,14 @@
 package db
 
 import (
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 	"testing"
-	"time"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 // Ensure that a database can be opened without error.
@@ -59,120 +54,12 @@ func TestDBReopen(t *testing.T) {
 	})
 }
 
-// Ensure that the database returns an error if the file handle cannot be open.
-func TestDBOpenFileError(t *testing.T) {
-	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
-		exp := &os.PathError{}
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return((*mockfile)(nil), exp)
-		err := db.Open(path, 0666)
-		assert.Equal(t, err, exp)
-	})
-}
-
-// Ensure that the database returns an error if the meta file handle cannot be open.
-func TestDBOpenMetaFileError(t *testing.T) {
-	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
-		exp := &os.PathError{}
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(&mockfile{}, nil)
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return((*mockfile)(nil), exp)
-		err := db.Open(path, 0666)
-		assert.Equal(t, err, exp)
-	})
-}
-
-// Ensure that write errors to the meta file handler during initialization are returned.
-func TestDBMetaInitWriteError(t *testing.T) {
-	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
-		// Mock the file system.
-		file, metafile := &mockfile{}, &mockfile{}
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
-		mockos.On("Getpagesize").Return(0x10000)
-		file.On("Stat").Return(&mockfileinfo{"", 0, 0666, time.Now(), false, nil}, nil)
-		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, io.ErrShortWrite)
-
-		// Open the database.
-		err := db.Open(path, 0666)
-		assert.Equal(t, err, io.ErrShortWrite)
-	})
-}
-
-// Ensure that a database that is too small returns an error.
-func TestDBFileTooSmall(t *testing.T) {
-	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
-		file, metafile := &mockfile{}, &mockfile{}
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
-		mockos.On("Getpagesize").Return(0x1000)
-		file.On("Stat").Return(&mockfileinfo{"", 0, 0666, time.Now(), false, nil}, nil)
-		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, nil)
-		err := db.Open(path, 0666)
-		assert.Equal(t, err, &Error{"file size too small", nil})
-	})
-}
-
-// Ensure that stat errors during mmap get returned.
-func TestDBMmapStatError(t *testing.T) {
-	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
-		exp := &os.PathError{}
-		file, metafile := &mockfile{}, &mockfile{}
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
-		mockos.On("Getpagesize").Return(0x1000)
-		file.On("ReadAt", mock.Anything, int64(0)).Return(0, nil)
-		file.On("Stat").Return((*mockfileinfo)(nil), exp)
-		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, nil)
-		err := db.Open(path, 0666)
-		assert.Equal(t, err, &Error{"stat error", exp})
-	})
-}
-
-// Ensure that corrupt meta0 page errors get returned.
-func TestDBCorruptMeta0(t *testing.T) {
-	withMockDB(func(db *DB, mockos *mockos, mocksyscall *mocksyscall, path string) {
-		var m meta
-		m.magic = magic
-		m.version = version
-		m.pageSize = 0x8000
-
-		// Create a file with bad magic.
-		b := make([]byte, 0x10000)
-		p0, p1 := (*page)(unsafe.Pointer(&b[0x0000])), (*page)(unsafe.Pointer(&b[0x8000]))
-		p0.meta().magic = 0
-		p0.meta().version = version
-		p1.meta().magic = magic
-		p1.meta().version = version
-
-		// Mock file access.
-		file, metafile := &mockfile{}, &mockfile{}
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_CREATE, os.FileMode(0666)).Return(file, nil)
-		mockos.On("OpenFile", path, os.O_RDWR|os.O_SYNC, os.FileMode(0666)).Return(metafile, nil)
-		mockos.On("Getpagesize").Return(0x10000)
-		file.On("ReadAt", mock.Anything, int64(0)).Return(0, nil)
-		file.On("Stat").Return(&mockfileinfo{"", 0x10000, 0666, time.Now(), false, nil}, nil)
-		metafile.On("WriteAt", mock.Anything, int64(0)).Return(0, nil)
-		mocksyscall.On("Mmap", 0, int64(0), 0x10000, syscall.PROT_READ, syscall.MAP_SHARED).Return(b, nil)
-
-		// Open the database.
-		err := db.Open(path, 0666)
-		assert.Equal(t, err, &Error{"meta error", ErrInvalid})
-	})
-}
-
 // Ensure that a database cannot open a transaction when it's not open.
 func TestDBTxErrDatabaseNotOpen(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		tx, err := db.Tx()
 		assert.Nil(t, tx)
 		assert.Equal(t, err, ErrDatabaseNotOpen)
-	})
-}
-
-// Ensure that a delete on a missing bucket returns an error.
-func TestDBDeleteFromMissingBucket(t *testing.T) {
-	withOpenDB(func(db *DB, path string) {
-		err := db.Delete("widgets", []byte("foo"))
-		assert.Equal(t, err, ErrBucketNotFound)
 	})
 }
 
@@ -208,10 +95,12 @@ func TestDBTxBlock(t *testing.T) {
 			return nil
 		})
 		assert.NoError(t, err)
-		value, _ := db.Get("widgets", []byte("foo"))
-		assert.Nil(t, value)
-		value, _ = db.Get("widgets", []byte("baz"))
-		assert.Equal(t, value, []byte("bat"))
+		err = db.With(func(tx *Tx) error {
+			assert.Nil(t, tx.Bucket("widgets").Get([]byte("foo")))
+			assert.Equal(t, []byte("bat"), tx.Bucket("widgets").Get([]byte("baz")))
+			return nil
+		})
+		assert.NoError(t, err)
 	})
 }
 
@@ -226,63 +115,15 @@ func TestDBTxBlockWhileClosed(t *testing.T) {
 	})
 }
 
-// Ensure a database returns an error when trying to attempt a for each on a missing bucket.
-func TestDBForEachBucketNotFound(t *testing.T) {
-	withOpenDB(func(db *DB, path string) {
-		err := db.ForEach("widgets", func(k, v []byte) error { return nil })
-		assert.Equal(t, err, ErrBucketNotFound)
-	})
-}
-
-// Ensure a closed database returns an error when executing a for each.
-func TestDBForEachWhileClosed(t *testing.T) {
-	withDB(func(db *DB, path string) {
-		err := db.ForEach("widgets", func(k, v []byte) error { return nil })
-		assert.Equal(t, err, ErrDatabaseNotOpen)
-	})
-}
-
-// Ensure a closed database returns an error when finding a bucket.
-func TestDBBucketWhileClosed(t *testing.T) {
-	withDB(func(db *DB, path string) {
-		b, err := db.Bucket("widgets")
-		assert.Equal(t, err, ErrDatabaseNotOpen)
-		assert.Nil(t, b)
-	})
-}
-
-// Ensure a closed database returns an error when finding all buckets.
-func TestDBBucketsWhileClosed(t *testing.T) {
-	withDB(func(db *DB, path string) {
-		b, err := db.Buckets()
-		assert.Equal(t, err, ErrDatabaseNotOpen)
-		assert.Nil(t, b)
-	})
-}
-
-// Ensure a closed database returns an error when getting a key.
-func TestDBGetWhileClosed(t *testing.T) {
-	withDB(func(db *DB, path string) {
-		value, err := db.Get("widgets", []byte("foo"))
-		assert.Equal(t, err, ErrDatabaseNotOpen)
-		assert.Nil(t, value)
-	})
-}
-
-// Ensure that an error is returned when inserting into a bucket that doesn't exist.
-func TestDBPutBucketNotFound(t *testing.T) {
-	withOpenDB(func(db *DB, path string) {
-		err := db.Put("widgets", []byte("foo"), []byte("bar"))
-		assert.Equal(t, err, ErrBucketNotFound)
-	})
-}
-
 // Ensure that the database can be copied to a file path.
 func TestDBCopyFile(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
-		db.CreateBucket("widgets")
-		db.Put("widgets", []byte("foo"), []byte("bar"))
-		db.Put("widgets", []byte("baz"), []byte("bat"))
+		db.Do(func(tx *Tx) error {
+			tx.CreateBucket("widgets")
+			tx.Bucket("widgets").Put([]byte("foo"), []byte("bar"))
+			tx.Bucket("widgets").Put([]byte("baz"), []byte("bat"))
+			return nil
+		})
 		assert.NoError(t, os.RemoveAll("/tmp/bolt.copyfile.db"))
 		assert.NoError(t, db.CopyFile("/tmp/bolt.copyfile.db", 0666))
 
@@ -290,10 +131,11 @@ func TestDBCopyFile(t *testing.T) {
 		assert.NoError(t, db2.Open("/tmp/bolt.copyfile.db", 0666))
 		defer db2.Close()
 
-		value, _ := db2.Get("widgets", []byte("foo"))
-		assert.Equal(t, value, []byte("bar"))
-		value, _ = db2.Get("widgets", []byte("baz"))
-		assert.Equal(t, value, []byte("bat"))
+		db2.With(func(tx *Tx) error {
+			assert.Equal(t, []byte("bar"), tx.Bucket("widgets").Get([]byte("foo")))
+			assert.Equal(t, []byte("bat"), tx.Bucket("widgets").Get([]byte("baz")))
+			return nil
+		})
 	})
 }
 
@@ -310,8 +152,12 @@ func TestDBStat(t *testing.T) {
 		})
 
 		// Delete some keys.
-		db.Delete("widgets", []byte("10"))
-		db.Delete("widgets", []byte("1000"))
+		db.Do(func(tx *Tx) error {
+			return tx.Bucket("widgets").Delete([]byte("10"))
+		})
+		db.Do(func(tx *Tx) error {
+			return tx.Bucket("widgets").Delete([]byte("1000"))
+		})
 
 		// Open some readers.
 		t0, _ := db.Tx()
@@ -371,9 +217,13 @@ func TestDBString(t *testing.T) {
 func BenchmarkDBPutSequential(b *testing.B) {
 	value := []byte(strings.Repeat("0", 64))
 	withOpenDB(func(db *DB, path string) {
-		db.CreateBucket("widgets")
+		db.Do(func(tx *Tx) error {
+			return tx.CreateBucket("widgets")
+		})
 		for i := 0; i < b.N; i++ {
-			db.Put("widgets", []byte(strconv.Itoa(i)), value)
+			db.Do(func(tx *Tx) error {
+				return tx.Bucket("widgets").Put([]byte(strconv.Itoa(i)), value)
+			})
 		}
 	})
 }
@@ -383,9 +233,13 @@ func BenchmarkDBPutRandom(b *testing.B) {
 	indexes := rand.Perm(b.N)
 	value := []byte(strings.Repeat("0", 64))
 	withOpenDB(func(db *DB, path string) {
-		db.CreateBucket("widgets")
+		db.Do(func(tx *Tx) error {
+			return tx.CreateBucket("widgets")
+		})
 		for i := 0; i < b.N; i++ {
-			db.Put("widgets", []byte(strconv.Itoa(indexes[i])), value)
+			db.Do(func(tx *Tx) error {
+				return tx.Bucket("widgets").Put([]byte(strconv.Itoa(indexes[i])), value)
+			})
 		}
 	})
 }
@@ -400,15 +254,6 @@ func withDB(fn func(*DB, string)) {
 
 	var db DB
 	fn(&db, path)
-}
-
-// withMockDB executes a function with a database reference and a mock filesystem.
-func withMockDB(fn func(*DB, *mockos, *mocksyscall, string)) {
-	os, syscall := &mockos{}, &mocksyscall{}
-	var db DB
-	db.os = os
-	db.syscall = syscall
-	fn(&db, os, syscall, "/mock/db")
 }
 
 // withOpenDB executes a function with an already opened database.

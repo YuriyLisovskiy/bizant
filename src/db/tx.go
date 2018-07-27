@@ -93,6 +93,7 @@ func (t *Tx) Buckets() []*Bucket {
 		}
 		buckets = append(buckets, bucket)
 	}
+	sort.Sort(bucketsByName(buckets))
 	return buckets
 }
 
