@@ -12,13 +12,12 @@ env:
   - "PATH=/home/travis/gopath/bin:$PATH"
 
 before_script:
-  - echo %PATH%
-  - echo %GOPATH%
+  - echo $PATH
+  - echo $GOPATH
   - go version
   - go env
   - go get -v -t ./...
   - go get github.com/mattn/goveralls
-  - go get code.google.com/p/go.tools/cmd/cover
 
 script:
   - go test -v -covermode=count -coverprofile=coverage.out ./...
