@@ -5,12 +5,15 @@
 package db
 
 import (
+	"errors"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -51,6 +54,66 @@ func TestDBReopen(t *testing.T) {
 		db.Open(path, 0666)
 		err := db.Open(path, 0666)
 		assert.Equal(t, err, ErrDatabaseOpen)
+	})
+}
+
+// Ensure that the database returns an error if the file handle cannot be open.
+func TestDBOpenFileError(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		err := db.Open(path+"/youre-not-my-real-parent", 0666)
+		if err, _ := err.(*os.PathError); assert.Error(t, err) {
+			assert.Equal(t, path+"/youre-not-my-real-parent", err.Path)
+			assert.Equal(t, "open", err.Op)
+		}
+	})
+}
+
+// Ensure that write errors to the meta file handler during initialization are returned.
+func TestDBMetaInitWriteError(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		// Mock the file system.
+		db.ops.metaWriteAt = func(p []byte, offset int64) (n int, err error) { return 0, io.ErrShortWrite }
+
+		// Open the database.
+		err := db.Open(path, 0666)
+		assert.Equal(t, err, io.ErrShortWrite)
+	})
+}
+
+// Ensure that a database that is too small returns an error.
+func TestDBFileTooSmall(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		db.Close()
+
+		// corrupt the database
+		assert.NoError(t, os.Truncate(path, int64(os.Getpagesize())))
+
+		err := db.Open(path, 0666)
+		assert.Equal(t, errors.New("file size too small"), err)
+	})
+}
+
+// Ensure that corrupt meta0 page errors get returned.
+func TestDBCorruptMeta0(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		var m meta
+		m.magic = magic
+		m.version = version
+		m.pageSize = 0x8000
+
+		// Create a file with bad magic.
+		b := make([]byte, 0x10000)
+		p0, p1 := (*page)(unsafe.Pointer(&b[0x0000])), (*page)(unsafe.Pointer(&b[0x8000]))
+		p0.meta().magic = 0
+		p0.meta().version = version
+		p1.meta().magic = magic
+		p1.meta().version = version
+		err := ioutil.WriteFile(path, b, 0666)
+		assert.NoError(t, err)
+
+		// Open the database.
+		err = db.Open(path, 0666)
+		assert.Equal(t, err, errors.New("meta error: invalid database"))
 	})
 }
 

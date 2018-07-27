@@ -5,6 +5,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,6 +19,16 @@ const minMmapSize = 1 << 22 // 4MB
 
 // The largest step that can be taken when remapping the mmap.
 const maxMmapStep = 1 << 30 // 1GB
+
+var (
+	// ErrDatabaseNotOpen is returned when a DB instance is accessed before it
+	// is opened or after it is closed.
+	ErrDatabaseNotOpen = errors.New("database not open")
+
+	// ErrDatabaseOpen is returned when opening a database that is
+	// already open.
+	ErrDatabaseOpen = errors.New("database already open")
+)
 
 // DB represents a collection of buckets persisted to a file on disk.
 // All data access is performed through transactions which can be obtained through the DB.
@@ -38,6 +49,11 @@ type DB struct {
 	rwlock   sync.Mutex   // Allows only one writer at a time.
 	metalock sync.Mutex   // Protects meta page access.
 	mmaplock sync.RWMutex // Protects mmap access during remapping.
+
+	ops struct {
+		writeAt     func(b []byte, off int64) (n int, err error)
+		metaWriteAt func(b []byte, off int64) (n int, err error)
+	}
 }
 
 // Path returns the path to currently open database file.
@@ -70,17 +86,25 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 	// Open data file and separate sync handler for metadata writes.
 	db.path = path
 	if db.file, err = os.OpenFile(db.path, os.O_RDWR|os.O_CREATE, mode); err != nil {
-		db.close()
+		_ = db.close()
 		return err
 	}
 	if db.metafile, err = os.OpenFile(db.path, os.O_RDWR|os.O_SYNC, mode); err != nil {
-		db.close()
+		_ = db.close()
 		return err
+	}
+
+	// default values for test hooks
+	if db.ops.writeAt == nil {
+		db.ops.writeAt = db.file.WriteAt
+	}
+	if db.ops.metaWriteAt == nil {
+		db.ops.metaWriteAt = db.metafile.WriteAt
 	}
 
 	// Initialize the database if it doesn't exist.
 	if info, err := db.file.Stat(); err != nil {
-		return &Error{"stat error", err}
+		return fmt.Errorf("stat error: %s", err)
 	} else if info.Size() == 0 {
 		// Initialize new files with meta pages.
 		if err := db.init(); err != nil {
@@ -92,7 +116,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 		if _, err := db.file.ReadAt(buf[:], 0); err == nil {
 			m := db.pageInBuffer(buf[:], 0).meta()
 			if err := m.validate(); err != nil {
-				return &Error{"meta error", err}
+				return fmt.Errorf("meta error: %s", err)
 			}
 			db.pageSize = int(m.pageSize)
 		}
@@ -100,7 +124,7 @@ func (db *DB) Open(path string, mode os.FileMode) error {
 
 	// Memory map the data file.
 	if err := db.mmap(0); err != nil {
-		db.close()
+		_ = db.close()
 		return err
 	}
 
@@ -131,9 +155,9 @@ func (db *DB) mmap(minsz int) error {
 
 	info, err := db.file.Stat()
 	if err != nil {
-		return &Error{"mmap stat error", err}
+		return fmt.Errorf("mmap stat error: %s", err)
 	} else if int(info.Size()) < db.pageSize*2 {
-		return &Error{"file size too small", err}
+		return fmt.Errorf("file size too small")
 	}
 
 	// Ensure the size is at least the minimum size.
@@ -154,10 +178,10 @@ func (db *DB) mmap(minsz int) error {
 
 	// Validate the meta pages.
 	if err := db.meta0.validate(); err != nil {
-		return &Error{"meta0 error", err}
+		return fmt.Errorf("meta0 error: %s", err)
 	}
 	if err := db.meta1.validate(); err != nil {
-		return &Error{"meta1 error", err}
+		return fmt.Errorf("meta1 error: %s", err)
 	}
 
 	return nil
@@ -230,7 +254,7 @@ func (db *DB) init() error {
 	p.count = 0
 
 	// Write the buffer to our data file.
-	if _, err := db.metafile.WriteAt(buf, 0); err != nil {
+	if _, err := db.ops.metaWriteAt(buf, 0); err != nil {
 		return err
 	}
 
@@ -373,7 +397,7 @@ func (db *DB) Do(fn func(*Tx) error) error {
 	err = fn(t)
 	t.managed = false
 	if err != nil {
-		t.Rollback()
+		_ = t.Rollback()
 		return err
 	}
 
@@ -389,7 +413,6 @@ func (db *DB) With(fn func(*Tx) error) error {
 	if err != nil {
 		return err
 	}
-	defer t.Rollback()
 
 	// Mark as a managed tx so that the inner function cannot manually rollback.
 	t.managed = true
@@ -397,8 +420,16 @@ func (db *DB) With(fn func(*Tx) error) error {
 	// If an error is returned from the function then pass it through.
 	err = fn(t)
 	t.managed = false
+	if err != nil {
+		_ = t.Rollback()
+		return err
+	}
 
-	return err
+	if err := t.Rollback(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Copy writes the entire database to a writer.
@@ -410,20 +441,26 @@ func (db *DB) Copy(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer t.Rollback()
 
 	// Open reader on the database.
 	f, err := os.Open(db.path)
 	if err != nil {
+		_ = t.Rollback()
 		return err
 	}
-	defer f.Close()
 
 	// Copy everything.
 	if _, err := io.Copy(w, f); err != nil {
+		_ = t.Rollback()
+		_ = f.Close()
 		return err
 	}
-	return nil
+
+	if err := t.Rollback(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // CopyFile copies the entire database to file at the given path.
@@ -434,10 +471,10 @@ func (db *DB) CopyFile(path string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 
 	err = db.Copy(f)
 	if err != nil {
+		_ = f.Close()
 		return err
 	}
 	return f.Close()
@@ -507,7 +544,7 @@ func (db *DB) allocate(count int) (*page, error) {
 	var minsz = int((p.id+pgid(count))+1) * db.pageSize
 	if minsz >= len(db.data) {
 		if err := db.mmap(minsz); err != nil {
-			return nil, &Error{"mmap allocate error", err}
+			return nil, fmt.Errorf("mmap allocate error: %s", err)
 		}
 	}
 

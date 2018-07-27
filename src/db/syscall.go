@@ -4,8 +4,6 @@
 
 package db
 
-package bolt
-
 import "os"
 
 func fdatasync(f *os.File) error {
