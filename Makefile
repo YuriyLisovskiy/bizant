@@ -13,6 +13,7 @@ install-deps:
 	@bash install-deps.sh
 
 target:
+	@echo Building the binary for target platform...
 	@go build -o bin/${BINARY} ${FLAGS}
 	@echo Done.
 
