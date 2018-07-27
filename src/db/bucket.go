@@ -11,9 +11,8 @@ import (
 // Bucket represents a collection of key/value pairs inside the database.
 type Bucket struct {
 	*bucket
-	name          string
-	transaction   *Transaction
-	rwtransaction *RWTransaction
+	name string
+	tx   *Tx
 }
 
 // bucket represents the on-file representation of a bucket.
@@ -29,17 +28,17 @@ func (b *Bucket) Name() string {
 
 // Writable returns whether the bucket is writable.
 func (b *Bucket) Writable() bool {
-	return (b.rwtransaction != nil)
+	return b.tx.writable
 }
 
 // Cursor creates a cursor associated with the bucket.
-// The cursor is only valid as long as the Transaction is open.
+// The cursor is only valid as long as the transaction is open.
 // Do not use a cursor after the transaction is closed.
 func (b *Bucket) Cursor() *Cursor {
 	return &Cursor{
-		transaction: b.transaction,
-		root:        b.root,
-		stack:       make([]elemRef, 0),
+		tx:    b.tx,
+		root:  b.root,
+		stack: make([]elemRef, 0),
 	}
 }
 
@@ -78,7 +77,7 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 	c.Seek(key)
 
 	// Insert the key/value.
-	c.node(b.rwtransaction).put(key, key, value, 0)
+	c.node(b.tx).put(key, key, value, 0)
 
 	return nil
 }
@@ -96,7 +95,7 @@ func (b *Bucket) Delete(key []byte) error {
 	c.Seek(key)
 
 	// Delete the node if we have a matching key.
-	c.node(b.rwtransaction).del(key)
+	c.node(b.tx).del(key)
 
 	return nil
 }
@@ -134,7 +133,7 @@ func (b *Bucket) ForEach(fn func(k, v []byte) error) error {
 // Stat returns stats on a bucket.
 func (b *Bucket) Stat() *BucketStat {
 	s := &BucketStat{}
-	b.transaction.forEachPage(b.root, 0, func(p *page, depth int) {
+	b.tx.forEachPage(b.root, 0, func(p *page, depth int) {
 		if (p.flags & leafPageFlag) != 0 {
 			s.LeafPageCount++
 			s.KeyCount += int(p.count)

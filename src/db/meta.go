@@ -14,7 +14,7 @@ type meta struct {
 	buckets  pgid
 	freelist pgid
 	pgid     pgid
-	txnid    txnid
+	txid     txid
 }
 
 // validate checks the marker bytes and version of the meta page to ensure it matches this binary.
@@ -35,13 +35,13 @@ func (m *meta) copy(dest *meta) {
 	dest.buckets = m.buckets
 	dest.freelist = m.freelist
 	dest.pgid = m.pgid
-	dest.txnid = m.txnid
+	dest.txid = m.txid
 }
 
 // write writes the meta onto a page.
 func (m *meta) write(p *page) {
-	// Page id is either going to be 0 or 1 which we can determine by the Txn ID.
-	p.id = pgid(m.txnid % 2)
+	// Page id is either going to be 0 or 1 which we can determine by the transaction ID.
+	p.id = pgid(m.txid % 2)
 	p.flags |= metaPageFlag
 
 	m.copy(p.meta())

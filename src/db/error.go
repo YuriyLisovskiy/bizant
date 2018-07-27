@@ -8,7 +8,7 @@ var (
 	// ErrInvalid is returned when a data file is not a Bolt-formatted database.
 	ErrInvalid = &Error{"Invalid database", nil}
 
-	// ErrVersionMismatch is returned when the data file was created with a 
+	// ErrVersionMismatch is returned when the data file was created with a
 	// different version of Bolt.
 	ErrVersionMismatch = &Error{"version mismatch", nil}
 
@@ -19,6 +19,10 @@ var (
 	// ErrDatabaseOpen is returned when opening a database that is
 	// already open.
 	ErrDatabaseOpen = &Error{"database already open", nil}
+
+	// ErrTxNotWritable is returned when performing a write operation on a
+	// read-only transaction.
+	ErrTxNotWritable = &Error{"tx not writable", nil}
 
 	// ErrBucketNotFound is returned when trying to access a bucket that has
 	// not been created yet.

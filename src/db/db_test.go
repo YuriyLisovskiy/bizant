@@ -7,8 +7,10 @@ package db
 import (
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -158,10 +160,10 @@ func TestDBCorruptMeta0(t *testing.T) {
 }
 
 // Ensure that a database cannot open a transaction when it's not open.
-func TestDBTransactionErrDatabaseNotOpen(t *testing.T) {
+func TestDBTxErrDatabaseNotOpen(t *testing.T) {
 	withDB(func(db *DB, path string) {
-		txn, err := db.Transaction()
-		assert.Nil(t, txn)
+		tx, err := db.Tx()
+		assert.Nil(t, tx)
 		assert.Equal(t, err, ErrDatabaseNotOpen)
 	})
 }
@@ -174,12 +176,32 @@ func TestDBDeleteFromMissingBucket(t *testing.T) {
 	})
 }
 
-// Ensure a database can provide a transactional block.
-func TestDBTransactionBlock(t *testing.T) {
+// Ensure that a read-write transaction can be retrieved.
+func TestDBRWTx(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
-		err := db.Do(func(txn *RWTransaction) error {
-			txn.CreateBucket("widgets")
-			b := txn.Bucket("widgets")
+		tx, err := db.RWTx()
+		assert.NotNil(t, tx)
+		assert.NoError(t, err)
+		assert.Equal(t, tx.DB(), db)
+		assert.Equal(t, tx.Writable(), true)
+	})
+}
+
+// Ensure that opening a transaction while the DB is closed returns an error.
+func TestDBRWTxOpenWithClosedDB(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		tx, err := db.RWTx()
+		assert.Equal(t, err, ErrDatabaseNotOpen)
+		assert.Nil(t, tx)
+	})
+}
+
+// Ensure a database can provide a transactional block.
+func TestDBTxBlock(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		err := db.Do(func(tx *Tx) error {
+			tx.CreateBucket("widgets")
+			b := tx.Bucket("widgets")
 			b.Put([]byte("foo"), []byte("bar"))
 			b.Put([]byte("baz"), []byte("bat"))
 			b.Delete([]byte("foo"))
@@ -194,10 +216,10 @@ func TestDBTransactionBlock(t *testing.T) {
 }
 
 // Ensure a closed database returns an error while running a transaction block
-func TestDBTransactionBlockWhileClosed(t *testing.T) {
+func TestDBTxBlockWhileClosed(t *testing.T) {
 	withDB(func(db *DB, path string) {
-		err := db.Do(func(txn *RWTransaction) error {
-			txn.CreateBucket("widgets")
+		err := db.Do(func(tx *Tx) error {
+			tx.CreateBucket("widgets")
 			return nil
 		})
 		assert.Equal(t, err, ErrDatabaseNotOpen)
@@ -278,9 +300,9 @@ func TestDBCopyFile(t *testing.T) {
 // Ensure the database can return stats about itself.
 func TestDBStat(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
-		db.Do(func(txn *RWTransaction) error {
-			txn.CreateBucket("widgets")
-			b := txn.Bucket("widgets")
+		db.Do(func(tx *Tx) error {
+			tx.CreateBucket("widgets")
+			b := tx.Bucket("widgets")
 			for i := 0; i < 10000; i++ {
 				b.Put([]byte(strconv.Itoa(i)), []byte(strconv.Itoa(i)))
 			}
@@ -292,10 +314,10 @@ func TestDBStat(t *testing.T) {
 		db.Delete("widgets", []byte("1000"))
 
 		// Open some readers.
-		t0, _ := db.Transaction()
-		t1, _ := db.Transaction()
-		t2, _ := db.Transaction()
-		t2.Close()
+		t0, _ := db.Tx()
+		t1, _ := db.Tx()
+		t2, _ := db.Tx()
+		t2.Rollback()
 
 		// Obtain stats.
 		stat, err := db.Stat()
@@ -304,11 +326,11 @@ func TestDBStat(t *testing.T) {
 		assert.Equal(t, stat.FreePageCount, 2)
 		assert.Equal(t, stat.PageSize, 4096)
 		assert.Equal(t, stat.MmapSize, 4194304)
-		assert.Equal(t, stat.TransactionCount, 2)
+		assert.Equal(t, stat.TxCount, 2)
 
 		// Close readers.
-		t0.Close()
-		t1.Close()
+		t0.Rollback()
+		t1.Rollback()
 	})
 }
 
@@ -343,6 +365,29 @@ func TestDBString(t *testing.T) {
 	db := &DB{path: "/tmp/foo"}
 	assert.Equal(t, db.String(), `DB<"/tmp/foo">`)
 	assert.Equal(t, db.GoString(), `bolt.DB{path:"/tmp/foo"}`)
+}
+
+// Benchmark the performance of single put transactions in random order.
+func BenchmarkDBPutSequential(b *testing.B) {
+	value := []byte(strings.Repeat("0", 64))
+	withOpenDB(func(db *DB, path string) {
+		db.CreateBucket("widgets")
+		for i := 0; i < b.N; i++ {
+			db.Put("widgets", []byte(strconv.Itoa(i)), value)
+		}
+	})
+}
+
+// Benchmark the performance of single put transactions in random order.
+func BenchmarkDBPutRandom(b *testing.B) {
+	indexes := rand.Perm(b.N)
+	value := []byte(strings.Repeat("0", 64))
+	withOpenDB(func(db *DB, path string) {
+		db.CreateBucket("widgets")
+		for i := 0; i < b.N; i++ {
+			db.Put("widgets", []byte(strconv.Itoa(indexes[i])), value)
+		}
+	})
 }
 
 // withDB executes a function with a database reference.

@@ -9,31 +9,99 @@ import (
 	"unsafe"
 )
 
-// RWTransaction represents a transaction that can read and write data.
-// Only one read/write transaction can be active for a database at a time.
-// RWTransaction is composed of a read-only Transaction so it can also use
-// functions provided by Transaction.
-type RWTransaction struct {
-	Transaction
-	pending []*node
+// txid represents the internal transaction identifier.
+type txid uint64
+
+// Tx represents a read-only or read/write transaction on the database.
+// Read-only transactions can be used for retrieving values for keys and creating cursors.
+// Read/write transactions can create and remove buckets and create and remove keys.
+//
+// IMPORTANT: You must commit or rollback transactions when you are done with
+// them. Pages can not be reclaimed by the writer until no more transactions
+// are using them. A long running read transaction can cause the database to
+// quickly grow.
+type Tx struct {
+	writable bool
+	db       *DB
+	meta     *meta
+	buckets  *buckets
+	nodes    map[pgid]*node
+	pages    map[pgid]*page
+	pending  []*node
 }
 
 // init initializes the transaction.
-func (t *RWTransaction) init(db *DB) {
-	t.Transaction.init(db)
-	t.Transaction.rwtransaction = t
-	t.pages = make(map[pgid]*page)
-	t.nodes = make(map[pgid]*node)
+func (t *Tx) init(db *DB) {
+	t.db = db
+	t.pages = nil
 
-	// Increment the transaction id.
-	t.meta.txnid += txnid(1)
+	// Copy the meta page since it can be changed by the writer.
+	t.meta = &meta{}
+	db.meta().copy(t.meta)
+
+	// Read in the buckets page.
+	t.buckets = &buckets{}
+	t.buckets.read(t.page(t.meta.buckets))
+
+	if t.writable {
+		t.pages = make(map[pgid]*page)
+		t.nodes = make(map[pgid]*node)
+
+		// Increment the transaction id.
+		t.meta.txid += txid(1)
+	}
+}
+
+// id returns the transaction id.
+func (t *Tx) id() txid {
+	return t.meta.txid
+}
+
+// DB returns a reference to the database that created the transaction.
+func (t *Tx) DB() *DB {
+	return t.db
+}
+
+// Writable returns whether the transaction can perform write operations.
+func (t *Tx) Writable() bool {
+	return t.writable
+}
+
+// Bucket retrieves a bucket by name.
+// Returns nil if the bucket does not exist.
+func (t *Tx) Bucket(name string) *Bucket {
+	b := t.buckets.get(name)
+	if b == nil {
+		return nil
+	}
+
+	return &Bucket{
+		bucket: b,
+		name:   name,
+		tx:     t,
+	}
+}
+
+// Buckets retrieves a list of all buckets.
+func (t *Tx) Buckets() []*Bucket {
+	buckets := make([]*Bucket, 0, len(t.buckets.items))
+	for name, b := range t.buckets.items {
+		bucket := &Bucket{
+			bucket: b,
+			name:   name,
+			tx:     t,
+		}
+		buckets = append(buckets, bucket)
+	}
+	return buckets
 }
 
 // CreateBucket creates a new bucket.
 // Returns an error if the bucket already exists, if the bucket name is blank, or if the bucket name is too long.
-func (t *RWTransaction) CreateBucket(name string) error {
-	// Check if bucket already exists.
-	if b := t.Bucket(name); b != nil {
+func (t *Tx) CreateBucket(name string) error {
+	if !t.writable {
+		return ErrTxNotWritable
+	} else if b := t.Bucket(name); b != nil {
 		return ErrBucketExists
 	} else if len(name) == 0 {
 		return ErrBucketNameRequired
@@ -56,7 +124,7 @@ func (t *RWTransaction) CreateBucket(name string) error {
 
 // CreateBucketIfNotExists creates a new bucket if it doesn't already exist.
 // Returns an error if the bucket name is blank, or if the bucket name is too long.
-func (t *RWTransaction) CreateBucketIfNotExists(name string) error {
+func (t *Tx) CreateBucketIfNotExists(name string) error {
 	err := t.CreateBucket(name)
 	if err != nil && err != ErrBucketExists {
 		return err
@@ -66,7 +134,11 @@ func (t *RWTransaction) CreateBucketIfNotExists(name string) error {
 
 // DeleteBucket deletes a bucket.
 // Returns an error if the bucket cannot be found.
-func (t *RWTransaction) DeleteBucket(name string) error {
+func (t *Tx) DeleteBucket(name string) error {
+	if !t.writable {
+		return ErrTxNotWritable
+	}
+
 	b := t.Bucket(name)
 	if b == nil {
 		return ErrBucketNotFound
@@ -85,7 +157,13 @@ func (t *RWTransaction) DeleteBucket(name string) error {
 
 // Commit writes all changes to disk and updates the meta page.
 // Returns an error if a disk write error occurs.
-func (t *RWTransaction) Commit() error {
+func (t *Tx) Commit() error {
+	if t.db == nil {
+		return nil
+	} else if !t.writable {
+		t.Rollback()
+		return nil
+	}
 	defer t.close()
 
 	// TODO(benbjohnson): Use vectorized I/O to write out dirty pages.
@@ -118,16 +196,23 @@ func (t *RWTransaction) Commit() error {
 }
 
 // Rollback closes the transaction and ignores all previous updates.
-func (t *RWTransaction) Rollback() {
+func (t *Tx) Rollback() {
 	t.close()
 }
 
-func (t *RWTransaction) close() {
-	t.db.rwlock.Unlock()
+func (t *Tx) close() {
+	if t.db != nil {
+		if t.writable {
+			t.db.rwlock.Unlock()
+		} else {
+			t.db.removeTx(t)
+		}
+		t.db = nil
+	}
 }
 
 // allocate returns a contiguous block of memory starting at a given page.
-func (t *RWTransaction) allocate(count int) (*page, error) {
+func (t *Tx) allocate(count int) (*page, error) {
 	p, err := t.db.allocate(count)
 	if err != nil {
 		return nil, err
@@ -140,14 +225,14 @@ func (t *RWTransaction) allocate(count int) (*page, error) {
 }
 
 // rebalance attempts to balance all nodes.
-func (t *RWTransaction) rebalance() {
+func (t *Tx) rebalance() {
 	for _, n := range t.nodes {
 		n.rebalance()
 	}
 }
 
 // spill writes all the nodes to dirty pages.
-func (t *RWTransaction) spill() error {
+func (t *Tx) spill() error {
 	// Keep track of the current root nodes.
 	// We will update this at the end once all nodes are created.
 	type root struct {
@@ -179,7 +264,7 @@ func (t *RWTransaction) spill() error {
 
 		// If this is a root node that split then create a parent node.
 		if n.parent == nil && len(newNodes) > 1 {
-			n.parent = &node{transaction: t, isLeaf: false}
+			n.parent = &node{tx: t, isLeaf: false}
 			nodes = append(nodes, n.parent)
 		}
 
@@ -230,7 +315,7 @@ func (t *RWTransaction) spill() error {
 }
 
 // write writes any dirty pages to disk.
-func (t *RWTransaction) write() error {
+func (t *Tx) write() error {
 	// Sort pages by id.
 	pages := make(pages, 0, len(t.pages))
 	for _, p := range t.pages {
@@ -255,7 +340,7 @@ func (t *RWTransaction) write() error {
 }
 
 // writeMeta writes the meta to the disk.
-func (t *RWTransaction) writeMeta() error {
+func (t *Tx) writeMeta() error {
 	// Create a temporary buffer for the meta page.
 	buf := make([]byte, t.db.pageSize)
 	p := t.db.pageInBuffer(buf, 0)
@@ -268,14 +353,16 @@ func (t *RWTransaction) writeMeta() error {
 }
 
 // node creates a node from a page and associates it with a given parent.
-func (t *RWTransaction) node(pgid pgid, parent *node) *node {
-	// Retrieve node if it has already been fetched.
-	if n := t.Transaction.node(pgid); n != nil {
+func (t *Tx) node(pgid pgid, parent *node) *node {
+	// Retrieve node if it's already been created.
+	if t.nodes == nil {
+		return nil
+	} else if n := t.nodes[pgid]; n != nil {
 		return n
 	}
 
 	// Otherwise create a branch and cache it.
-	n := &node{transaction: t, parent: parent}
+	n := &node{tx: t, parent: parent}
 	if n.parent != nil {
 		n.depth = n.parent.depth + 1
 	}
@@ -286,12 +373,53 @@ func (t *RWTransaction) node(pgid pgid, parent *node) *node {
 }
 
 // dereference removes all references to the old mmap.
-func (t *RWTransaction) dereference() {
+func (t *Tx) dereference() {
 	for _, n := range t.nodes {
 		n.dereference()
 	}
 
 	for _, n := range t.pending {
 		n.dereference()
+	}
+}
+
+// page returns a reference to the page with a given id.
+// If page has been written to then a temporary bufferred page is returned.
+func (t *Tx) page(id pgid) *page {
+	// Check the dirty pages first.
+	if t.pages != nil {
+		if p, ok := t.pages[id]; ok {
+			return p
+		}
+	}
+
+	// Otherwise return directly from the mmap.
+	return t.db.page(id)
+}
+
+// pageNode returns the in-memory node, if it exists.
+// Otherwise returns the underlying page.
+func (t *Tx) pageNode(id pgid) (*page, *node) {
+	if t.nodes != nil {
+		if n := t.nodes[id]; n != nil {
+			return nil, n
+		}
+	}
+	return t.page(id), nil
+}
+
+// forEachPage iterates over every page within a given page and executes a function.
+func (t *Tx) forEachPage(pgid pgid, depth int, fn func(*page, int)) {
+	p := t.page(pgid)
+
+	// Execute function.
+	fn(p, depth)
+
+	// Recursively loop over children.
+	if (p.flags & branchPageFlag) != 0 {
+		for i := 0; i < int(p.count); i++ {
+			elem := p.branchPageElement(uint16(i))
+			t.forEachPage(elem.pgid, depth+1, fn)
+		}
 	}
 }

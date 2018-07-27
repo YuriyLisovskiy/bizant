@@ -16,7 +16,7 @@ import (
 )
 
 // Ensure that multiple threads can use the DB without race detector errors.
-func TestParallelTransactions(t *testing.T) {
+func TestParallelTxs(t *testing.T) {
 	var mutex sync.RWMutex
 
 	err := quick.Check(func(numReaders, batchSize uint, items testdata) bool {
@@ -49,7 +49,7 @@ func TestParallelTransactions(t *testing.T) {
 					go func() {
 						mutex.RLock()
 						local := current
-						txn, err := db.Transaction()
+						tx, err := db.Tx()
 						mutex.RUnlock()
 						if err == ErrDatabaseNotOpen {
 							wg.Done()
@@ -60,15 +60,15 @@ func TestParallelTransactions(t *testing.T) {
 
 						// Verify all data is in for local data list.
 						for _, item := range local {
-							value := txn.Bucket("widgets").Get(item.Key)
+							value := tx.Bucket("widgets").Get(item.Key)
 							if !assert.NoError(t, err) || !assert.Equal(t, value, item.Value) {
-								txn.Close()
+								tx.Rollback()
 								wg.Done()
 								t.FailNow()
 							}
 						}
 
-						txn.Close()
+						tx.Rollback()
 						wg.Done()
 						<-readers
 					}()
@@ -87,13 +87,13 @@ func TestParallelTransactions(t *testing.T) {
 				pending = pending[currentBatchSize:]
 
 				// Start write transaction.
-				txn, err := db.RWTransaction()
+				tx, err := db.RWTx()
 				if !assert.NoError(t, err) {
 					t.FailNow()
 				}
 
 				// Insert whole batch.
-				b := txn.Bucket("widgets")
+				b := tx.Bucket("widgets")
 				for _, item := range batchItems {
 					err := b.Put(item.Key, item.Value)
 					if !assert.NoError(t, err) {
@@ -103,7 +103,7 @@ func TestParallelTransactions(t *testing.T) {
 
 				// Commit and update the current list.
 				mutex.Lock()
-				err = txn.Commit()
+				err = tx.Commit()
 				current = append(current, batchItems...)
 				mutex.Unlock()
 				if !assert.NoError(t, err) {
