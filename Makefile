@@ -69,9 +69,17 @@ freebsd-arm:
 freebsd-amd64:
 	@GOOS=freebsd GOARCH=${ARCH_amd64} go build -o bin/freebsd/${ARCH_amd64}/${BINARY}.out ${FLAGS}
 
+PACKAGES = ./src/consensus ./src/core ./src/core/types ./src/core/types/tx_io ./src/db ./src/network/protocol ./src/secp256k1 ./src/utils ./src/wallet
+
+coverage:
+	@echo Running tests...
+	@go test -v -covermode=count -coverprofile=coverage.out ${PACKAGES}
+	@echo Generating coverage report...
+	@go tool cover -html coverage.out -o coverage.html
+	@echo Done
 
 test:
-	@go test ./src/...
+	@go test -v ${PACKAGES}
 
 clean:
 	@-rm -rf bin/

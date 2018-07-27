@@ -225,9 +225,9 @@ func NewUTXOTransaction(targetWallet *wallet.Wallet, to string, amount, fee floa
 		}
 	}
 	from := fmt.Sprintf("%x", targetWallet.GetAddress())
-	outputs = append(outputs, *tx_io.NewTXOutput(amount, to))
+	outputs = append(outputs, tx_io.NewTXOutput(amount, to))
 	if acc > amount {
-		outputs = append(outputs, *tx_io.NewTXOutput(acc-amount, from)) // a change
+		outputs = append(outputs, tx_io.NewTXOutput(acc-amount, from)) // a change
 	}
 	tx := types.Transaction{
 		Hash:        nil,

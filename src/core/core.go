@@ -51,7 +51,7 @@ func NewCoinBaseTX(to string, fees float64) types.Transaction {
 	tx := types.Transaction{
 		Hash:        nil,
 		VIn:       []tx_io.TXInput{txIn},
-		VOut:      []tx_io.TXOutput{*txOut},
+		VOut:      []tx_io.TXOutput{txOut},
 		Timestamp: time.Now().Unix(),
 		Fee:       0,
 	}
