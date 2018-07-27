@@ -70,7 +70,7 @@ func GetCommand(c *cli.Context) {
 	}
 	defer db.Close()
 
-	err = db.With(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *bolt.Tx) error {
 		// Find bucket.
 		b := tx.Bucket(name)
 		if b == nil {
@@ -109,7 +109,7 @@ func SetCommand(c *cli.Context) {
 	}
 	defer db.Close()
 
-	err = db.Do(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *bolt.Tx) error {
 		// Find bucket.
 		b := tx.Bucket(name)
 		if b == nil {
@@ -141,7 +141,7 @@ func KeysCommand(c *cli.Context) {
 	}
 	defer db.Close()
 
-	err = db.With(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *bolt.Tx) error {
 		// Find bucket.
 		b := tx.Bucket(name)
 		if b == nil {
@@ -176,7 +176,7 @@ func BucketsCommand(c *cli.Context) {
 	}
 	defer db.Close()
 
-	err = db.With(func(tx *bolt.Tx) error {
+	err = db.View(func(tx *bolt.Tx) error {
 		for _, b := range tx.Buckets() {
 			println(b.Name())
 		}
@@ -206,7 +206,7 @@ func PagesCommand(c *cli.Context) {
 	println("ID       TYPE       ITEMS  OVRFLW")
 	println("======== ========== ====== ======")
 
-	db.Do(func(tx *bolt.Tx) error {
+	db.Update(func(tx *bolt.Tx) error {
 		var id int
 		for {
 			p, err := tx.Page(id)

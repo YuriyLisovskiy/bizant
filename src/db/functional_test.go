@@ -32,7 +32,7 @@ func TestParallelTxs(t *testing.T) {
 		var current testdata
 
 		withOpenDB(func(db *DB, path string) {
-			db.Do(func(tx *Tx) error {
+			db.Update(func(tx *Tx) error {
 				return tx.CreateBucket("widgets")
 			})
 
@@ -55,7 +55,7 @@ func TestParallelTxs(t *testing.T) {
 					go func() {
 						mutex.RLock()
 						local := current
-						tx, err := db.Tx()
+						tx, err := db.Begin(false)
 						mutex.RUnlock()
 						if err == ErrDatabaseNotOpen {
 							wg.Done()
@@ -93,7 +93,7 @@ func TestParallelTxs(t *testing.T) {
 				pending = pending[currentBatchSize:]
 
 				// Start write transaction.
-				tx, err := db.RWTx()
+				tx, err := db.Begin(true)
 				if !assert.NoError(t, err) {
 					t.FailNow()
 				}

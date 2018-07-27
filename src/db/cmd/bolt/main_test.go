@@ -19,7 +19,7 @@ import (
 func TestGet(t *testing.T) {
 	SetTestMode(true)
 	open(func(db *bolt.DB) {
-		db.Do(func(tx *bolt.Tx) error {
+		db.Update(func(tx *bolt.Tx) error {
 			tx.CreateBucket("widgets")
 			tx.Bucket("widgets").Put([]byte("foo"), []byte("bar"))
 			return nil
@@ -49,7 +49,7 @@ func TestGetBucketNotFound(t *testing.T) {
 func TestGetKeyNotFound(t *testing.T) {
 	SetTestMode(true)
 	open(func(db *bolt.DB) {
-		db.Do(func(tx *bolt.Tx) error {
+		db.Update(func(tx *bolt.Tx) error {
 			return tx.CreateBucket("widgets")
 		})
 		output := run("get", db.Path(), "widgets", "foo")
@@ -61,7 +61,7 @@ func TestGetKeyNotFound(t *testing.T) {
 func TestSet(t *testing.T) {
 	SetTestMode(true)
 	open(func(db *bolt.DB) {
-		db.Do(func(tx *bolt.Tx) error {
+		db.Update(func(tx *bolt.Tx) error {
 			tx.CreateBucket("widgets")
 			return nil
 		})
@@ -90,7 +90,7 @@ func TestSetBucketNotFound(t *testing.T) {
 func TestKeys(t *testing.T) {
 	SetTestMode(true)
 	open(func(db *bolt.DB) {
-		db.Do(func(tx *bolt.Tx) error {
+		db.Update(func(tx *bolt.Tx) error {
 			tx.CreateBucket("widgets")
 			tx.Bucket("widgets").Put([]byte("0002"), []byte(""))
 			tx.Bucket("widgets").Put([]byte("0001"), []byte(""))
@@ -122,7 +122,7 @@ func TestKeysBucketNotFound(t *testing.T) {
 func TestBuckets(t *testing.T) {
 	SetTestMode(true)
 	open(func(db *bolt.DB) {
-		db.Do(func(tx *bolt.Tx) error {
+		db.Update(func(tx *bolt.Tx) error {
 			tx.CreateBucket("woojits")
 			tx.CreateBucket("widgets")
 			tx.CreateBucket("whatchits")
