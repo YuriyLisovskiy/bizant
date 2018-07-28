@@ -7,6 +7,8 @@ package db
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"sort"
 	"unsafe"
 )
@@ -196,6 +198,8 @@ func (n *node) write(p *page) {
 		copy(b[0:], item.value)
 		b = b[len(item.value):]
 	}
+
+	// DEBUG ONLY: n.dump(os.Stderr)
 }
 
 // split breaks up a node into smaller nodes, if appropriate.
@@ -266,6 +270,7 @@ func (n *node) spill() error {
 	// Add node's page to the freelist if it's not new.
 	if n.pgid > 0 {
 		tx.db.freelist.free(tx.id(), tx.page(n.pgid))
+		n.pgid = 0
 	}
 
 	// Spill nodes by deepest first.
@@ -278,8 +283,8 @@ func (n *node) spill() error {
 		}
 
 		// Write the node.
-		node.write(p)
 		node.pgid = p.id
+		node.write(p)
 
 		// Insert into parent inodes.
 		if node.parent != nil {
@@ -307,8 +312,8 @@ func (n *node) spill() error {
 		}
 
 		// Write the new root.
-		parent.write(p)
 		parent.pgid = p.id
+		parent.write(p)
 	}
 
 	return nil
@@ -336,7 +341,7 @@ func (n *node) rebalance() {
 		// If root node is a branch and only has one node then collapse it.
 		if !n.isLeaf && len(n.inodes) == 1 {
 			// Move root's child up.
-			child := n.bucket.nodes[n.inodes[0].pgid]
+			child := n.bucket.node(n.inodes[0].pgid, n)
 			n.isLeaf = child.isLeaf
 			n.inodes = child.inodes[:]
 			n.children = child.children
@@ -354,6 +359,16 @@ func (n *node) rebalance() {
 			child.free()
 		}
 
+		return
+	}
+
+	// If node has no keys then just remove it.
+	if n.numChildren() == 0 {
+		n.parent.del(n.key)
+		n.parent.removeChild(n)
+		delete(n.bucket.nodes, n.pgid)
+		n.free()
+		n.parent.rebalance()
 		return
 	}
 
@@ -480,6 +495,31 @@ func (n *node) free() {
 		n.bucket.tx.db.freelist.free(n.bucket.tx.id(), n.bucket.tx.page(n.pgid))
 		n.pgid = 0
 	}
+}
+
+// dump writes the contents of the node for debugging purposes.
+func (n *node) dump(w io.Writer) {
+	// Write node header.
+	var typ = "branch"
+	if n.isLeaf {
+		typ = "leaf"
+	}
+	fmt.Fprintf(w, "[NODE %d {type=%s count=%d}]\n", n.pgid, typ, len(n.inodes))
+
+	// Write out abbreviated version of each item.
+	for _, item := range n.inodes {
+		if n.isLeaf {
+			if item.flags&bucketLeafFlag != 0 {
+				bucket := (*bucket)(unsafe.Pointer(&item.value[0]))
+				fmt.Fprintf(w, "[L \"%s\" -> (bucket root=%d)]\n", item.key, bucket.root)
+			} else {
+				fmt.Fprintf(w, "[L \"%s\" -> \"%s\"]\n", item.key, item.value)
+			}
+		} else {
+			fmt.Fprintf(w, "[B \"%s\" -> pgid=%d]\n", item.key, item.pgid)
+		}
+	}
+	fmt.Fprint(w, "\n")
 }
 
 // inode represents an internal node inside of a node.
