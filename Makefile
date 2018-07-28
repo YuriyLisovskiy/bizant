@@ -34,7 +34,7 @@ freebsd: freebsd-i386 freebsd-arm freebsd-amd64
 
 
 linux-i386:
-	@CGO_ENABLED=1 GOOS=linux GOARCH=${ARCH_i386} go build -o bin/linux/i${ARCH_i386}/${BINARY} ${FLAGS}
+	@GOOS=linux GOARCH=${ARCH_i386} go build -o bin/linux/i${ARCH_i386}/${BINARY} ${FLAGS}
 
 linux-arm:
 	@GOOS=linux GOARCH=${ARCH_arm} go build -o bin/linux/${ARCH_arm}/${BINARY} ${FLAGS}
