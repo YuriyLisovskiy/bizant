@@ -334,22 +334,33 @@ func (b *Bucket) ForEach(fn func(k, v []byte) error) error {
 }
 
 // Stat returns stats on a bucket.
-func (b *Bucket) Stat() *BucketStat {
-	s := &BucketStat{}
+func (b *Bucket) Stats() BucketStats {
+	var s BucketStats
+	pageSize := b.tx.db.pageSize
 	b.tx.forEachPage(b.root, 0, func(p *page, depth int) {
 		if (p.flags & leafPageFlag) != 0 {
-			s.LeafPageCount++
-			s.KeyCount += int(p.count)
+			s.LeafPageN++
+			s.KeyN += int(p.count)
+			lastElement := p.leafPageElement(p.count - 1)
+			used := pageHeaderSize + (leafPageElementSize * int(p.count-1))
+			used += int(lastElement.pos + lastElement.ksize + lastElement.vsize)
+			s.LeafInuse += used
+			s.LeafOverflowN += int(p.overflow)
 		} else if (p.flags & branchPageFlag) != 0 {
-			s.BranchPageCount++
+			s.BranchPageN++
+			lastElement := p.branchPageElement(p.count - 1)
+			used := pageHeaderSize + (branchPageElementSize * int(p.count-1))
+			used += int(lastElement.pos + lastElement.ksize)
+			s.BranchInuse += used
+			s.BranchOverflowN += int(p.overflow)
 		}
 
-		s.OverflowPageCount += int(p.overflow)
-
-		if depth+1 > s.MaxDepth {
-			s.MaxDepth = (depth + 1)
+		if depth+1 > s.Depth {
+			s.Depth = (depth + 1)
 		}
 	})
+	s.BranchAlloc = (s.BranchPageN + s.BranchOverflowN) * pageSize
+	s.LeafAlloc = (s.LeafPageN + s.LeafOverflowN) * pageSize
 	return s
 }
 
@@ -509,11 +520,21 @@ func (b *Bucket) pageNode(id pgid) (*page, *node) {
 	return b.tx.page(id), nil
 }
 
-// BucketStat represents stats on a bucket such as branch pages and leaf pages.
-type BucketStat struct {
-	BranchPageCount   int
-	LeafPageCount     int
-	OverflowPageCount int
-	KeyCount          int
-	MaxDepth          int
+// BucketStats records statistics about resources used by a bucket.
+type BucketStats struct {
+	// Page count statistics.
+	BranchPageN     int // number of logical branch pages
+	BranchOverflowN int // number of physical branch overflow pages
+	LeafPageN       int // number of logical leaf pages
+	LeafOverflowN   int // number of physical leaf overflow pages
+
+	// Tree statistics.
+	KeyN  int // number of keys/value pairs
+	Depth int // number of levels in B+tree
+
+	// Page size utilization.
+	BranchAlloc int // bytes allocated for physical branch pages
+	BranchInuse int // bytes actually used for branch data
+	LeafAlloc   int // bytes allocated for physical leaf pages
+	LeafInuse   int // bytes actually used for leaf data
 }
