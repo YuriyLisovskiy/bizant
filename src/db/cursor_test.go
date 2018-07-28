@@ -17,12 +17,13 @@ import (
 func TestCursor_Seek(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		db.Update(func(tx *Tx) error {
-			assert.NoError(t, tx.CreateBucket([]byte("widgets")))
-			b := tx.Bucket([]byte("widgets"))
+			b, err := tx.CreateBucket([]byte("widgets"))
+			assert.NoError(t, err)
 			assert.NoError(t, b.Put([]byte("foo"), []byte("0001")))
 			assert.NoError(t, b.Put([]byte("bar"), []byte("0002")))
 			assert.NoError(t, b.Put([]byte("baz"), []byte("0003")))
-			assert.NoError(t, b.CreateBucket([]byte("bkt")))
+			_, err = b.CreateBucket([]byte("bkt"))
+			assert.NoError(t, err)
 			return nil
 		})
 		db.View(func(tx *Tx) error {
@@ -62,7 +63,8 @@ func TestCursor_Seek(t *testing.T) {
 func TestCursor_EmptyBucket(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		db.Update(func(tx *Tx) error {
-			return tx.CreateBucket([]byte("widgets"))
+			_, err := tx.CreateBucket([]byte("widgets"))
+			return err
 		})
 		db.View(func(tx *Tx) error {
 			c := tx.Bucket([]byte("widgets")).Cursor()
@@ -78,7 +80,8 @@ func TestCursor_EmptyBucket(t *testing.T) {
 func TestCursor_EmptyBucketReverse(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		db.Update(func(tx *Tx) error {
-			return tx.CreateBucket([]byte("widgets"))
+			_, err := tx.CreateBucket([]byte("widgets"))
+			return err
 		})
 		db.View(func(tx *Tx) error {
 			c := tx.Bucket([]byte("widgets")).Cursor()
@@ -267,11 +270,14 @@ func TestCursor_Iterate_Reverse(t *testing.T) {
 func TestCursor_Iterate_BucketsOnly(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		db.Update(func(tx *Tx) error {
-			assert.NoError(t, tx.CreateBucket([]byte("widgets")))
-			b := tx.Bucket([]byte("widgets"))
-			assert.NoError(t, b.CreateBucket([]byte("foo")))
-			assert.NoError(t, b.CreateBucket([]byte("bar")))
-			assert.NoError(t, b.CreateBucket([]byte("baz")))
+			b, err := tx.CreateBucket([]byte("widgets"))
+			assert.NoError(t, err)
+			_, err = b.CreateBucket([]byte("foo"))
+			assert.NoError(t, err)
+			_, err = b.CreateBucket([]byte("bar"))
+			assert.NoError(t, err)
+			_, err = b.CreateBucket([]byte("baz"))
+			assert.NoError(t, err)
 			return nil
 		})
 		db.View(func(tx *Tx) error {
@@ -291,11 +297,14 @@ func TestCursor_Iterate_BucketsOnly(t *testing.T) {
 func TestCursor_Iterate_BucketsOnly_Reverse(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		db.Update(func(tx *Tx) error {
-			assert.NoError(t, tx.CreateBucket([]byte("widgets")))
-			b := tx.Bucket([]byte("widgets"))
-			assert.NoError(t, b.CreateBucket([]byte("foo")))
-			assert.NoError(t, b.CreateBucket([]byte("bar")))
-			assert.NoError(t, b.CreateBucket([]byte("baz")))
+			b, err := tx.CreateBucket([]byte("widgets"))
+			assert.NoError(t, err)
+			_, err = b.CreateBucket([]byte("foo"))
+			assert.NoError(t, err)
+			_, err = b.CreateBucket([]byte("bar"))
+			assert.NoError(t, err)
+			_, err = b.CreateBucket([]byte("baz"))
+			assert.NoError(t, err)
 			return nil
 		})
 		db.View(func(tx *Tx) error {
