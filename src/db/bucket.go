@@ -134,16 +134,23 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 	}
 
 	// Otherwise create a bucket and cache it.
-	var child = newBucket(b.tx)
-	child.bucket = &bucket{}
-	*child.bucket = *(*bucket)(unsafe.Pointer(&v[0]))
-	b.buckets[string(name)] = &child
+	var child = b.openBucket(v)
+	b.buckets[string(name)] = child
 
 	// Save a reference to the inline page if the bucket is inline.
 	if child.root == 0 {
 		child.page = (*page)(unsafe.Pointer(&v[bucketHeaderSize]))
 	}
 
+	return child
+}
+
+// Helper method that re-interprets a sub-bucket value
+// from a parent into a Bucket
+func (b *Bucket) openBucket(value []byte) *Bucket {
+	var child = newBucket(b.tx)
+	child.bucket = &bucket{}
+	*child.bucket = *(*bucket)(unsafe.Pointer(&value[0]))
 	return &child
 }
 
@@ -359,17 +366,28 @@ func (b *Bucket) ForEach(fn func(k, v []byte) error) error {
 
 // Stat returns stats on a bucket.
 func (b *Bucket) Stats() BucketStats {
-	var s BucketStats
+	var s, subStats BucketStats
 	pageSize := b.tx.db.pageSize
 	b.forEachPage(func(p *page, depth int) {
 		if (p.flags & leafPageFlag) != 0 {
 			s.LeafPageN++
+			if p.count == 0 {
+				return
+			}
 			s.KeyN += int(p.count)
 			lastElement := p.leafPageElement(p.count - 1)
 			used := pageHeaderSize + (leafPageElementSize * int(p.count-1))
 			used += int(lastElement.pos + lastElement.ksize + lastElement.vsize)
 			s.LeafInuse += used
 			s.LeafOverflowN += int(p.overflow)
+
+			// Collect stats from sub-buckets
+			for i := uint16(0); i < p.count; i++ {
+				e := p.leafPageElement(i)
+				if (e.flags & bucketLeafFlag) != 0 {
+					subStats.Add(b.openBucket(e.value()).Stats())
+				}
+			}
 		} else if (p.flags & branchPageFlag) != 0 {
 			s.BranchPageN++
 			lastElement := p.branchPageElement(p.count - 1)
@@ -385,6 +403,10 @@ func (b *Bucket) Stats() BucketStats {
 	})
 	s.BranchAlloc = (s.BranchPageN + s.BranchOverflowN) * pageSize
 	s.LeafAlloc = (s.LeafPageN + s.LeafOverflowN) * pageSize
+
+	// add the max depth of sub-buckets to get total nested depth
+	s.Depth += subStats.Depth
+	s.Add(subStats)
 	return s
 }
 
@@ -596,16 +618,13 @@ func (b *Bucket) free() {
 
 // dereference removes all references to the old mmap.
 func (b *Bucket) dereference() {
-	for _, n := range b.nodes {
-		n.dereference()
+	if b.rootNode != nil {
+		b.rootNode.dereference()
 	}
 
 	for _, child := range b.buckets {
 		child.dereference()
 	}
-
-	// Update statistics
-	b.tx.stats.NodeDeref += len(b.nodes)
 }
 
 // pageNode returns the in-memory node, if it exists.
@@ -649,6 +668,21 @@ type BucketStats struct {
 	BranchInuse int // bytes actually used for branch data
 	LeafAlloc   int // bytes allocated for physical leaf pages
 	LeafInuse   int // bytes actually used for leaf data
+}
+
+func (s *BucketStats) Add(other BucketStats) {
+	s.BranchPageN += other.BranchPageN
+	s.BranchOverflowN += other.BranchOverflowN
+	s.LeafPageN += other.LeafPageN
+	s.LeafOverflowN += other.LeafOverflowN
+	s.KeyN += other.KeyN
+	if s.Depth < other.Depth {
+		s.Depth = other.Depth
+	}
+	s.BranchAlloc += other.BranchAlloc
+	s.BranchInuse += other.BranchInuse
+	s.LeafAlloc += other.LeafAlloc
+	s.LeafInuse += other.LeafInuse
 }
 
 // cloneBytes returns a copy of a given slice.

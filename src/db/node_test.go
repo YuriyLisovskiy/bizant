@@ -14,7 +14,7 @@ import (
 
 // Ensure that a node can insert a key/value.
 func TestNode_put(t *testing.T) {
-	n := &node{inodes: make(inodes, 0)}
+	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{meta: &meta{pgid: 1}}}}
 	n.put([]byte("baz"), []byte("baz"), []byte("2"), 0, 0)
 	n.put([]byte("foo"), []byte("foo"), []byte("0"), 0, 0)
 	n.put([]byte("bar"), []byte("bar"), []byte("1"), 0, 0)
@@ -63,7 +63,7 @@ func TestNode_read_LeafPage(t *testing.T) {
 // Ensure that a node can serialize into a leaf page.
 func TestNode_write_LeafPage(t *testing.T) {
 	// Create a node.
-	n := &node{isLeaf: true, inodes: make(inodes, 0)}
+	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{meta: &meta{pgid: 1}}}}
 	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
 	n.put([]byte("ricki"), []byte("ricki"), []byte("lake"), 0, 0)
 	n.put([]byte("john"), []byte("john"), []byte("johnson"), 0, 0)
@@ -90,7 +90,7 @@ func TestNode_write_LeafPage(t *testing.T) {
 // Ensure that a node can split into appropriate subgroups.
 func TestNode_split(t *testing.T) {
 	// Create a node.
-	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{}}}
+	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{meta: &meta{pgid: 1}}}}
 	n.put([]byte("00000001"), []byte("00000001"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000002"), []byte("00000002"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000003"), []byte("00000003"), []byte("0123456701234567"), 0, 0)
@@ -109,7 +109,7 @@ func TestNode_split(t *testing.T) {
 // Ensure that a page with the minimum number of inodes just returns a single node.
 func TestNode_split_MinKeys(t *testing.T) {
 	// Create a node.
-	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{}}}
+	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{meta: &meta{pgid: 1}}}}
 	n.put([]byte("00000001"), []byte("00000001"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000002"), []byte("00000002"), []byte("0123456701234567"), 0, 0)
 
@@ -121,7 +121,7 @@ func TestNode_split_MinKeys(t *testing.T) {
 // Ensure that a node that has keys that all fit on a page just returns one leaf.
 func TestNode_split_SinglePage(t *testing.T) {
 	// Create a node.
-	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{}}}
+	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{meta: &meta{pgid: 1}}}}
 	n.put([]byte("00000001"), []byte("00000001"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000002"), []byte("00000002"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000003"), []byte("00000003"), []byte("0123456701234567"), 0, 0)
