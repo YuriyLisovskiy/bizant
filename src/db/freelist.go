@@ -31,42 +31,30 @@ func (f *freelist) all() []pgid {
 		ids = append(ids, list...)
 	}
 
-	sort.Sort(pgids(ids))
+	sort.Sort(reverseSortedPgids(ids))
 	return ids
 }
 
 // allocate returns the starting page id of a contiguous list of pages of a given size.
 // If a contiguous block cannot be found then 0 is returned.
 func (f *freelist) allocate(n int) pgid {
-	if len(f.ids) == 0 {
-		return 0
-	}
-
-	var initial, previd pgid
+	var count int
+	var previd pgid
 	for i, id := range f.ids {
-		_assert(id > 1, "invalid page allocation: %d", id)
-
-		// Reset initial page if this is not contiguous.
-		if previd == 0 || id-previd != 1 {
-			initial = id
+		// Reset count if this is not contiguous.
+		if previd == 0 || previd-id != 1 {
+			count = 1
 		}
 
 		// If we found a contiguous block then remove it and return it.
-		if (id-initial)+1 == pgid(n) {
-			// If we're allocating off the beginning then take the fast path
-			// and just adjust the existing slice. This will use extra memory
-			// temporarily but the append() in free() will realloc the slice
-			// as is necessary.
-			if (i + 1) == n {
-				f.ids = f.ids[i+1:]
-			} else {
-				copy(f.ids[i-n+1:], f.ids[i+1:])
-				f.ids = f.ids[:len(f.ids)-n]
-			}
-			return initial
+		if count == n {
+			f.ids = append(f.ids[:i-(n-1)], f.ids[i+1:]...)
+			_assert(id > 1, "cannot allocate page 0 or 1: %d", id)
+			return id
 		}
 
 		previd = id
+		count++
 	}
 	return 0
 }
@@ -91,7 +79,7 @@ func (f *freelist) release(txid txid) {
 			delete(f.pending, tid)
 		}
 	}
-	sort.Sort(pgids(f.ids))
+	sort.Sort(reverseSortedPgids(f.ids))
 }
 
 // isFree returns whether a given page is in the free list.
@@ -116,7 +104,6 @@ func (f *freelist) read(p *page) {
 	ids := ((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0:p.count]
 	f.ids = make([]pgid, len(ids))
 	copy(f.ids, ids)
-	sort.Sort(pgids(f.ids))
 }
 
 // write writes the page ids onto a freelist page. All free and pending ids are
@@ -151,3 +138,9 @@ func (f *freelist) check() {
 	}
 }
 */
+
+type reverseSortedPgids []pgid
+
+func (s reverseSortedPgids) Len() int           { return len(s) }
+func (s reverseSortedPgids) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s reverseSortedPgids) Less(i, j int) bool { return s[i] > s[j] }
