@@ -13,8 +13,8 @@ FLAGS = main.go
 
 all: test target
 
-install-deps:
-	@bash install-deps.sh
+dependencies:
+	@bash dependencies.sh
 
 target:
 	@echo Building the binary for target platform...

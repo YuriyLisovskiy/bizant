@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 if hash git 2>/dev/null
 then
     echo Installing submodules...
