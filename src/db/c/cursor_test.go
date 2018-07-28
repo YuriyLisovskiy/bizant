@@ -11,18 +11,18 @@ import (
 	"os"
 	"testing"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/db"
+	bolt "github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/stretchr/testify/assert"
 )
 
 // Ensure that the C cursor can
 func TestCursor_First(t *testing.T) {
-	withDB(func(db *db.DB) {
-		db.Update(func(tx *db.Tx) error {
+	withDB(func(db *bolt.DB) {
+		db.Update(func(tx *bolt.Tx) error {
 			b, _ := tx.CreateBucket([]byte("widgets"))
 			return b.Put([]byte("foo"), []byte("barz"))
 		})
-		db.View(func(tx *db.Tx) error {
+		db.View(func(tx *bolt.Tx) error {
 			c := NewCursor(tx.Bucket([]byte("widgets")))
 			key, value := c.First()
 			assert.Equal(t, []byte("foo"), key)
@@ -34,8 +34,8 @@ func TestCursor_First(t *testing.T) {
 
 // Ensure that a C cursor can seek to the appropriate keys.
 func TestCursor_Seek(t *testing.T) {
-	withDB(func(db *db.DB) {
-		db.Update(func(tx *db.Tx) error {
+	withDB(func(db *bolt.DB) {
+		db.Update(func(tx *bolt.Tx) error {
 			b, err := tx.CreateBucket([]byte("widgets"))
 			assert.NoError(t, err)
 			assert.NoError(t, b.Put([]byte("foo"), []byte("0001")))
@@ -45,7 +45,7 @@ func TestCursor_Seek(t *testing.T) {
 			assert.NoError(t, err)
 			return nil
 		})
-		db.View(func(tx *db.Tx) error {
+		db.View(func(tx *bolt.Tx) error {
 			c := NewCursor(tx.Bucket([]byte("widgets")))
 
 			// Exact match should go to the key.
@@ -85,15 +85,15 @@ func TestCursor_Seek(t *testing.T) {
 
 // Ensure that a C cursor can iterate over a single root with a couple elements.
 func TestCursor_Iterate_Leaf(t *testing.T) {
-	withDB(func(db *db.DB) {
-		db.Update(func(tx *db.Tx) error {
+	withDB(func(db *bolt.DB) {
+		db.Update(func(tx *bolt.Tx) error {
 			tx.CreateBucket([]byte("widgets"))
 			tx.Bucket([]byte("widgets")).Put([]byte("baz"), []byte{})
 			tx.Bucket([]byte("widgets")).Put([]byte("foo"), []byte{0})
 			tx.Bucket([]byte("widgets")).Put([]byte("bar"), []byte{1})
 			return nil
 		})
-		db.View(func(tx *db.Tx) error {
+		db.View(func(tx *bolt.Tx) error {
 			c := NewCursor(tx.Bucket([]byte("widgets")))
 
 			k, v := c.First()
@@ -120,17 +120,17 @@ func TestCursor_Iterate_Leaf(t *testing.T) {
 	})
 }
 
-// Ensure that a C cursor can iterate over a branches and leafs.
+// Ensure that a C cursor can iterate over branches and leafs.
 func TestCursor_Iterate_Large(t *testing.T) {
-	withDB(func(db *db.DB) {
-		db.Update(func(tx *db.Tx) error {
+	withDB(func(db *bolt.DB) {
+		db.Update(func(tx *bolt.Tx) error {
 			b, _ := tx.CreateBucket([]byte("widgets"))
 			for i := 0; i < 1000; i++ {
 				b.Put([]byte(fmt.Sprintf("%05d", i)), []byte(fmt.Sprintf("%020d", i)))
 			}
 			return nil
 		})
-		db.View(func(tx *db.Tx) error {
+		db.View(func(tx *bolt.Tx) error {
 			var index int
 			c := NewCursor(tx.Bucket([]byte("widgets")))
 			for k, v := c.First(); len(k) > 0; k, v = c.Next() {
@@ -139,6 +139,44 @@ func TestCursor_Iterate_Large(t *testing.T) {
 				index++
 			}
 			assert.Equal(t, 1000, index)
+			return nil
+		})
+	})
+}
+
+// Ensure that a C cursor can seek over branches and leafs.
+func TestCursor_Seek_Large(t *testing.T) {
+	withDB(func(db *bolt.DB) {
+		db.Update(func(tx *bolt.Tx) error {
+			b, _ := tx.CreateBucket([]byte("widgets"))
+			for i := 1; i < 1000; i++ {
+				b.Put([]byte(fmt.Sprintf("%05d\000", i*10)), []byte(fmt.Sprintf("%020d", i*10)))
+			}
+			return nil
+		})
+		db.View(func(tx *bolt.Tx) error {
+			c := NewCursor(tx.Bucket([]byte("widgets")))
+
+			// Exact match should go to the key.
+			k, v, _ := c.Seek([]byte("05000\000"))
+			assert.Equal(t, "05000\000", string(k))
+			assert.Equal(t, fmt.Sprintf("%020d", 5000), string(v))
+
+			// Inexact match should go to the next key.
+			k, v, _ = c.Seek([]byte("07495\000"))
+			assert.Equal(t, "07500\000", string(k))
+			assert.Equal(t, fmt.Sprintf("%020d", 7500), string(v))
+
+			// Low key should go to the first key.
+			k, v, _ = c.Seek([]byte("00000\000"))
+			assert.Equal(t, "00010\000", string(k))
+			assert.Equal(t, fmt.Sprintf("%020d", 10), string(v))
+
+			// High key should return no key.
+			k, v, _ = c.Seek([]byte("40000\000"))
+			assert.Equal(t, "", string(k))
+			assert.Equal(t, "", string(v))
+
 			return nil
 		})
 	})
@@ -153,29 +191,29 @@ func tempfile() string {
 }
 
 // withDB executes a function with an already opened database.
-func withDB(fn func(*db.DB)) {
+func withDB(fn func(*bolt.DB)) {
 	path := tempfile()
-	database, err := db.Open(path, 0666)
+	db, err := bolt.Open(path, 0666)
 	if err != nil {
 		panic("cannot open db: " + err.Error())
 	}
 	defer os.Remove(path)
-	defer database.Close()
+	defer db.Close()
 
-	fn(database)
+	fn(db)
 
 	// Check database consistency after every test.
-	mustCheck(database)
+	mustCheck(db)
 }
 
 // mustCheck runs a consistency check on the database and panics if any errors are found.
-func mustCheck(db *db.DB) {
+func mustCheck(db *bolt.DB) {
 	if err := db.Check(); err != nil {
 		// Copy db off first.
 		var path = tempfile()
 		db.CopyFile(path, 0600)
 
-		if errors, ok := err.(db.ErrorList); ok {
+		if errors, ok := err.(bolt.ErrorList); ok {
 			for _, err := range errors {
 				fmt.Println(err)
 			}
