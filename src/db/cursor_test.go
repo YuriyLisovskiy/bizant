@@ -13,18 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Ensure that a cursor can return a reference to the bucket that created it.
-func TestCursor_Bucket(t *testing.T) {
-	withOpenDB(func(db *DB, path string) {
-		db.Update(func(tx *Tx) error {
-			b, _ := tx.CreateBucket([]byte("widgets"))
-			c := b.Cursor()
-			assert.Equal(t, b, c.Bucket())
-			return nil
-		})
-	})
-}
-
 // Ensure that a Tx cursor can seek to the appropriate keys.
 func TestCursor_Seek(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
@@ -106,7 +94,7 @@ func TestCursor_EmptyBucketReverse(t *testing.T) {
 }
 
 // Ensure that a Tx cursor can iterate over a single root with a couple elements.
-func TestCursor_LeafRoot(t *testing.T) {
+func TestCursor_Iterate_Leaf(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		db.Update(func(tx *Tx) error {
 			tx.CreateBucket([]byte("widgets"))
@@ -209,7 +197,7 @@ func TestCursor_Restart(t *testing.T) {
 }
 
 // Ensure that a Tx can iterate over all elements in a bucket.
-func TestCursor_Iterate(t *testing.T) {
+func TestCursor_QuickCheck(t *testing.T) {
 	f := func(items testdata) bool {
 		withOpenDB(func(db *DB, path string) {
 			// Bulk insert all values.
@@ -244,7 +232,7 @@ func TestCursor_Iterate(t *testing.T) {
 }
 
 // Ensure that a transaction can iterate over all elements in a bucket in reverse.
-func TestCursor_Iterate_Reverse(t *testing.T) {
+func TestCursor_QuickCheck_Reverse(t *testing.T) {
 	f := func(items testdata) bool {
 		withOpenDB(func(db *DB, path string) {
 			// Bulk insert all values.
@@ -279,7 +267,7 @@ func TestCursor_Iterate_Reverse(t *testing.T) {
 }
 
 // Ensure that a Tx cursor can iterate over subbuckets.
-func TestCursor_Iterate_BucketsOnly(t *testing.T) {
+func TestCursor_QuickCheck_BucketsOnly(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		db.Update(func(tx *Tx) error {
 			b, err := tx.CreateBucket([]byte("widgets"))
@@ -306,7 +294,7 @@ func TestCursor_Iterate_BucketsOnly(t *testing.T) {
 }
 
 // Ensure that a Tx cursor can reverse iterate over subbuckets.
-func TestCursor_Iterate_BucketsOnly_Reverse(t *testing.T) {
+func TestCursor_QuickCheck_BucketsOnly_Reverse(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
 		db.Update(func(tx *Tx) error {
 			b, err := tx.CreateBucket([]byte("widgets"))
