@@ -11,6 +11,7 @@ import (
 	"hash/fnv"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -27,6 +28,15 @@ const version = 2
 
 // Represents a marker value to indicate that a file is a Bolt DB.
 const magic uint32 = 0xED0CDAED
+
+const (
+	minFillPercent = 0.1
+	maxFillPercent = 1.0
+)
+
+// DefaultFillPercent is the percentage that split pages are filled.
+// This value can be changed by setting DB.FillPercent.
+const DefaultFillPercent = 0.5
 
 var (
 	// ErrDatabaseNotOpen is returned when a DB instance is accessed before it
@@ -52,6 +62,17 @@ var (
 // All data access is performed through transactions which can be obtained through the DB.
 // All the functions on DB will return a ErrDatabaseNotOpen if accessed before Open() is called.
 type DB struct {
+	// When enabled, the database will perform a Check() after every commit.
+	// A panic is issued if the database is in an inconsistent state. This
+	// flag has a large performance impact so it should only be used for
+	// debugging purposes.
+	StrictMode bool
+
+	// Sets the threshold for filling nodes when they split. By default,
+	// the database will fill to 50% but it can be useful to increase this
+	// amount if you know that your write workloads are mostly append-only.
+	FillPercent float64
+
 	path     string
 	file     *os.File
 	data     []byte
@@ -92,7 +113,7 @@ func (db *DB) String() string {
 // Open creates and opens a database at the given path.
 // If the file does not exist then it will be created automatically.
 func Open(path string, mode os.FileMode) (*DB, error) {
-	var db = &DB{opened: true}
+	var db = &DB{opened: true, FillPercent: DefaultFillPercent}
 
 	// Open data file and separate sync handler for metadata writes.
 	db.path = path
@@ -335,7 +356,6 @@ func (db *DB) beginTx() (*Tx, error) {
 
 	// Lock the meta pages while we initialize the transaction.
 	db.metalock.Lock()
-	defer db.metalock.Unlock()
 
 	// Exit if the database is not open yet.
 	if !db.opened {
@@ -349,6 +369,16 @@ func (db *DB) beginTx() (*Tx, error) {
 
 	// Keep track of transaction until it closes.
 	db.txs = append(db.txs, t)
+	n := len(db.txs)
+
+	// Unlock the meta pages.
+	db.metalock.Unlock()
+
+	// Update the transaction stats.
+	db.statlock.Lock()
+	db.stats.TxN++
+	db.stats.OpenTxN = n
+	db.statlock.Unlock()
 
 	return t, nil
 }
@@ -402,12 +432,14 @@ func (db *DB) removeTx(tx *Tx) {
 			break
 		}
 	}
+	n := len(db.txs)
 
 	// Unlock the meta pages.
 	db.metalock.Unlock()
 
 	// Merge statistics.
 	db.statlock.Lock()
+	db.stats.OpenTxN = n
 	db.stats.TxStats.add(&tx.stats)
 	db.statlock.Unlock()
 }
@@ -538,69 +570,7 @@ func (db *DB) Stats() Stats {
 // An error is returned if any inconsistency is found.
 func (db *DB) Check() error {
 	return db.Update(func(tx *Tx) error {
-		var errors ErrorList
-
-		// Track every reachable page.
-		reachable := make(map[pgid]*page)
-		reachable[0] = db.page(0) // meta0
-		reachable[1] = db.page(1) // meta1
-		for i := uint32(0); i <= db.page(tx.meta.freelist).overflow; i++ {
-			reachable[tx.meta.freelist+pgid(i)] = db.page(tx.meta.freelist)
-		}
-
-		// Recursively check buckets.
-		db.checkBucket(&tx.root, reachable, &errors)
-
-		// Ensure all pages below high water mark are either reachable or freed.
-		for i := pgid(0); i < tx.meta.pgid; i++ {
-			_, isReachable := reachable[i]
-			if !isReachable && !db.freelist.isFree(i) {
-				errors = append(errors, fmt.Errorf("page %d: unreachable unfreed", int(i)))
-			}
-		}
-
-		if len(errors) > 0 {
-			return errors
-		}
-
-		return nil
-	})
-}
-
-func (db *DB) checkBucket(b *Bucket, reachable map[pgid]*page, errors *ErrorList) {
-	// Ignore inline buckets.
-	if b.root == 0 {
-		return
-	}
-
-	// Check every page used by this bucket.
-	b.tx.forEachPage(b.root, 0, func(p *page, _ int) {
-		// Ensure each page is only referenced once.
-		for i := pgid(0); i <= pgid(p.overflow); i++ {
-			var id = p.id + i
-			if _, ok := reachable[id]; ok {
-				*errors = append(*errors, fmt.Errorf("page %d: multiple references", int(id)))
-			}
-			reachable[id] = p
-		}
-
-		// Retrieve page info.
-		info, err := b.tx.Page(int(p.id))
-		if err != nil {
-			*errors = append(*errors, err)
-		} else if info == nil {
-			*errors = append(*errors, fmt.Errorf("page %d: out of bounds: %d", int(p.id), int(b.tx.meta.pgid)))
-		} else if info.Type != "branch" && info.Type != "leaf" {
-			*errors = append(*errors, fmt.Errorf("page %d: invalid type: %s", int(p.id), info.Type))
-		}
-	})
-
-	// Check each bucket within this bucket.
-	_ = b.ForEach(func(k, v []byte) error {
-		if child := b.Bucket(k); child != nil {
-			db.checkBucket(child, reachable, errors)
-		}
-		return nil
+		return tx.Check()
 	})
 }
 
@@ -658,6 +628,10 @@ func (db *DB) allocate(count int) (*page, error) {
 
 // Stats represents statistics about the database.
 type Stats struct {
+	// Transaction stats
+	TxN     int // total number of completed read transactions
+	OpenTxN int // number of currently open read transactions
+
 	TxStats TxStats // global, ongoing stats.
 }
 
@@ -737,6 +711,15 @@ type ErrorList []error
 // Error returns a readable count of the errors in the list.
 func (l ErrorList) Error() string {
 	return fmt.Sprintf("%d errors occurred", len(l))
+}
+
+// join returns a error messages joined by a string.
+func (l ErrorList) join(sep string) string {
+	var a []string
+	for _, e := range l {
+		a = append(a, e.Error())
+	}
+	return strings.Join(a, sep)
 }
 
 // _assert will panic with a given formatted message if the given condition is false.
