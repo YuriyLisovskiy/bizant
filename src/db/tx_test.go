@@ -209,9 +209,8 @@ func TestTx_DeleteBucket(t *testing.T) {
 		})
 
 		// Save root page id.
-		var root pgid
 		db.View(func(tx *Tx) error {
-			root = tx.Bucket([]byte("widgets")).root
+			_ = tx.Bucket([]byte("widgets")).root
 			return nil
 		})
 
