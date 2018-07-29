@@ -60,26 +60,7 @@ func (c *Cursor) Last() (key []byte, value []byte) {
 // If the cursor is at the end of the bucket then a nil key and value are returned.
 func (c *Cursor) Next() (key []byte, value []byte) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
-
-	// Attempt to move over one element until we're successful.
-	// Move up the stack as we hit the end of each page in our stack.
-	for i := len(c.stack) - 1; i >= 0; i-- {
-		elem := &c.stack[i]
-		if elem.index < elem.count()-1 {
-			elem.index++
-			break
-		}
-		c.stack = c.stack[:i]
-	}
-
-	// If we've hit the end then return nil.
-	if len(c.stack) == 0 {
-		return nil, nil
-	}
-
-	// Move down the stack to find the first element of the first leaf under this branch.
-	c.first()
-	k, v, flags := c.keyValue()
+	k, v, flags := c.next()
 	if (flags & uint32(bucketLeafFlag)) != 0 {
 		return k, nil
 	}
@@ -121,6 +102,12 @@ func (c *Cursor) Prev() (key []byte, value []byte) {
 // follow, a nil key is returned.
 func (c *Cursor) Seek(seek []byte) (key []byte, value []byte) {
 	k, v, flags := c.seek(seek)
+
+	// If we ended up after the last element of a page then move to the next one.
+	if ref := &c.stack[len(c.stack)-1]; ref.index >= ref.count() {
+		k, v, flags = c.next()
+	}
+
 	if k == nil {
 		return nil, nil
 	} else if (flags & uint32(bucketLeafFlag)) != 0 {
@@ -129,9 +116,27 @@ func (c *Cursor) Seek(seek []byte) (key []byte, value []byte) {
 	return k, v
 }
 
+// Delete removes the current key/value under the cursor from the bucket.
+// Delete fails if current key/value is a bucket or if the transaction is not writable.
+func (c *Cursor) Delete() error {
+	if c.bucket.tx.db == nil {
+		return ErrTxClosed
+	} else if !c.bucket.Writable() {
+		return ErrTxNotWritable
+	}
+
+	key, _, flags := c.keyValue()
+	// Return an error if current value is a bucket.
+	if (flags & bucketLeafFlag) != 0 {
+		return ErrIncompatibleValue
+	}
+	c.node().del(key)
+
+	return nil
+}
+
 // seek moves the cursor to a given key and returns it.
-// If the key does not exist then the next key is used. If no keys
-// follow, a nil value is returned.
+// If the key does not exist then the next key is used.
 func (c *Cursor) seek(seek []byte) (key []byte, value []byte, flags uint32) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
 
@@ -194,11 +199,38 @@ func (c *Cursor) last() {
 	}
 }
 
+// next moves to the next leaf element and returns the key and value.
+// If the cursor is at the last leaf element then it stays there and returns nil.
+func (c *Cursor) next() (key []byte, value []byte, flags uint32) {
+	// Attempt to move over one element until we're successful.
+	// Move up the stack as we hit the end of each page in our stack.
+	var i int
+	for i = len(c.stack) - 1; i >= 0; i-- {
+		elem := &c.stack[i]
+		if elem.index < elem.count()-1 {
+			elem.index++
+			break
+		}
+	}
+
+	// If we've hit the root page then stop and return. This will leave the
+	// cursor on the last element of the last page.
+	if i == -1 {
+		return nil, nil, 0
+	}
+
+	// Otherwise start from where we left off in the stack and find the
+	// first element of the first leaf page.
+	c.stack = c.stack[:i+1]
+	c.first()
+	return c.keyValue()
+}
+
 // search recursively performs a binary search against a given page/node until it finds a given key.
 func (c *Cursor) search(key []byte, pgid pgid) {
 	p, n := c.bucket.pageNode(pgid)
 	if p != nil {
-		_assert((p.flags&(branchPageFlag|leafPageFlag)) != 0, "invalid page type: %d: %s", p.id, p.typ())
+		_assert((p.flags&(branchPageFlag|leafPageFlag)) != 0, "invalid page type: %d: %x", p.id, p.flags)
 	}
 	e := elemRef{page: p, node: n}
 	c.stack = append(c.stack, e)

@@ -6,6 +6,8 @@
 package db
 
 import (
+	"bytes"
+	"encoding/binary"
 	"sort"
 	"testing"
 	"testing/quick"
@@ -65,6 +67,96 @@ func TestCursor_Seek(t *testing.T) {
 			k, v = c.Seek([]byte("bkt"))
 			assert.Equal(t, []byte("bkt"), k)
 			assert.Nil(t, v)
+
+			return nil
+		})
+	})
+}
+
+func TestCursor_Delete(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		var count = 1000
+
+		// Insert every other key between 0 and $count.
+		db.Update(func(tx *Tx) error {
+			b, _ := tx.CreateBucket([]byte("widgets"))
+			for i := 0; i < count; i += 1 {
+				k := make([]byte, 8)
+				binary.BigEndian.PutUint64(k, uint64(i))
+				b.Put(k, make([]byte, 100))
+			}
+			b.CreateBucket([]byte("sub"))
+			return nil
+		})
+
+		db.Update(func(tx *Tx) error {
+			c := tx.Bucket([]byte("widgets")).Cursor()
+			bound := make([]byte, 8)
+			binary.BigEndian.PutUint64(bound, uint64(count/2))
+			for key, _ := c.First(); bytes.Compare(key, bound) < 0; key, _ = c.Next() {
+				if err := c.Delete(); err != nil {
+					return err
+				}
+			}
+			c.Seek([]byte("sub"))
+			err := c.Delete()
+			assert.Equal(t, err, ErrIncompatibleValue)
+			return nil
+		})
+
+		db.View(func(tx *Tx) error {
+			b := tx.Bucket([]byte("widgets"))
+			assert.Equal(t, b.Stats().KeyN, count/2+1)
+			return nil
+		})
+	})
+}
+
+// Ensure that a Tx cursor can seek to the appropriate keys when there are a
+// large number of keys. This test also checks that seek will always move
+// forward to the next key.
+//
+// Related: https://github.com/boltdb/bolt/pull/187
+func TestCursor_Seek_Large(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		var count = 10000
+
+		// Insert every other key between 0 and $count.
+		db.Update(func(tx *Tx) error {
+			b, _ := tx.CreateBucket([]byte("widgets"))
+			for i := 0; i < count; i += 100 {
+				for j := i; j < i+100; j += 2 {
+					k := make([]byte, 8)
+					binary.BigEndian.PutUint64(k, uint64(j))
+					b.Put(k, make([]byte, 100))
+				}
+			}
+			return nil
+		})
+
+		db.View(func(tx *Tx) error {
+			c := tx.Bucket([]byte("widgets")).Cursor()
+			for i := 0; i < count; i++ {
+				seek := make([]byte, 8)
+				binary.BigEndian.PutUint64(seek, uint64(i))
+
+				k, _ := c.Seek(seek)
+
+				// The last seek is beyond the end of the the range so
+				// it should return nil.
+				if i == count-1 {
+					assert.Nil(t, k)
+					continue
+				}
+
+				// Otherwise we should seek to the exact key or the next key.
+				num := binary.BigEndian.Uint64(k)
+				if i%2 == 0 {
+					assert.Equal(t, uint64(i), num)
+				} else {
+					assert.Equal(t, uint64(i+1), num)
+				}
+			}
 
 			return nil
 		})

@@ -14,12 +14,13 @@ import (
 // node represents an in-memory, deserialized page.
 type node struct {
 	bucket     *Bucket
+	dirty      bool
 	isLeaf     bool
 	unbalanced bool
 	key        []byte
 	pgid       pgid
 	parent     *node
-	children   []*node
+	children   nodes
 	inodes     inodes
 }
 
@@ -197,6 +198,7 @@ func (n *node) write(p *page) {
 			elem.pos = uint32(uintptr(unsafe.Pointer(&b[0])) - uintptr(unsafe.Pointer(elem)))
 			elem.ksize = uint32(len(item.key))
 			elem.pgid = item.pgid
+			_assert(elem.pgid != p.id, "write: circular dependency occurred")
 		}
 
 		// Write data for the element to the end of the page.
@@ -209,15 +211,37 @@ func (n *node) write(p *page) {
 	// DEBUG ONLY: n.dump()
 }
 
-// split breaks up a node into smaller nodes, if appropriate.
+// split breaks up a node into multiple smaller nodes, if appropriate.
 // This should only be called from the spill() function.
 func (n *node) split(pageSize int) []*node {
-	var nodes = []*node{n}
+	var nodes []*node
 
+	node := n
+	for {
+		// Split node into two.
+		a, b := node.splitTwo(pageSize)
+		nodes = append(nodes, a)
+
+		// If we can't split then exit the loop.
+		if b == nil {
+			break
+		}
+
+		// Set node to b so it gets split on the next iteration.
+		node = b
+	}
+
+	return nodes
+}
+
+// splitTwo breaks up a node into two smaller nodes, if appropriate.
+// This should only be called from the split() function.
+func (n *node) splitTwo(pageSize int) (*node, *node) {
 	// Ignore the split if the page doesn't have at least enough nodes for
-	// multiple pages or if the data can fit on a single page.
-	if len(n.inodes) <= (minKeysPerPage*2) || n.size() < pageSize {
-		return nodes
+	// two pages or if the data can fit on a single page.
+	sz := n.size()
+	if len(n.inodes) <= (minKeysPerPage*2) || sz < pageSize {
+		return n, nil
 	}
 
 	// Determine the threshold before starting a new node.
@@ -229,43 +253,52 @@ func (n *node) split(pageSize int) []*node {
 	}
 	threshold := int(float64(pageSize) * fillPercent)
 
-	// Group into smaller pages and target a given fill size.
-	size := pageHeaderSize
-	internalNodes := n.inodes
-	current := n
-	current.inodes = nil
+	// Determine split position and sizes of the two pages.
+	splitIndex, _ := n.splitIndex(threshold)
 
-	// Loop over every inode and split once we reach our threshold.
-	for i, inode := range internalNodes {
-		elemSize := n.pageElementSize() + len(inode.key) + len(inode.value)
-
-		// Split once we reach our threshold split size. However, this should
-		// only be done if we have enough keys for this node and we will have
-		// enough keys for the next node.
-		if len(current.inodes) >= minKeysPerPage && i < len(internalNodes)-minKeysPerPage && size+elemSize > threshold {
-			// If there's no parent then we need to create one.
-			if n.parent == nil {
-				n.parent = &node{bucket: n.bucket, children: []*node{n}}
-			}
-
-			// Create a new node and add it to the parent.
-			current = &node{bucket: n.bucket, isLeaf: n.isLeaf, parent: n.parent}
-			n.parent.children = append(n.parent.children, current)
-			nodes = append(nodes, current)
-
-			// Reset our running total back to zero (plus header size).
-			size = pageHeaderSize
-
-			// Update the statistics.
-			n.bucket.tx.stats.Split++
-		}
-
-		// Increase our running total of the size and append the inode.
-		size += elemSize
-		current.inodes = append(current.inodes, inode)
+	// Split node into two separate nodes.
+	// If there's no parent then we'll need to create one.
+	if n.parent == nil {
+		n.parent = &node{bucket: n.bucket, children: []*node{n}}
 	}
 
-	return nodes
+	// Create a new node and add it to the parent.
+	next := &node{bucket: n.bucket, isLeaf: n.isLeaf, parent: n.parent}
+	n.parent.children = append(n.parent.children, next)
+
+	// Split inodes across two nodes.
+	next.inodes = n.inodes[splitIndex:]
+	n.inodes = n.inodes[:splitIndex]
+
+	// Update the statistics.
+	n.bucket.tx.stats.Split++
+
+	return n, next
+}
+
+// splitIndex finds the position where a page will fill a given threshold.
+// It returns the index as well as the size of the first page.
+// This is only be called from split().
+func (n *node) splitIndex(threshold int) (index, sz int) {
+	sz = pageHeaderSize
+
+	// Loop until we only have the minimum number of keys required for the second page.
+	for i := 0; i < len(n.inodes)-minKeysPerPage; i++ {
+		index = i
+		inode := n.inodes[i]
+		elsize := n.pageElementSize() + len(inode.key) + len(inode.value)
+
+		// If we have at least the minimum number of keys and adding another
+		// node would put us over the threshold then exit and return.
+		if i >= minKeysPerPage && sz+elsize > threshold {
+			break
+		}
+
+		// Add the element size to the total size.
+		sz += elsize
+	}
+
+	return
 }
 
 // spill writes the nodes to dirty pages and splits nodes as it goes.
@@ -273,22 +306,28 @@ func (n *node) split(pageSize int) []*node {
 func (n *node) spill() error {
 	var tx = n.bucket.tx
 
-	// Spill child nodes first.
-	for _, child := range n.children {
-		if err := child.spill(); err != nil {
+	// Spill child nodes first. Child nodes can materialize sibling nodes in
+	// the case of split-merge so we cannot use a range loop. We have to check
+	// the children size on every loop iteration.
+	sort.Sort(n.children)
+	for i := 0; i < len(n.children); i++ {
+		if err := n.children[i].spill(); err != nil {
 			return err
 		}
 	}
 
-	// Add node's page to the freelist if it's not new.
-	if n.pgid > 0 {
-		tx.db.freelist.free(tx.id(), tx.page(n.pgid))
-		n.pgid = 0
-	}
+	// We no longer need the child list because it's only used for spill tracking.
+	n.children = nil
 
-	// Spill nodes by deepest first.
+	// Split nodes into appropriate sizes. The first node will always be n.
 	var nodes = n.split(tx.db.pageSize)
 	for _, node := range nodes {
+		// Add node's page to the freelist if it's not new.
+		if node.pgid > 0 {
+			tx.db.freelist.free(tx.id(), tx.page(node.pgid))
+			node.pgid = 0
+		}
+
 		// Allocate contiguous space for the node.
 		p, err := tx.allocate((node.size() / tx.db.pageSize) + 1)
 		if err != nil {
@@ -309,7 +348,7 @@ func (n *node) spill() error {
 
 			node.parent.put(key, node.inodes[0].key, nil, node.pgid, 0)
 			node.key = node.inodes[0].key
-			_assert(len(n.key) > 0, "spill: zero-length node key")
+			_assert(len(node.key) > 0, "spill: zero-length node key")
 		}
 
 		// Update the statistics.
@@ -467,7 +506,6 @@ func (n *node) rebalance() {
 		target.inodes = append(target.inodes, n.inodes...)
 		n.parent.del(n.key)
 		n.parent.removeChild(n)
-		n.parent.put(target.key, target.inodes[0].key, nil, target.pgid, 0)
 		delete(n.bucket.nodes, n.pgid)
 		n.free()
 	}
@@ -553,6 +591,12 @@ func (n *node) dump() {
 	warn("")
 }
 */
+
+type nodes []*node
+
+func (s nodes) Len() int           { return len(s) }
+func (s nodes) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s nodes) Less(i, j int) bool { return bytes.Compare(s[i].inodes[0].key, s[j].inodes[0].key) == -1 }
 
 // inode represents an internal node inside of a node.
 // It can be used to point to elements in a page or point

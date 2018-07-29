@@ -224,7 +224,7 @@ func TestTx_DeleteBucket(t *testing.T) {
 
 		db.Update(func(tx *Tx) error {
 			// Verify that the bucket's page is free.
-			assert.Equal(t, []pgid{5, 4}, db.freelist.all())
+			assert.Equal(t, []pgid{4, 5}, db.freelist.all())
 
 			// Create the bucket again and make sure there's not a phantom value.
 			b, err := tx.CreateBucket([]byte("widgets"))
@@ -293,31 +293,6 @@ func TestTx_OnCommit_Rollback(t *testing.T) {
 	assert.Equal(t, 0, x)
 }
 
-// Ensure that a Tx in strict mode will fail when corrupted.
-func TestTx_Check_Corrupt(t *testing.T) {
-	var msg string
-	func() {
-		defer func() {
-			msg = fmt.Sprintf("%s", recover())
-		}()
-
-		withOpenDB(func(db *DB, path string) {
-			db.StrictMode = true
-			db.Update(func(tx *Tx) error {
-				tx.CreateBucket([]byte("foo"))
-
-				// Corrupt the DB by adding a page to the freelist.
-				warn("---")
-				db.freelist.free(0, tx.page(3))
-
-				return nil
-			})
-		})
-	}()
-
-	assert.Equal(t, "check fail: 1 errors occurred: page 3: already freed", msg)
-}
-
 // Ensure that the database can be copied to a file path.
 func TestTx_CopyFile(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
@@ -331,7 +306,7 @@ func TestTx_CopyFile(t *testing.T) {
 
 		assert.NoError(t, db.View(func(tx *Tx) error { return tx.CopyFile(dest, 0600) }))
 
-		db2, err := Open(dest, 0600)
+		db2, err := Open(dest, 0600, nil)
 		assert.NoError(t, err)
 		defer db2.Close()
 
@@ -343,9 +318,60 @@ func TestTx_CopyFile(t *testing.T) {
 	})
 }
 
+type failWriterError struct{}
+
+func (failWriterError) Error() string {
+	return "error injected for tests"
+}
+
+type failWriter struct {
+	// fail after this many bytes
+	After int
+}
+
+func (f *failWriter) Write(p []byte) (n int, err error) {
+	n = len(p)
+	if n > f.After {
+		n = f.After
+		err = failWriterError{}
+	}
+	f.After -= n
+	return n, err
+}
+
+// Ensure that Copy handles write errors right.
+func TestTx_CopyFile_Error_Meta(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		db.Update(func(tx *Tx) error {
+			tx.CreateBucket([]byte("widgets"))
+			tx.Bucket([]byte("widgets")).Put([]byte("foo"), []byte("bar"))
+			tx.Bucket([]byte("widgets")).Put([]byte("baz"), []byte("bat"))
+			return nil
+		})
+
+		err := db.View(func(tx *Tx) error { return tx.Copy(&failWriter{}) })
+		assert.EqualError(t, err, "meta copy: error injected for tests")
+	})
+}
+
+// Ensure that Copy handles write errors right.
+func TestTx_CopyFile_Error_Normal(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		db.Update(func(tx *Tx) error {
+			tx.CreateBucket([]byte("widgets"))
+			tx.Bucket([]byte("widgets")).Put([]byte("foo"), []byte("bar"))
+			tx.Bucket([]byte("widgets")).Put([]byte("baz"), []byte("bat"))
+			return nil
+		})
+
+		err := db.View(func(tx *Tx) error { return tx.Copy(&failWriter{3 * db.pageSize}) })
+		assert.EqualError(t, err, "error injected for tests")
+	})
+}
+
 func ExampleTx_Rollback() {
 	// Open the database.
-	db, _ := Open(tempfile(), 0666)
+	db, _ := Open(tempfile(), 0666, nil)
 	defer os.Remove(db.Path())
 	defer db.Close()
 
@@ -379,7 +405,7 @@ func ExampleTx_Rollback() {
 
 func ExampleTx_CopyFile() {
 	// Open the database.
-	db, _ := Open(tempfile(), 0666)
+	db, _ := Open(tempfile(), 0666, nil)
 	defer os.Remove(db.Path())
 	defer db.Close()
 
@@ -396,7 +422,7 @@ func ExampleTx_CopyFile() {
 	defer os.Remove(toFile)
 
 	// Open the cloned database.
-	db2, _ := Open(toFile, 0666)
+	db2, _ := Open(toFile, 0666, nil)
 	defer db2.Close()
 
 	// Ensure that the key exists in the copy.

@@ -6,23 +6,12 @@
 package db
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"sort"
 	"time"
 	"unsafe"
-)
-
-var (
-	// ErrTxNotWritable is returned when performing a write operation on a
-	// read-only transaction.
-	ErrTxNotWritable = errors.New("tx not writable")
-
-	// ErrTxClosed is returned when committing or rolling back a transaction
-	// that has already been committed or rolled back.
-	ErrTxClosed = errors.New("tx closed")
 )
 
 // txid represents the internal transaction identifier.
@@ -162,7 +151,7 @@ func (tx *Tx) Commit() error {
 	// spill data onto dirty pages.
 	startTime = time.Now()
 	if err := tx.root.spill(); err != nil {
-		tx.close()
+		tx.rollback()
 		return err
 	}
 	tx.stats.SpillTime += time.Since(startTime)
@@ -175,30 +164,33 @@ func (tx *Tx) Commit() error {
 	tx.db.freelist.free(tx.id(), tx.db.page(tx.meta.freelist))
 	p, err := tx.allocate((tx.db.freelist.size() / tx.db.pageSize) + 1)
 	if err != nil {
-		tx.close()
+		tx.rollback()
 		return err
 	}
-	tx.db.freelist.write(p)
+	if err := tx.db.freelist.write(p); err != nil {
+		tx.rollback()
+		return err
+	}
 	tx.meta.freelist = p.id
 
 	// Write dirty pages to disk.
 	startTime = time.Now()
 	if err := tx.write(); err != nil {
-		tx.close()
+		tx.rollback()
 		return err
 	}
 
 	// If strict mode is enabled then perform a consistency check.
+	// Only the first consistency error is reported in the panic.
 	if tx.db.StrictMode {
-		if err := tx.Check(); err != nil {
-			err := err.(ErrorList)
-			panic("check fail: " + err.Error() + ": " + err.join("; "))
+		if err, ok := <-tx.Check(); ok {
+			panic("check fail: " + err.Error())
 		}
 	}
 
 	// Write meta to disk.
 	if err := tx.writeMeta(); err != nil {
-		tx.close()
+		tx.rollback()
 		return err
 	}
 	tx.stats.WriteTime += time.Since(startTime)
@@ -220,17 +212,34 @@ func (tx *Tx) Rollback() error {
 	if tx.db == nil {
 		return ErrTxClosed
 	}
-	tx.close()
+	tx.rollback()
 	return nil
+}
+
+func (tx *Tx) rollback() {
+	if tx.writable {
+		tx.db.freelist.rollback(tx.id())
+		tx.db.freelist.reload(tx.db.page(tx.db.meta().freelist))
+	}
+	tx.close()
 }
 
 func (tx *Tx) close() {
 	if tx.writable {
+		// Grab freelist stats.
+		var freelistFreeN = tx.db.freelist.free_count()
+		var freelistPendingN = tx.db.freelist.pending_count()
+		var freelistAlloc = tx.db.freelist.size()
+
 		// Remove writer lock.
 		tx.db.rwlock.Unlock()
 
 		// Merge statistics.
 		tx.db.statlock.Lock()
+		tx.db.stats.FreePageN = freelistFreeN
+		tx.db.stats.PendingPageN = freelistPendingN
+		tx.db.stats.FreeAlloc = (freelistFreeN + freelistPendingN) * tx.db.pageSize
+		tx.db.stats.FreelistInuse = freelistAlloc
 		tx.db.stats.TxStats.add(&tx.stats)
 		tx.db.statlock.Unlock()
 	} else {
@@ -244,11 +253,15 @@ func (tx *Tx) close() {
 // using the database while a copy is in progress.
 // Copy will write exactly tx.Size() bytes into the writer.
 func (tx *Tx) Copy(w io.Writer) error {
-	// Open reader on the database.
-	f, err := os.Open(tx.db.path)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
+	var f *os.File
+	var err error
+
+	// Attempt to open reader directly.
+	if f, err = os.OpenFile(tx.db.path, os.O_RDONLY|odirect, 0); err != nil {
+		// Fallback to a regular open if that doesn't work.
+		if f, err = os.OpenFile(tx.db.path, os.O_RDONLY, 0); err != nil {
+			return err
+		}
 	}
 
 	// Copy the meta pages.
@@ -256,14 +269,12 @@ func (tx *Tx) Copy(w io.Writer) error {
 	_, err = io.CopyN(w, f, int64(tx.db.pageSize*2))
 	tx.db.metalock.Unlock()
 	if err != nil {
-		_ = tx.Rollback()
 		_ = f.Close()
 		return fmt.Errorf("meta copy: %s", err)
 	}
 
 	// Copy data pages.
 	if _, err := io.CopyN(w, f, tx.Size()-int64(tx.db.pageSize*2)); err != nil {
-		_ = tx.Rollback()
 		_ = f.Close()
 		return err
 	}
@@ -289,19 +300,25 @@ func (tx *Tx) CopyFile(path string, mode os.FileMode) error {
 }
 
 // Check performs several consistency checks on the database for this transaction.
-// An error is returned if any inconsistency is found or if executed on a read-only transaction.
-func (tx *Tx) Check() error {
-	if !tx.writable {
-		return ErrTxNotWritable
-	}
+// An error is returned if any inconsistency is found.
+//
+// It can be safely run concurrently on a writable transaction. However, this
+// incurs a high cost for large databases and databases with a lot of subbuckets
+// because of caching. This overhead can be removed if running on a read-only
+// transaction, however, it is not safe to execute other writer transactions at
+// the same time.
+func (tx *Tx) Check() <-chan error {
+	ch := make(chan error)
+	go tx.check(ch)
+	return ch
+}
 
-	var errors ErrorList
-
+func (tx *Tx) check(ch chan error) {
 	// Check if any pages are double freed.
 	freed := make(map[pgid]bool)
 	for _, id := range tx.db.freelist.all() {
 		if freed[id] {
-			errors = append(errors, fmt.Errorf("page %d: already freed", id))
+			ch <- fmt.Errorf("page %d: already freed", id)
 		}
 		freed[id] = true
 	}
@@ -315,26 +332,21 @@ func (tx *Tx) Check() error {
 	}
 
 	// Recursively check buckets.
-	tx.checkBucket(&tx.root, reachable, &errors)
+	tx.checkBucket(&tx.root, reachable, freed, ch)
 
 	// Ensure all pages below high water mark are either reachable or freed.
 	for i := pgid(0); i < tx.meta.pgid; i++ {
 		_, isReachable := reachable[i]
 		if !isReachable && !freed[i] {
-			errors = append(errors, fmt.Errorf("page %d: unreachable unfreed", int(i)))
-		} else if isReachable && freed[i] {
-			errors = append(errors, fmt.Errorf("page %d: reachable freed", int(i)))
+			ch <- fmt.Errorf("page %d: unreachable unfreed", int(i))
 		}
 	}
 
-	if len(errors) > 0 {
-		return errors
-	}
-
-	return nil
+	// Close the channel to signal completion.
+	close(ch)
 }
 
-func (tx *Tx) checkBucket(b *Bucket, reachable map[pgid]*page, errors *ErrorList) {
+func (tx *Tx) checkBucket(b *Bucket, reachable map[pgid]*page, freed map[pgid]bool, ch chan error) {
 	// Ignore inline buckets.
 	if b.root == 0 {
 		return
@@ -342,30 +354,31 @@ func (tx *Tx) checkBucket(b *Bucket, reachable map[pgid]*page, errors *ErrorList
 
 	// Check every page used by this bucket.
 	b.tx.forEachPage(b.root, 0, func(p *page, _ int) {
+		if p.id > tx.meta.pgid {
+			ch <- fmt.Errorf("page %d: out of bounds: %d", int(p.id), int(b.tx.meta.pgid))
+		}
+
 		// Ensure each page is only referenced once.
 		for i := pgid(0); i <= pgid(p.overflow); i++ {
 			var id = p.id + i
 			if _, ok := reachable[id]; ok {
-				*errors = append(*errors, fmt.Errorf("page %d: multiple references", int(id)))
+				ch <- fmt.Errorf("page %d: multiple references", int(id))
 			}
 			reachable[id] = p
 		}
 
-		// Retrieve page info.
-		info, err := b.tx.Page(int(p.id))
-		if err != nil {
-			*errors = append(*errors, err)
-		} else if info == nil {
-			*errors = append(*errors, fmt.Errorf("page %d: out of bounds: %d", int(p.id), int(b.tx.meta.pgid)))
-		} else if info.Type != "branch" && info.Type != "leaf" {
-			*errors = append(*errors, fmt.Errorf("page %d: invalid type: %s", int(p.id), info.Type))
+		// We should only encounter un-freed leaf and branch pages.
+		if freed[p.id] {
+			ch <- fmt.Errorf("page %d: reachable freed", int(p.id))
+		} else if (p.flags&branchPageFlag) == 0 && (p.flags&leafPageFlag) == 0 {
+			ch <- fmt.Errorf("page %d: invalid type: %s", int(p.id), p.typ())
 		}
 	})
 
 	// Check each bucket within this bucket.
 	_ = b.ForEach(func(k, v []byte) error {
 		if child := b.Bucket(k); child != nil {
-			tx.checkBucket(child, reachable, errors)
+			tx.checkBucket(child, reachable, freed, ch)
 		}
 		return nil
 	})
@@ -471,12 +484,10 @@ func (tx *Tx) forEachPage(pgid pgid, depth int, fn func(*page, int)) {
 }
 
 // Page returns page information for a given page number.
-// This is only available from writable transactions.
+// This is only safe for concurrent use when used by a writable transaction.
 func (tx *Tx) Page(id int) (*PageInfo, error) {
 	if tx.db == nil {
 		return nil, ErrTxClosed
-	} else if !tx.writable {
-		return nil, ErrTxNotWritable
 	} else if pgid(id) >= tx.meta.pgid {
 		return nil, nil
 	}

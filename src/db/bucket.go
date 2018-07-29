@@ -7,7 +7,6 @@ package db
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"unsafe"
 )
@@ -18,36 +17,6 @@ const (
 
 	// MaxValueSize is the maximum length of a value, in bytes.
 	MaxValueSize = 4294967295
-)
-
-var (
-	// ErrBucketNotFound is returned when trying to access a bucket that has
-	// not been created yet.
-	ErrBucketNotFound = errors.New("bucket not found")
-
-	// ErrBucketExists is returned when creating a bucket that already exists.
-	ErrBucketExists = errors.New("bucket already exists")
-
-	// ErrBucketNameRequired is returned when creating a bucket with a blank name.
-	ErrBucketNameRequired = errors.New("bucket name required")
-
-	// ErrKeyRequired is returned when inserting a zero-length key.
-	ErrKeyRequired = errors.New("key required")
-
-	// ErrKeyTooLarge is returned when inserting a key that is larger than MaxKeySize.
-	ErrKeyTooLarge = errors.New("key too large")
-
-	// ErrValueTooLarge is returned when inserting a value that is larger than MaxValueSize.
-	ErrValueTooLarge = errors.New("value too large")
-
-	// ErrIncompatibleValue is returned when trying create or delete a bucket
-	// on an existing non-bucket key or when trying to create or delete a
-	// non-bucket key on an existing bucket key.
-	ErrIncompatibleValue = errors.New("incompatible value")
-
-	// ErrSequenceOverflow is returned when the next sequence number will be
-	// larger than the maximum integer size.
-	ErrSequenceOverflow = errors.New("sequence overflow")
 )
 
 const (
@@ -81,8 +50,8 @@ type bucket struct {
 // newBucket returns a new bucket associated with a transaction.
 func newBucket(tx *Tx) Bucket {
 	var b = Bucket{tx: tx}
-	b.buckets = make(map[string]*Bucket)
 	if tx.writable {
+		b.buckets = make(map[string]*Bucket)
 		b.nodes = make(map[pgid]*node)
 	}
 	return b
@@ -120,8 +89,10 @@ func (b *Bucket) Cursor() *Cursor {
 // Bucket retrieves a nested bucket by name.
 // Returns nil if the bucket does not exist.
 func (b *Bucket) Bucket(name []byte) *Bucket {
-	if child := b.buckets[string(name)]; child != nil {
-		return child
+	if b.buckets != nil {
+		if child := b.buckets[string(name)]; child != nil {
+			return child
+		}
 	}
 
 	// Move cursor to key.
@@ -135,7 +106,9 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 
 	// Otherwise create a bucket and cache it.
 	var child = b.openBucket(v)
-	b.buckets[string(name)] = child
+	if b.buckets != nil {
+		b.buckets[string(name)] = child
+	}
 
 	return child
 }
@@ -144,8 +117,15 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 // from a parent into a Bucket
 func (b *Bucket) openBucket(value []byte) *Bucket {
 	var child = newBucket(b.tx)
-	child.bucket = &bucket{}
-	*child.bucket = *(*bucket)(unsafe.Pointer(&value[0]))
+
+	// If this is a writable transaction then we need to copy the bucket entry.
+	// Read-only transactions can point directly at the mmap entry.
+	if b.tx.writable {
+		child.bucket = &bucket{}
+		*child.bucket = *(*bucket)(unsafe.Pointer(&value[0]))
+	} else {
+		child.bucket = (*bucket)(unsafe.Pointer(&value[0]))
+	}
 
 	// Save a reference to the inline page if the bucket is inline.
 	if child.root == 0 {
@@ -330,23 +310,16 @@ func (b *Bucket) Delete(key []byte) error {
 }
 
 // NextSequence returns an autoincrementing integer for the bucket.
-func (b *Bucket) NextSequence() (int, error) {
+func (b *Bucket) NextSequence() (uint64, error) {
 	if b.tx.db == nil {
 		return 0, ErrTxClosed
 	} else if !b.Writable() {
 		return 0, ErrTxNotWritable
 	}
 
-	// Make sure next sequence number will not be larger than the maximum
-	// integer size of the system.
-	if b.bucket.sequence == uint64(maxInt) {
-		return 0, ErrSequenceOverflow
-	}
-
 	// Increment and return the sequence.
 	b.bucket.sequence++
-
-	return int(b.bucket.sequence), nil
+	return b.bucket.sequence, nil
 }
 
 // ForEach executes a function for each key/value pair in a bucket.
@@ -607,6 +580,7 @@ func (b *Bucket) rebalance() {
 // node creates a node from a page and associates it with a given parent.
 func (b *Bucket) node(pgid pgid, parent *node) *node {
 	_assert(b.nodes != nil, "nodes map expected")
+
 	// Retrieve node if it's already been created.
 	if n := b.nodes[pgid]; n != nil {
 		return n

@@ -6,13 +6,13 @@
 package db
 
 import (
-	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
-	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -37,26 +37,6 @@ const (
 // This value can be changed by setting DB.FillPercent.
 const DefaultFillPercent = 0.5
 
-var (
-	// ErrDatabaseNotOpen is returned when a DB instance is accessed before it
-	// is opened or after it is closed.
-	ErrDatabaseNotOpen = errors.New("database not open")
-
-	// ErrDatabaseOpen is returned when opening a database that is
-	// already open.
-	ErrDatabaseOpen = errors.New("database already open")
-
-	// ErrInvalid is returned when a data file is not a Bolt-formatted database.
-	ErrInvalid = errors.New("invalid database")
-
-	// ErrVersionMismatch is returned when the data file was created with a
-	// different version of Bolt.
-	ErrVersionMismatch = errors.New("version mismatch")
-
-	// ErrChecksum is returned when either meta page checksum does not match.
-	ErrChecksum = errors.New("checksum error")
-)
-
 // DB represents a collection of buckets persisted to a file on disk.
 // All data access is performed through transactions which can be obtained through the DB.
 // All the functions on DB will return a ErrDatabaseNotOpen if accessed before Open() is called.
@@ -74,7 +54,9 @@ type DB struct {
 
 	path     string
 	file     *os.File
-	data     []byte
+	dataref  []byte
+	data     *[maxMapSize]byte
+	datasz   int
 	meta0    *meta
 	meta1    *meta
 	pageSize int
@@ -111,8 +93,14 @@ func (db *DB) String() string {
 
 // Open creates and opens a database at the given path.
 // If the file does not exist then it will be created automatically.
-func Open(path string, mode os.FileMode) (*DB, error) {
+// Passing in nil options will cause Bolt to open the database with the default options.
+func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	var db = &DB{opened: true, FillPercent: DefaultFillPercent}
+
+	// Set default options if no options are provided.
+	if options == nil {
+		options = DefaultOptions
+	}
 
 	// Open data file and separate sync handler for metadata writes.
 	db.path = path
@@ -126,7 +114,7 @@ func Open(path string, mode os.FileMode) (*DB, error) {
 	// Lock file so that other processes using Bolt cannot use the database
 	// at the same time. This would cause corruption since the two processes
 	// would write meta pages and free pages separately.
-	if err := syscall.Flock(int(db.file.Fd()), syscall.LOCK_EX); err != nil {
+	if err := flock(db.file, options.Timeout); err != nil {
 		_ = db.close()
 		return nil, err
 	}
@@ -199,7 +187,7 @@ func (db *DB) mmap(minsz int) error {
 	size = db.mmapSize(size)
 
 	// Memory-map the data file as a byte slice.
-	if db.data, err = syscall.Mmap(int(db.file.Fd()), 0, size, syscall.PROT_READ, syscall.MAP_SHARED); err != nil {
+	if err := mmap(db, size); err != nil {
 		return err
 	}
 
@@ -220,11 +208,8 @@ func (db *DB) mmap(minsz int) error {
 
 // munmap unmaps the data file from memory.
 func (db *DB) munmap() error {
-	if db.data != nil {
-		if err := syscall.Munmap(db.data); err != nil {
-			return fmt.Errorf("unmap error: " + err.Error())
-		}
-		db.data = nil
+	if err := munmap(db); err != nil {
+		return fmt.Errorf("unmap error: " + err.Error())
 	}
 	return nil
 }
@@ -320,7 +305,7 @@ func (db *DB) close() error {
 	// Close file handles.
 	if db.file != nil {
 		// Unlock the file.
-		_ = syscall.Flock(int(db.file.Fd()), syscall.LOCK_UN)
+		_ = funlock(db.file)
 
 		// Close the file descriptor.
 		if err := db.file.Close(); err != nil {
@@ -348,18 +333,20 @@ func (db *DB) Begin(writable bool) (*Tx, error) {
 }
 
 func (db *DB) beginTx() (*Tx, error) {
+	// Lock the meta pages while we initialize the transaction. We obtain
+	// the meta lock before the mmap lock because that's the order that the
+	// write transaction will obtain them.
+	db.metalock.Lock()
+
 	// Obtain a read-only lock on the mmap. When the mmap is remapped it will
 	// obtain a write lock so all transactions must finish before it can be
 	// remapped.
 	db.mmaplock.RLock()
 
-	// Lock the meta pages while we initialize the transaction.
-	db.metalock.Lock()
-	defer db.metalock.Unlock()
-
 	// Exit if the database is not open yet.
 	if !db.opened {
 		db.mmaplock.RUnlock()
+		db.metalock.Unlock()
 		return nil, ErrDatabaseNotOpen
 	}
 
@@ -369,6 +356,16 @@ func (db *DB) beginTx() (*Tx, error) {
 
 	// Keep track of transaction until it closes.
 	db.txs = append(db.txs, t)
+	n := len(db.txs)
+
+	// Unlock the meta pages.
+	db.metalock.Unlock()
+
+	// Update the transaction stats.
+	db.statlock.Lock()
+	db.stats.TxN++
+	db.stats.OpenTxN = n
+	db.statlock.Unlock()
 
 	return t, nil
 }
@@ -410,10 +407,11 @@ func (db *DB) beginRWTx() (*Tx, error) {
 
 // removeTx removes a transaction from the database.
 func (db *DB) removeTx(tx *Tx) {
-	db.metalock.Lock()
-
 	// Release the read lock on the mmap.
 	db.mmaplock.RUnlock()
+
+	// Use the meta lock to restrict access to the DB object.
+	db.metalock.Lock()
 
 	// Remove the transaction.
 	for i, t := range db.txs {
@@ -422,12 +420,14 @@ func (db *DB) removeTx(tx *Tx) {
 			break
 		}
 	}
+	n := len(db.txs)
 
 	// Unlock the meta pages.
 	db.metalock.Unlock()
 
 	// Merge statistics.
 	db.statlock.Lock()
+	db.stats.OpenTxN = n
 	db.stats.TxStats.add(&tx.stats)
 	db.statlock.Unlock()
 }
@@ -495,18 +495,10 @@ func (db *DB) Stats() Stats {
 	return db.stats
 }
 
-// Check performs several consistency checks on the database.
-// An error is returned if any inconsistency is found.
-func (db *DB) Check() error {
-	return db.Update(func(tx *Tx) error {
-		return tx.Check()
-	})
-}
-
 // This is for internal access to the raw data bytes from the C cursor, use
 // carefully, or not at all.
 func (db *DB) Info() *Info {
-	return &Info{db.data, db.pageSize}
+	return &Info{uintptr(unsafe.Pointer(&db.data[0])), db.pageSize}
 }
 
 // page retrieves a page reference from the mmap based on the current page size.
@@ -543,7 +535,7 @@ func (db *DB) allocate(count int) (*page, error) {
 	// Resize mmap() if we're at the end.
 	p.id = db.rwtx.meta.pgid
 	var minsz = int((p.id+pgid(count))+1) * db.pageSize
-	if minsz >= len(db.data) {
+	if minsz >= db.datasz {
 		if err := db.mmap(minsz); err != nil {
 			return nil, fmt.Errorf("mmap allocate error: %s", err)
 		}
@@ -555,8 +547,32 @@ func (db *DB) allocate(count int) (*page, error) {
 	return p, nil
 }
 
+// Options represents the options that can be set when opening a database.
+type Options struct {
+	// Timeout is the amount of time to wait to obtain a file lock.
+	// When set to zero it will wait indefinitely. This option is only
+	// available on Darwin and Linux.
+	Timeout time.Duration
+}
+
+// DefaultOptions represent the options used if nil options are passed into Open().
+// No timeout is used which will cause Bolt to wait indefinitely for a lock.
+var DefaultOptions = &Options{
+	Timeout: 0,
+}
+
 // Stats represents statistics about the database.
 type Stats struct {
+	// Freelist stats
+	FreePageN     int // total number of free pages on the freelist
+	PendingPageN  int // total number of pending pages on the freelist
+	FreeAlloc     int // total bytes allocated in free pages
+	FreelistInuse int // total bytes used by the freelist
+
+	// Transaction stats
+	TxN     int // total number of started read transactions
+	OpenTxN int // number of currently open read transactions
+
 	TxStats TxStats // global, ongoing stats.
 }
 
@@ -574,7 +590,7 @@ func (s *Stats) add(other *Stats) {
 }
 
 type Info struct {
-	Data     []byte
+	Data     uintptr
 	PageSize int
 }
 
@@ -630,23 +646,6 @@ func (m *meta) sum64() uint64 {
 	return h.Sum64()
 }
 
-// ErrorList represents a slice of errors.
-type ErrorList []error
-
-// Error returns a readable count of the errors in the list.
-func (l ErrorList) Error() string {
-	return fmt.Sprintf("%d errors occurred", len(l))
-}
-
-// join returns a error messages joined by a string.
-func (l ErrorList) join(sep string) string {
-	var a []string
-	for _, e := range l {
-		a = append(a, e.Error())
-	}
-	return strings.Join(a, sep)
-}
-
 // _assert will panic with a given formatted message if the given condition is false.
 func _assert(condition bool, msg string, v ...interface{}) {
 	if !condition {
@@ -660,4 +659,9 @@ func warn(v ...interface{}) {
 
 func warnf(msg string, v ...interface{}) {
 	fmt.Fprintf(os.Stderr, msg+"\n", v...)
+}
+
+func printstack() {
+	stack := strings.Join(strings.Split(string(debug.Stack()), "\n")[2:], "\n")
+	fmt.Fprintln(os.Stderr, stack)
 }
