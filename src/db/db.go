@@ -52,6 +52,15 @@ type DB struct {
 	// amount if you know that your write workloads are mostly append-only.
 	FillPercent float64
 
+	// Setting the NoSync flag will cause the database to skip fsync()
+	// calls after each commit. This can be useful when bulk loading data
+	// into a database and you can restart the bulk load in the event of
+	// a system failure or database corruption. Do not set this flag for
+	// normal use.
+	//
+	// THIS IS UNSAFE. PLEASE USE WITH CAUTION.
+	NoSync bool
+
 	path     string
 	file     *os.File
 	dataref  []byte
@@ -445,6 +454,13 @@ func (db *DB) Update(fn func(*Tx) error) error {
 		return err
 	}
 
+	// Make sure the transaction rolls back in the event of a panic.
+	defer func() {
+		if t.db != nil {
+			t.rollback()
+		}
+	}()
+
 	// Mark as a managed tx so that the inner function cannot manually commit.
 	t.managed = true
 
@@ -468,6 +484,13 @@ func (db *DB) View(fn func(*Tx) error) error {
 	if err != nil {
 		return err
 	}
+
+	// Make sure the transaction rolls back in the event of a panic.
+	defer func() {
+		if t.db != nil {
+			t.rollback()
+		}
+	}()
 
 	// Mark as a managed tx so that the inner function cannot manually rollback.
 	t.managed = true

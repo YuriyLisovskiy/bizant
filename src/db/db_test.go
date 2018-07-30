@@ -267,6 +267,36 @@ func TestDB_Update_ManualCommitAndRollback(t *testing.T) {
 	})
 }
 
+// Ensure a write transaction that panics does not hold open locks.
+func TestDB_Update_Panic(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					warn("recover: update", r)
+				}
+			}()
+			db.Update(func(tx *Tx) error {
+				tx.CreateBucket([]byte("widgets"))
+				panic("omg")
+			})
+		}()
+
+		// Verify we can update again.
+		err := db.Update(func(tx *Tx) error {
+			_, err := tx.CreateBucket([]byte("widgets"))
+			return err
+		})
+		assert.NoError(t, err)
+
+		// Verify that our change persisted.
+		err = db.Update(func(tx *Tx) error {
+			assert.NotNil(t, tx.Bucket([]byte("widgets")))
+			return nil
+		})
+	})
+}
+
 // Ensure a database can return an error through a read-only transactional block.
 func TestDB_View_Error(t *testing.T) {
 	withOpenDB(func(db *DB, path string) {
@@ -274,6 +304,34 @@ func TestDB_View_Error(t *testing.T) {
 			return errors.New("xxx")
 		})
 		assert.Equal(t, errors.New("xxx"), err)
+	})
+}
+
+// Ensure a read transaction that panics does not hold open locks.
+func TestDB_View_Panic(t *testing.T) {
+	withOpenDB(func(db *DB, path string) {
+		db.Update(func(tx *Tx) error {
+			tx.CreateBucket([]byte("widgets"))
+			return nil
+		})
+
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					warn("recover: view", r)
+				}
+			}()
+			db.View(func(tx *Tx) error {
+				assert.NotNil(t, tx.Bucket([]byte("widgets")))
+				panic("omg")
+			})
+		}()
+
+		// Verify that we can still use read transactions.
+		db.View(func(tx *Tx) error {
+			assert.NotNil(t, tx.Bucket([]byte("widgets")))
+			return nil
+		})
 	})
 }
 

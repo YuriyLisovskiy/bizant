@@ -146,7 +146,9 @@ func (tx *Tx) Commit() error {
 	// Rebalance nodes which have had deletions.
 	var startTime = time.Now()
 	tx.root.rebalance()
-	tx.stats.RebalanceTime += time.Since(startTime)
+	if tx.stats.Rebalance > 0 {
+		tx.stats.RebalanceTime += time.Since(startTime)
+	}
 
 	// spill data onto dirty pages.
 	startTime = time.Now()
@@ -217,6 +219,9 @@ func (tx *Tx) Rollback() error {
 }
 
 func (tx *Tx) rollback() {
+	if tx.db == nil {
+		return
+	}
 	if tx.writable {
 		tx.db.freelist.rollback(tx.id())
 		tx.db.freelist.reload(tx.db.page(tx.db.meta().freelist))
@@ -225,6 +230,9 @@ func (tx *Tx) rollback() {
 }
 
 func (tx *Tx) close() {
+	if tx.db == nil {
+		return
+	}
 	if tx.writable {
 		// Grab freelist stats.
 		var freelistFreeN = tx.db.freelist.free_count()
@@ -422,8 +430,10 @@ func (tx *Tx) write() error {
 		// Update statistics.
 		tx.stats.Write++
 	}
-	if err := fdatasync(tx.db.file); err != nil {
-		return err
+	if !tx.db.NoSync {
+		if err := fdatasync(tx.db.file); err != nil {
+			return err
+		}
 	}
 
 	// Clear out page cache.
@@ -443,8 +453,10 @@ func (tx *Tx) writeMeta() error {
 	if _, err := tx.db.ops.writeAt(buf, int64(p.id)*int64(tx.db.pageSize)); err != nil {
 		return err
 	}
-	if err := fdatasync(tx.db.file); err != nil {
-		return err
+	if !tx.db.NoSync {
+		if err := fdatasync(tx.db.file); err != nil {
+			return err
+		}
 	}
 
 	// Update statistics.
