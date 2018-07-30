@@ -6,6 +6,7 @@
 package db
 
 import (
+	"fmt"
 	"sort"
 	"unsafe"
 )
@@ -72,7 +73,9 @@ func (f *freelist) allocate(n int) pgid {
 
 	var initial, previd pgid
 	for i, id := range f.ids {
-		_assert(id > 1, "invalid page allocation: %d", id)
+		if id <= 1 {
+			panic(fmt.Sprintf("invalid page allocation: %d", id))
+		}
 
 		// Reset initial page if this is not contiguous.
 		if previd == 0 || id-previd != 1 {
@@ -108,13 +111,17 @@ func (f *freelist) allocate(n int) pgid {
 // free releases a page and its overflow for a given transaction id.
 // If the page is already free then a panic will occur.
 func (f *freelist) free(txid txid, p *page) {
-	_assert(p.id > 1, "cannot free page 0 or 1: %d", p.id)
+	if p.id <= 1 {
+		panic(fmt.Sprintf("cannot free page 0 or 1: %d", p.id))
+	}
 
 	// Free page and all its overflow pages.
 	var ids = f.pending[txid]
 	for id := p.id; id <= p.id+pgid(p.overflow); id++ {
 		// Verify that page is not already free.
-		_assert(!f.cache[id], "page %d already freed", id)
+		if f.cache[id] {
+			panic(fmt.Sprintf("page %d already freed", id))
+		}
 
 		// Add to the freelist and cache.
 		ids = append(ids, id)
