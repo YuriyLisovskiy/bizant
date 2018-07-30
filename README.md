@@ -18,4 +18,4 @@ Read [feature request template](.github/FEATURE_REQUEST.md).
 * [Yuriy Lisovskiy](https://github.com/YuriyLisovskiy)
 
 ### License
-Block Chain Go is licensed under the terms of the BSD 3-Clause license. see the [LICENSE](LICENSE) file for more information or see https://opensource.org/licenses/BSD-3-Clause.
+Block Chain Go is licensed under the terms of the [GNU General Public License v3.0](https://opensource.org/licenses/GPL-3.0), see the [LICENSE](LICENSE) file for more information.
