@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -72,7 +73,7 @@ func mmap(db *DB, sz int) error {
 	}
 
 	// Map the data file to memory.
-	b, err := unix.Mmap(int(db.file.Fd()), 0, sz, syscall.PROT_READ, syscall.MAP_SHARED)
+	b, err := unix.Mmap(int(db.file.Fd()), 0, sz, syscall.PROT_READ, syscall.MAP_SHARED|db.MmapFlags)
 	if err != nil {
 		return err
 	}
