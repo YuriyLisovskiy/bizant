@@ -6,8 +6,8 @@
 package db
 
 import (
-	"reflect"
 	"sort"
+	"reflect"
 	"testing"
 	"testing/quick"
 )
@@ -43,7 +43,6 @@ func TestPgids_merge(t *testing.T) {
 	if !reflect.DeepEqual(c, pgids{1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 25, 27, 30}) {
 		t.Errorf("mismatch: %v", c)
 	}
-
 	a = pgids{4, 5, 6, 10, 11, 12, 13, 27, 35, 36}
 	b = pgids{8, 9, 25, 30}
 	c = a.merge(b)
@@ -64,12 +63,10 @@ func TestPgids_merge_quick(t *testing.T) {
 		// The expected value should be the two lists combined and sorted.
 		exp := append(a, b...)
 		sort.Sort(exp)
-
 		if !reflect.DeepEqual(exp, got) {
 			t.Errorf("\nexp=%+v\ngot=%+v\n", exp, got)
 			return false
 		}
-
 		return true
 	}, nil); err != nil {
 		t.Fatal(err)

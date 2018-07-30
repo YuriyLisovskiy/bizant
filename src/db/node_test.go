@@ -6,8 +6,8 @@
 package db
 
 import (
-	"testing"
 	"unsafe"
+	"testing"
 )
 
 // Ensure that a node can insert a key/value.
@@ -17,7 +17,6 @@ func TestNode_put(t *testing.T) {
 	n.put([]byte("foo"), []byte("foo"), []byte("0"), 0, 0)
 	n.put([]byte("bar"), []byte("bar"), []byte("1"), 0, 0)
 	n.put([]byte("foo"), []byte("foo"), []byte("3"), 0, leafPageFlag)
-
 	if len(n.inodes) != 3 {
 		t.Fatalf("exp=3; got=%d", len(n.inodes))
 	}
@@ -116,7 +115,6 @@ func TestNode_split(t *testing.T) {
 
 	// Split between 2 & 3.
 	n.split(100)
-
 	var parent = n.parent
 	if len(parent.children) != 2 {
 		t.Fatalf("exp=2; got=%d", len(parent.children))

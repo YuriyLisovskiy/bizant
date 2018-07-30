@@ -6,13 +6,11 @@
 package db
 
 import (
-	"bytes"
 	"fmt"
-	"math/rand"
 	"sync"
+	"bytes"
 	"testing"
-
-	"github.com/boltdb/bolt"
+	"math/rand"
 )
 
 func TestSimulate_1op_1p(t *testing.T)     { testSimulate(t, 1, 1) }
@@ -37,19 +35,15 @@ func testSimulate(t *testing.T, threadCount, parallelism int) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-
 	rand.Seed(int64(qseed))
 
 	// A list of operations that readers and writers can perform.
 	var readerHandlers = []simulateHandler{simulateGetHandler}
 	var writerHandlers = []simulateHandler{simulateGetHandler, simulatePutHandler}
-
 	var versions = make(map[int]*QuickDB)
 	versions[1] = NewQuickDB()
-
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	var mutex sync.Mutex
 
 	// Run n threads in parallel, each with their own operation.
@@ -59,7 +53,7 @@ func testSimulate(t *testing.T, threadCount, parallelism int) {
 	for {
 		threads <- true
 		wg.Add(1)
-		writable := ((rand.Int() % 100) < 20) // 20% writers
+		writable := (rand.Int() % 100) < 20 // 20% writers
 
 		// Choose an operation to execute.
 		var handler simulateHandler
@@ -93,7 +87,6 @@ func testSimulate(t *testing.T, threadCount, parallelism int) {
 					mutex.Lock()
 					versions[tx.ID()] = qdb
 					mutex.Unlock()
-
 					if err := tx.Commit(); err != nil {
 						t.Fatal(err)
 					}
@@ -113,7 +106,6 @@ func testSimulate(t *testing.T, threadCount, parallelism int) {
 			// Release a thread back to the scheduling loop.
 			<-threads
 		}(writable, handler)
-
 		i++
 		if i > threadCount {
 			break
@@ -124,10 +116,10 @@ func testSimulate(t *testing.T, threadCount, parallelism int) {
 	wg.Wait()
 }
 
-type simulateHandler func(tx *bolt.Tx, qdb *QuickDB)
+type simulateHandler func(tx *Tx, qdb *QuickDB)
 
 // Retrieves a key from the database and verifies that it is what is expected.
-func simulateGetHandler(tx *bolt.Tx, qdb *QuickDB) {
+func simulateGetHandler(tx *Tx, qdb *QuickDB) {
 	// Randomly retrieve an existing exist.
 	keys := qdb.Rand()
 	if len(keys) == 0 {
@@ -141,7 +133,7 @@ func simulateGetHandler(tx *bolt.Tx, qdb *QuickDB) {
 	}
 
 	// Drill into nested buckets.
-	for _, key := range keys[1 : len(keys)-1] {
+	for _, key := range keys[1: len(keys)-1] {
 		b = b.Bucket(key)
 		if b == nil {
 			panic(fmt.Sprintf("bucket[n] expected: %v -> %v\n", keys, key))
@@ -162,7 +154,7 @@ func simulateGetHandler(tx *bolt.Tx, qdb *QuickDB) {
 }
 
 // Inserts a key into the database.
-func simulatePutHandler(tx *bolt.Tx, qdb *QuickDB) {
+func simulatePutHandler(tx *Tx, qdb *QuickDB) {
 	var err error
 	keys, value := randKeys(), randValue()
 
@@ -176,7 +168,7 @@ func simulatePutHandler(tx *bolt.Tx, qdb *QuickDB) {
 	}
 
 	// Create nested buckets, if necessary.
-	for _, key := range keys[1 : len(keys)-1] {
+	for _, key := range keys[1: len(keys)-1] {
 		child := b.Bucket(key)
 		if child != nil {
 			b = child
@@ -198,8 +190,8 @@ func simulatePutHandler(tx *bolt.Tx, qdb *QuickDB) {
 }
 
 // QuickDB is an in-memory database that replicates the functionality of the
-// Bolt DB type except that it is entirely in-memory. It is meant for testing
-// that the Bolt database is consistent.
+// DB type except that it is entirely in-memory. It is meant for testing
+// that the database is consistent.
 type QuickDB struct {
 	sync.RWMutex
 	m map[string]interface{}
@@ -214,7 +206,6 @@ func NewQuickDB() *QuickDB {
 func (db *QuickDB) Get(keys [][]byte) []byte {
 	db.RLock()
 	defer db.RUnlock()
-
 	m := db.m
 	for _, key := range keys[:len(keys)-1] {
 		value := m[string(key)]
@@ -247,7 +238,6 @@ func (db *QuickDB) Put(keys [][]byte, value []byte) {
 		if _, ok := m[string(key)].([]byte); ok {
 			return // Keypath intersects with a simple value. Do nothing.
 		}
-
 		if m[string(key)] == nil {
 			m[string(key)] = make(map[string]interface{})
 		}

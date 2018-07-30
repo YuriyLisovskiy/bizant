@@ -75,7 +75,6 @@ func (f *freelist) allocate(n int) pgid {
 	if len(f.ids) == 0 {
 		return 0
 	}
-
 	var initial, previd pgid
 	for i, id := range f.ids {
 		if id <= 1 {
@@ -104,10 +103,8 @@ func (f *freelist) allocate(n int) pgid {
 			for i := pgid(0); i < pgid(n); i++ {
 				delete(f.cache, initial+i)
 			}
-
 			return initial
 		}
-
 		previd = id
 	}
 	return 0
@@ -214,7 +211,6 @@ func (f *freelist) write(p *page) error {
 		((*[arch.MaxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0] = pgid(lenids)
 		f.copyall(((*[arch.MaxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[1:])
 	}
-
 	return nil
 }
 

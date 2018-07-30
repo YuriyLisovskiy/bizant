@@ -6,9 +6,11 @@
 package db
 
 import (
-	"bytes"
 	"fmt"
+	"bytes"
 	"unsafe"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
 )
 
 const (
@@ -126,7 +128,6 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 	if b.buckets != nil {
 		b.buckets[string(name)] = child
 	}
-
 	return child
 }
 
@@ -137,7 +138,7 @@ func (b *Bucket) openBucket(value []byte) *Bucket {
 
 	// If unaligned load/stores are broken on this arch and value is
 	// unaligned simply clone to an aligned byte array.
-	unaligned := brokenUnaligned && uintptr(unsafe.Pointer(&value[0]))&3 != 0
+	unaligned := arch.BrokenUnaligned && uintptr(unsafe.Pointer(&value[0]))&3 != 0
 
 	if unaligned {
 		value = cloneBytes(value)
@@ -156,7 +157,6 @@ func (b *Bucket) openBucket(value []byte) *Bucket {
 	if child.root == 0 {
 		child.page = (*page)(unsafe.Pointer(&value[bucketHeaderSize]))
 	}
-
 	return &child
 }
 
@@ -200,7 +200,6 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 	// dereference the inline page, if it exists. This will cause the bucket
 	// to be treated as a regular, non-inline bucket for the rest of the tx.
 	b.page = nil
-
 	return b.Bucket(key), nil
 }
 
@@ -261,7 +260,6 @@ func (b *Bucket) DeleteBucket(key []byte) error {
 
 	// Delete the node if we have a matching key.
 	c.node().del(key)
-
 	return nil
 }
 
@@ -312,7 +310,6 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 	// Insert into node.
 	key = cloneBytes(key)
 	c.node().put(key, key, value, 0, 0)
-
 	return nil
 }
 
@@ -337,7 +334,6 @@ func (b *Bucket) Delete(key []byte) error {
 
 	// Delete the node if we have a matching key.
 	c.node().del(key)
-
 	return nil
 }
 
@@ -413,7 +409,6 @@ func (b *Bucket) Stats() BucketStats {
 
 			// used totals the used bytes for the page
 			used := pageHeaderSize
-
 			if p.count != 0 {
 				// If page has any elements, add all element headers.
 				used += leafPageElementSize * int(p.count-1)
@@ -426,7 +421,6 @@ func (b *Bucket) Stats() BucketStats {
 				lastElement := p.leafPageElement(p.count - 1)
 				used += int(lastElement.pos + lastElement.ksize + lastElement.vsize)
 			}
-
 			if b.root == 0 {
 				// For inlined bucket just update the inline stats
 				s.InlineBucketInuse += used
@@ -608,7 +602,6 @@ func (b *Bucket) inlineable() bool {
 			return false
 		}
 	}
-
 	return true
 }
 
@@ -630,7 +623,6 @@ func (b *Bucket) write() []byte {
 	// Convert byte slice to a fake page and write the root node.
 	var p = (*page)(unsafe.Pointer(&value[bucketHeaderSize]))
 	n.write(p)
-
 	return value
 }
 
@@ -673,7 +665,6 @@ func (b *Bucket) node(pgid pgid, parent *node) *node {
 
 	// Update statistics.
 	b.tx.stats.NodeCount++
-
 	return n
 }
 
@@ -682,7 +673,6 @@ func (b *Bucket) free() {
 	if b.root == 0 {
 		return
 	}
-
 	var tx = b.tx
 	b.forEachPageNode(func(p *page, n *node, _ int) {
 		if p != nil {
@@ -699,7 +689,6 @@ func (b *Bucket) dereference() {
 	if b.rootNode != nil {
 		b.rootNode.root().dereference()
 	}
-
 	for _, child := range b.buckets {
 		child.dereference()
 	}
@@ -768,7 +757,6 @@ func (s *BucketStats) Add(other BucketStats) {
 	s.BranchInuse += other.BranchInuse
 	s.LeafAlloc += other.LeafAlloc
 	s.LeafInuse += other.LeafInuse
-
 	s.BucketN += other.BucketN
 	s.InlineBucketN += other.InlineBucketN
 	s.InlineBucketInuse += other.InlineBucketInuse

@@ -6,24 +6,22 @@
 package db
 
 import (
-	"bytes"
-	"encoding/binary"
+	"os"
 	"fmt"
 	"log"
-	"os"
-	"reflect"
 	"sort"
+	"bytes"
+	"reflect"
 	"testing"
 	"testing/quick"
-
-	"github.com/boltdb/bolt"
+	"encoding/binary"
 )
 
 // Ensure that a cursor can return a reference to the bucket that created it.
 func TestCursor_Bucket(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -41,7 +39,7 @@ func TestCursor_Bucket(t *testing.T) {
 func TestCursor_Seek(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -55,7 +53,6 @@ func TestCursor_Seek(t *testing.T) {
 		if err := b.Put([]byte("baz"), []byte("0003")); err != nil {
 			t.Fatal(err)
 		}
-
 		if _, err := b.CreateBucket([]byte("bkt")); err != nil {
 			t.Fatal(err)
 		}
@@ -63,8 +60,7 @@ func TestCursor_Seek(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		c := tx.Bucket([]byte("widgets")).Cursor()
 
 		// Exact match should go to the key.
@@ -111,11 +107,10 @@ func TestCursor_Seek(t *testing.T) {
 func TestCursor_Delete(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	const count = 1000
 
 	// Insert every other key between 0 and $count.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -134,8 +129,7 @@ func TestCursor_Delete(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		c := tx.Bucket([]byte("widgets")).Cursor()
 		bound := make([]byte, 8)
 		binary.BigEndian.PutUint64(bound, uint64(count/2))
@@ -144,18 +138,15 @@ func TestCursor_Delete(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-
 		c.Seek([]byte("sub"))
-		if err := c.Delete(); err != bolt.ErrIncompatibleValue {
+		if err := c.Delete(); err != ErrIncompatibleValue {
 			t.Fatalf("unexpected error: %s", err)
 		}
-
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		stats := tx.Bucket([]byte("widgets")).Stats()
 		if stats.KeyN != count/2+1 {
 			t.Fatalf("unexpected KeyN: %d", stats.KeyN)
@@ -169,21 +160,17 @@ func TestCursor_Delete(t *testing.T) {
 // Ensure that a Tx cursor can seek to the appropriate keys when there are a
 // large number of keys. This test also checks that seek will always move
 // forward to the next key.
-//
-// Related: https://github.com/boltdb/bolt/pull/187
 func TestCursor_Seek_Large(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	var count = 10000
 
 	// Insert every other key between 0 and $count.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		for i := 0; i < count; i += 100 {
 			for j := i; j < i+100; j += 2 {
 				k := make([]byte, 8)
@@ -197,13 +184,11 @@ func TestCursor_Seek_Large(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		c := tx.Bucket([]byte("widgets")).Cursor()
 		for i := 0; i < count; i++ {
 			seek := make([]byte, 8)
 			binary.BigEndian.PutUint64(seek, uint64(i))
-
 			k, _ := c.Seek(seek)
 
 			// The last seek is beyond the end of the the range so
@@ -227,7 +212,6 @@ func TestCursor_Seek_Large(t *testing.T) {
 				}
 			}
 		}
-
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -238,14 +222,13 @@ func TestCursor_Seek_Large(t *testing.T) {
 func TestCursor_EmptyBucket(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		_, err := tx.CreateBucket([]byte("widgets"))
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		c := tx.Bucket([]byte("widgets")).Cursor()
 		k, v := c.First()
 		if k != nil {
@@ -263,14 +246,13 @@ func TestCursor_EmptyBucket(t *testing.T) {
 func TestCursor_EmptyBucketReverse(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		_, err := tx.CreateBucket([]byte("widgets"))
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		c := tx.Bucket([]byte("widgets")).Cursor()
 		k, v := c.Last()
 		if k != nil {
@@ -288,8 +270,7 @@ func TestCursor_EmptyBucketReverse(t *testing.T) {
 func TestCursor_Iterate_Leaf(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -312,44 +293,37 @@ func TestCursor_Iterate_Leaf(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback() }()
-
 	c := tx.Bucket([]byte("widgets")).Cursor()
-
 	k, v := c.First()
 	if !bytes.Equal(k, []byte("bar")) {
 		t.Fatalf("unexpected key: %v", k)
 	} else if !bytes.Equal(v, []byte{1}) {
 		t.Fatalf("unexpected value: %v", v)
 	}
-
 	k, v = c.Next()
 	if !bytes.Equal(k, []byte("baz")) {
 		t.Fatalf("unexpected key: %v", k)
 	} else if !bytes.Equal(v, []byte{}) {
 		t.Fatalf("unexpected value: %v", v)
 	}
-
 	k, v = c.Next()
 	if !bytes.Equal(k, []byte("foo")) {
 		t.Fatalf("unexpected key: %v", k)
 	} else if !bytes.Equal(v, []byte{0}) {
 		t.Fatalf("unexpected value: %v", v)
 	}
-
 	k, v = c.Next()
 	if k != nil {
 		t.Fatalf("expected nil key: %v", k)
 	} else if v != nil {
 		t.Fatalf("expected nil value: %v", v)
 	}
-
 	k, v = c.Next()
 	if k != nil {
 		t.Fatalf("expected nil key: %v", k)
 	} else if v != nil {
 		t.Fatalf("expected nil value: %v", v)
 	}
-
 	if err := tx.Rollback(); err != nil {
 		t.Fatal(err)
 	}
@@ -359,8 +333,7 @@ func TestCursor_Iterate_Leaf(t *testing.T) {
 func TestCursor_LeafRootReverse(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -383,37 +356,31 @@ func TestCursor_LeafRootReverse(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := tx.Bucket([]byte("widgets")).Cursor()
-
 	if k, v := c.Last(); !bytes.Equal(k, []byte("foo")) {
 		t.Fatalf("unexpected key: %v", k)
 	} else if !bytes.Equal(v, []byte{0}) {
 		t.Fatalf("unexpected value: %v", v)
 	}
-
 	if k, v := c.Prev(); !bytes.Equal(k, []byte("baz")) {
 		t.Fatalf("unexpected key: %v", k)
 	} else if !bytes.Equal(v, []byte{}) {
 		t.Fatalf("unexpected value: %v", v)
 	}
-
 	if k, v := c.Prev(); !bytes.Equal(k, []byte("bar")) {
 		t.Fatalf("unexpected key: %v", k)
 	} else if !bytes.Equal(v, []byte{1}) {
 		t.Fatalf("unexpected value: %v", v)
 	}
-
 	if k, v := c.Prev(); k != nil {
 		t.Fatalf("expected nil key: %v", k)
 	} else if v != nil {
 		t.Fatalf("expected nil value: %v", v)
 	}
-
 	if k, v := c.Prev(); k != nil {
 		t.Fatalf("expected nil key: %v", k)
 	} else if v != nil {
 		t.Fatalf("expected nil value: %v", v)
 	}
-
 	if err := tx.Rollback(); err != nil {
 		t.Fatal(err)
 	}
@@ -423,8 +390,7 @@ func TestCursor_LeafRootReverse(t *testing.T) {
 func TestCursor_Restart(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -439,27 +405,23 @@ func TestCursor_Restart(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
 	tx, err := db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := tx.Bucket([]byte("widgets")).Cursor()
-
 	if k, _ := c.First(); !bytes.Equal(k, []byte("bar")) {
 		t.Fatalf("unexpected key: %v", k)
 	}
 	if k, _ := c.Next(); !bytes.Equal(k, []byte("foo")) {
 		t.Fatalf("unexpected key: %v", k)
 	}
-
 	if k, _ := c.First(); !bytes.Equal(k, []byte("bar")) {
 		t.Fatalf("unexpected key: %v", k)
 	}
 	if k, _ := c.Next(); !bytes.Equal(k, []byte("foo")) {
 		t.Fatalf("unexpected key: %v", k)
 	}
-
 	if err := tx.Rollback(); err != nil {
 		t.Fatal(err)
 	}
@@ -471,32 +433,29 @@ func TestCursor_First_EmptyPages(t *testing.T) {
 	defer db.MustClose()
 
 	// Create 1000 keys in the "widgets" bucket.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		for i := 0; i < 1000; i++ {
 			if err := b.Put(u64tob(uint64(i)), []byte{}); err != nil {
 				t.Fatal(err)
 			}
 		}
-
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Delete half the keys and then try to iterate.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b := tx.Bucket([]byte("widgets"))
 		for i := 0; i < 600; i++ {
 			if err := b.Delete(u64tob(uint64(i))); err != nil {
 				t.Fatal(err)
 			}
 		}
-
 		c := b.Cursor()
 		var n int
 		for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -505,7 +464,6 @@ func TestCursor_First_EmptyPages(t *testing.T) {
 		if n != 400 {
 			t.Fatalf("unexpected key count: %d", n)
 		}
-
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -545,7 +503,6 @@ func TestCursor_QuickCheck(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		c := tx.Bucket([]byte("widgets")).Cursor()
 		for k, v := c.First(); k != nil && index < len(items); k, v = c.Next() {
 			if !bytes.Equal(k, items[index].Key) {
@@ -558,11 +515,9 @@ func TestCursor_QuickCheck(t *testing.T) {
 		if len(items) != index {
 			t.Fatalf("unexpected item count: %v, expected %v", len(items), index)
 		}
-
 		if err := tx.Rollback(); err != nil {
 			t.Fatal(err)
 		}
-
 		return true
 	}
 	if err := quick.Check(f, qconfig()); err != nil {
@@ -615,11 +570,9 @@ func TestCursor_QuickCheck_Reverse(t *testing.T) {
 		if len(items) != index {
 			t.Fatalf("unexpected item count: %v, expected %v", len(items), index)
 		}
-
 		if err := tx.Rollback(); err != nil {
 			t.Fatal(err)
 		}
-
 		return true
 	}
 	if err := quick.Check(f, qconfig()); err != nil {
@@ -631,8 +584,7 @@ func TestCursor_QuickCheck_Reverse(t *testing.T) {
 func TestCursor_QuickCheck_BucketsOnly(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -650,8 +602,7 @@ func TestCursor_QuickCheck_BucketsOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		var names []string
 		c := tx.Bucket([]byte("widgets")).Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -673,8 +624,7 @@ func TestCursor_QuickCheck_BucketsOnly(t *testing.T) {
 func TestCursor_QuickCheck_BucketsOnly_Reverse(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -692,8 +642,7 @@ func TestCursor_QuickCheck_BucketsOnly_Reverse(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		var names []string
 		c := tx.Bucket([]byte("widgets")).Cursor()
 		for k, v := c.Last(); k != nil; k, v = c.Prev() {
@@ -713,14 +662,14 @@ func TestCursor_QuickCheck_BucketsOnly_Reverse(t *testing.T) {
 
 func ExampleCursor() {
 	// Open the database.
-	db, err := bolt.Open(tempfile(), 0666, nil)
+	db, err := Open(tempfile(), 0666, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer os.Remove(db.Path())
 
 	// Start a read-write transaction.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		// Create a new bucket.
 		b, err := tx.CreateBucket([]byte("animals"))
 		if err != nil {
@@ -749,32 +698,25 @@ func ExampleCursor() {
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			fmt.Printf("A %s is %s.\n", k, v)
 		}
-
 		return nil
 	}); err != nil {
 		log.Fatal(err)
 	}
-
 	if err := db.Close(); err != nil {
 		log.Fatal(err)
 	}
-
-	// Output:
-	// A cat is lame.
-	// A dog is fun.
-	// A liger is awesome.
 }
 
 func ExampleCursor_reverse() {
 	// Open the database.
-	db, err := bolt.Open(tempfile(), 0666, nil)
+	db, err := Open(tempfile(), 0666, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer os.Remove(db.Path())
 
 	// Start a read-write transaction.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		// Create a new bucket.
 		b, err := tx.CreateBucket([]byte("animals"))
 		if err != nil {
@@ -804,7 +746,6 @@ func ExampleCursor_reverse() {
 		for k, v := c.Last(); k != nil; k, v = c.Prev() {
 			fmt.Printf("A %s is %s.\n", k, v)
 		}
-
 		return nil
 	}); err != nil {
 		log.Fatal(err)
@@ -814,9 +755,4 @@ func ExampleCursor_reverse() {
 	if err := db.Close(); err != nil {
 		log.Fatal(err)
 	}
-
-	// Output:
-	// A liger is awesome.
-	// A dog is fun.
-	// A cat is lame.
 }

@@ -6,9 +6,9 @@
 package db
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
+	"bytes"
 )
 
 // Cursor represents an iterator that can traverse over all key/value pairs in a bucket in sorted order.
@@ -45,7 +45,6 @@ func (c *Cursor) First() (key []byte, value []byte) {
 	if c.stack[len(c.stack)-1].count() == 0 {
 		c.next()
 	}
-
 	k, v, flags := c.keyValue()
 	if (flags & uint32(bucketLeafFlag)) != 0 {
 		return k, nil
@@ -126,7 +125,6 @@ func (c *Cursor) Seek(seek []byte) (key []byte, value []byte) {
 	if ref := &c.stack[len(c.stack)-1]; ref.index >= ref.count() {
 		k, v, flags = c.next()
 	}
-
 	if k == nil {
 		return nil, nil
 	} else if (flags & uint32(bucketLeafFlag)) != 0 {
@@ -143,14 +141,13 @@ func (c *Cursor) Delete() error {
 	} else if !c.bucket.Writable() {
 		return ErrTxNotWritable
 	}
-
 	key, _, flags := c.keyValue()
+
 	// Return an error if current value is a bucket.
 	if (flags & bucketLeafFlag) != 0 {
 		return ErrIncompatibleValue
 	}
 	c.node().del(key)
-
 	return nil
 }
 
@@ -211,7 +208,6 @@ func (c *Cursor) last() {
 			pgid = ref.page.branchPageElement(uint16(ref.index)).pgid
 		}
 		p, n := c.bucket.pageNode(pgid)
-
 		var nextRef = elemRef{page: p, node: n}
 		nextRef.index = nextRef.count() - 1
 		c.stack = append(c.stack, nextRef)
@@ -249,7 +245,6 @@ func (c *Cursor) next() (key []byte, value []byte, flags uint32) {
 		if c.stack[len(c.stack)-1].count() == 0 {
 			continue
 		}
-
 		return c.keyValue()
 	}
 }
@@ -268,7 +263,6 @@ func (c *Cursor) search(key []byte, pgid pgid) {
 		c.nsearch(key)
 		return
 	}
-
 	if n != nil {
 		c.searchNode(key, n)
 		return
@@ -279,7 +273,7 @@ func (c *Cursor) search(key []byte, pgid pgid) {
 func (c *Cursor) searchNode(key []byte, n *node) {
 	var exact bool
 	index := sort.Search(len(n.inodes), func(i int) bool {
-		// TODO(benbjohnson): Optimize this range search. It's a bit hacky right now.
+		// TODO: Optimize this range search. It's a bit hacky right now.
 		// sort.Search() finds the lowest index where f() != -1 but we need the highest index.
 		ret := bytes.Compare(n.inodes[i].key, key)
 		if ret == 0 {
@@ -299,10 +293,9 @@ func (c *Cursor) searchNode(key []byte, n *node) {
 func (c *Cursor) searchPage(key []byte, p *page) {
 	// Binary search for the correct range.
 	inodes := p.branchPageElements()
-
 	var exact bool
 	index := sort.Search(int(p.count), func(i int) bool {
-		// TODO(benbjohnson): Optimize this range search. It's a bit hacky right now.
+		// TODO: Optimize this range search. It's a bit hacky right now.
 		// sort.Search() finds the lowest index where f() != -1 but we need the highest index.
 		ret := bytes.Compare(inodes[i].key(), key)
 		if ret == 0 {

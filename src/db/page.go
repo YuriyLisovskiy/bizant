@@ -6,18 +6,20 @@
 package db
 
 import (
-	"fmt"
 	"os"
+	"fmt"
 	"sort"
 	"unsafe"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
 )
 
-const pageHeaderSize = int(unsafe.Offsetof(((*page)(nil)).ptr))
-
-const minKeysPerPage = 2
-
-const branchPageElementSize = int(unsafe.Sizeof(branchPageElement{}))
-const leafPageElementSize = int(unsafe.Sizeof(leafPageElement{}))
+const (
+	pageHeaderSize        = int(unsafe.Offsetof(((*page)(nil)).ptr))
+	minKeysPerPage        = 2
+	branchPageElementSize = int(unsafe.Sizeof(branchPageElement{}))
+	leafPageElementSize   = int(unsafe.Sizeof(leafPageElement{}))
+)
 
 const (
 	branchPageFlag   = 0x01
@@ -26,9 +28,7 @@ const (
 	freelistPageFlag = 0x10
 )
 
-const (
-	bucketLeafFlag = 0x01
-)
+const bucketLeafFlag = 0x01
 
 type pgid uint64
 
@@ -88,7 +88,7 @@ func (p *page) branchPageElements() []branchPageElement {
 
 // dump writes n bytes of the page to STDERR as hex output.
 func (p *page) hexdump(n int) {
-	buf := (*[maxAllocSize]byte)(unsafe.Pointer(p))[:n]
+	buf := (*[arch.MaxAllocSize]byte)(unsafe.Pointer(p))[:n]
 	fmt.Fprintf(os.Stderr, "%x\n", buf)
 }
 
@@ -107,8 +107,8 @@ type branchPageElement struct {
 
 // key returns a byte slice of the node key.
 func (n *branchPageElement) key() []byte {
-	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
-	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos]))[:n.ksize]
+	buf := (*[arch.MaxAllocSize]byte)(unsafe.Pointer(n))
+	return (*[arch.MaxAllocSize]byte)(unsafe.Pointer(&buf[n.pos]))[:n.ksize]
 }
 
 // leafPageElement represents a node on a leaf page.
@@ -121,14 +121,14 @@ type leafPageElement struct {
 
 // key returns a byte slice of the node key.
 func (n *leafPageElement) key() []byte {
-	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
-	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos]))[:n.ksize:n.ksize]
+	buf := (*[arch.MaxAllocSize]byte)(unsafe.Pointer(n))
+	return (*[arch.MaxAllocSize]byte)(unsafe.Pointer(&buf[n.pos]))[:n.ksize:n.ksize]
 }
 
 // value returns a byte slice of the node value.
 func (n *leafPageElement) value() []byte {
-	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
-	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos+n.ksize]))[:n.vsize:n.vsize]
+	buf := (*[arch.MaxAllocSize]byte)(unsafe.Pointer(n))
+	return (*[arch.MaxAllocSize]byte)(unsafe.Pointer(&buf[n.pos+n.ksize]))[:n.vsize:n.vsize]
 }
 
 // PageInfo represents human readable information about a page.
@@ -146,16 +146,16 @@ func (s pgids) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s pgids) Less(i, j int) bool { return s[i] < s[j] }
 
 // merge returns the sorted union of a and b.
-func (a pgids) merge(b pgids) pgids {
+func (s pgids) merge(b pgids) pgids {
 	// Return the opposite slice if one is nil.
-	if len(a) == 0 {
+	if len(s) == 0 {
 		return b
 	}
 	if len(b) == 0 {
-		return a
+		return s
 	}
-	merged := make(pgids, len(a)+len(b))
-	mergepgids(merged, a, b)
+	merged := make(pgids, len(s)+len(b))
+	mergepgids(merged, s, b)
 	return merged
 }
 

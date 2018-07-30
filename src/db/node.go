@@ -6,9 +6,9 @@
 package db
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
+	"bytes"
 	"unsafe"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
@@ -138,7 +138,6 @@ func (n *node) put(oldKey, newKey, value []byte, pgid pgid, flags uint32) {
 		n.inodes = append(n.inodes, inode{})
 		copy(n.inodes[index+1:], n.inodes[index:])
 	}
-
 	inode := &n.inodes[index]
 	inode.flags = flags
 	inode.key = newKey
@@ -167,9 +166,8 @@ func (n *node) del(key []byte) {
 // read initializes the node from a page.
 func (n *node) read(p *page) {
 	n.pgid = p.id
-	n.isLeaf = ((p.flags & leafPageFlag) != 0)
+	n.isLeaf = (p.flags & leafPageFlag) != 0
 	n.inodes = make(inodes, int(p.count))
-
 	for i := 0; i < int(p.count); i++ {
 		inode := &n.inodes[i]
 		if n.isLeaf {
@@ -202,7 +200,6 @@ func (n *node) write(p *page) {
 	} else {
 		p.flags |= branchPageFlag
 	}
-
 	if len(n.inodes) >= 0xFFFF {
 		panic(fmt.Sprintf("inode overflow: %d (pgid=%d)", len(n.inodes), p.id))
 	}
@@ -256,7 +253,6 @@ func (n *node) write(p *page) {
 // This should only be called from the spill() function.
 func (n *node) split(pageSize int) []*node {
 	var nodes []*node
-
 	node := n
 	for {
 		// Split node into two.
@@ -271,7 +267,6 @@ func (n *node) split(pageSize int) []*node {
 		// Set node to b so it gets split on the next iteration.
 		node = b
 	}
-
 	return nodes
 }
 
@@ -312,7 +307,6 @@ func (n *node) splitTwo(pageSize int) (*node, *node) {
 
 	// Update the statistics.
 	n.bucket.tx.stats.Split++
-
 	return n, next
 }
 
@@ -337,7 +331,6 @@ func (n *node) splitIndex(threshold int) (index, sz int) {
 		// Add the element size to the total size.
 		sz += elsize
 	}
-
 	return
 }
 
@@ -407,7 +400,6 @@ func (n *node) spill() error {
 		n.children = nil
 		return n.parent.spill()
 	}
-
 	return nil
 }
 
@@ -450,7 +442,6 @@ func (n *node) rebalance() {
 			delete(n.bucket.nodes, child.pgid)
 			child.free()
 		}
-
 		return
 	}
 
@@ -463,12 +454,11 @@ func (n *node) rebalance() {
 		n.parent.rebalance()
 		return
 	}
-
 	_assert(n.parent.numChildren() > 1, "parent must have at least 2 children")
 
 	// Destination node is right sibling if idx == 0, otherwise left sibling.
 	var target *node
-	var useNextSibling = (n.parent.childIndex(n) == 0)
+	var useNextSibling = n.parent.childIndex(n) == 0
 	if useNextSibling {
 		target = n.nextSibling()
 	} else {
@@ -534,15 +524,12 @@ func (n *node) dereference() {
 		n.key = key
 		_assert(n.pgid == 0 || len(n.key) > 0, "dereference: zero-length node key on existing node")
 	}
-
 	for i := range n.inodes {
 		inode := &n.inodes[i]
-
 		key := make([]byte, len(inode.key))
 		copy(key, inode.key)
 		inode.key = key
 		_assert(len(inode.key) > 0, "dereference: zero-length inode key")
-
 		value := make([]byte, len(inode.value))
 		copy(value, inode.value)
 		inode.value = value

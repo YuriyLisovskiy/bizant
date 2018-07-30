@@ -6,11 +6,11 @@
 package db
 
 import (
-	"math/rand"
-	"reflect"
 	"sort"
-	"testing"
 	"unsafe"
+	"testing"
+	"reflect"
+	"math/rand"
 )
 
 // Ensure that a page is added to a transaction's freelist.
@@ -42,7 +42,6 @@ func TestFreelist_release(t *testing.T) {
 	if exp := []pgid{9, 12, 13}; !reflect.DeepEqual(exp, f.ids) {
 		t.Fatalf("exp=%v; got=%v", exp, f.ids)
 	}
-
 	f.release(102)
 	if exp := []pgid{9, 12, 13, 39}; !reflect.DeepEqual(exp, f.ids) {
 		t.Fatalf("exp=%v; got=%v", exp, f.ids)
@@ -76,7 +75,6 @@ func TestFreelist_allocate(t *testing.T) {
 	if exp := []pgid{9, 18}; !reflect.DeepEqual(exp, f.ids) {
 		t.Fatalf("exp=%v; got=%v", exp, f.ids)
 	}
-
 	if id := int(f.allocate(1)); id != 9 {
 		t.Fatalf("exp=9; got=%v", id)
 	}
@@ -86,7 +84,7 @@ func TestFreelist_allocate(t *testing.T) {
 	if id := int(f.allocate(1)); id != 0 {
 		t.Fatalf("exp=0; got=%v", id)
 	}
-	if exp := []pgid{}; !reflect.DeepEqual(exp, f.ids) {
+	if var exp []pgid; !reflect.DeepEqual(exp, f.ids) {
 		t.Fatalf("exp=%v; got=%v", exp, f.ids)
 	}
 }
