@@ -430,8 +430,8 @@ func (tx *Tx) write() error {
 		// Update statistics.
 		tx.stats.Write++
 	}
-	if !tx.db.NoSync {
-		if err := fdatasync(tx.db.file); err != nil {
+	if !tx.db.NoSync || IgnoreNoSync {
+		if err := fdatasync(tx.db); err != nil {
 			return err
 		}
 	}
@@ -453,8 +453,8 @@ func (tx *Tx) writeMeta() error {
 	if _, err := tx.db.ops.writeAt(buf, int64(p.id)*int64(tx.db.pageSize)); err != nil {
 		return err
 	}
-	if !tx.db.NoSync {
-		if err := fdatasync(tx.db.file); err != nil {
+	if !tx.db.NoSync || IgnoreNoSync {
+		if err := fdatasync(tx.db); err != nil {
 			return err
 		}
 	}

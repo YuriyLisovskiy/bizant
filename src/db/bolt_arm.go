@@ -3,13 +3,7 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-// +build !windows,!plan9,!linux,!openbsd
-
 package db
 
-var odirect int
-
-// fdatasync flushes written data to a file descriptor.
-func fdatasync(db *DB) error {
-	return db.file.Sync()
-}
+// maxMapSize represents the largest mmap size supported by Bolt.
+const maxMapSize = 0xFFFFFFF // 256MB
