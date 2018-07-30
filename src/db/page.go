@@ -13,7 +13,6 @@ import (
 
 const pageHeaderSize = int(unsafe.Offsetof(((*page)(nil)).ptr))
 
-const maxAllocSize = 0xFFFFFFF
 const minKeysPerPage = 2
 
 const branchPageElementSize = int(unsafe.Sizeof(branchPageElement{}))
