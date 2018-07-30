@@ -6,13 +6,15 @@
 package db
 
 import (
-	"fmt"
 	"io"
 	"os"
+	"fmt"
 	"sort"
-	"strings"
 	"time"
 	"unsafe"
+	"strings"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
 )
 
 // txid represents the internal transaction identifier.
@@ -492,12 +494,12 @@ func (tx *Tx) write() error {
 		offset := int64(p.id) * int64(tx.db.pageSize)
 
 		// Write out page in "max allocation" sized chunks.
-		ptr := (*[maxAllocSize]byte)(unsafe.Pointer(p))
+		ptr := (*[arch.MaxAllocSize]byte)(unsafe.Pointer(p))
 		for {
 			// Limit our write to our max allocation size.
 			sz := size
-			if sz > maxAllocSize-1 {
-				sz = maxAllocSize - 1
+			if sz > arch.MaxAllocSize-1 {
+				sz = arch.MaxAllocSize - 1
 			}
 
 			// Write chunk to disk.
@@ -517,7 +519,7 @@ func (tx *Tx) write() error {
 
 			// Otherwise move offset forward and move pointer to next chunk.
 			offset += int64(sz)
-			ptr = (*[maxAllocSize]byte)(unsafe.Pointer(&ptr[sz]))
+			ptr = (*[arch.MaxAllocSize]byte)(unsafe.Pointer(&ptr[sz]))
 		}
 	}
 
@@ -536,7 +538,7 @@ func (tx *Tx) write() error {
 			continue
 		}
 
-		buf := (*[maxAllocSize]byte)(unsafe.Pointer(p))[:tx.db.pageSize]
+		buf := (*[arch.MaxAllocSize]byte)(unsafe.Pointer(p))[:tx.db.pageSize]
 
 		// See https://go.googlesource.com/go/+/f03c9202c43e0abb130669852082117ca50aa9b1
 		for i := range buf {
