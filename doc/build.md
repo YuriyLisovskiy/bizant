@@ -41,7 +41,7 @@ Submodules
 ---------------------
 Module      | Purpose                  | Description
 ------------|--------------------------|----------------------
-secp256k1   | secp256k1 elliptic curve | Optimized C library for EC operations on curve secp256k1
+secp256k1   | Digital signature        | Optimized C library for EC operations on curve secp256k1
 
 #### Install dependencies
 You can install required go libraries and submodules manually, see [manual-installation.md](manual-installation.md),
