@@ -2,11 +2,18 @@ Build Notes
 ===========
 Some notes on how to build [Block Chain Go](https://github.com/YuriyLisovskiy/blockchain-go).
 
+Testing
+---------------------
+Run tests:
+```bash
+$ make test
+```
+
 Build
 ---------------------
-
+Build binary for target platform:
 ```bash
-$ make
+$ make target
 ```
 See [`supported-platforms.md`](supported-platforms.md) for more info.
 
@@ -40,5 +47,5 @@ secp256k1   | secp256k1 elliptic curve | Optimized C library for EC operations o
 You can install required go libraries and submodules manually, see [manual-installation.md](manual-installation.md),
 or use [install-deps.sh](../install-deps.sh) script:
 ```bash
-$ make install-deps
+$ make dependencies
 ```
