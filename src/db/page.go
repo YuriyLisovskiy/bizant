@@ -67,6 +67,9 @@ func (p *page) leafPageElement(index uint16) *leafPageElement {
 
 // leafPageElements retrieves a list of leaf nodes.
 func (p *page) leafPageElements() []leafPageElement {
+	if p.count == 0 {
+		return nil
+	}
 	return ((*[0x7FFFFFF]leafPageElement)(unsafe.Pointer(&p.ptr)))[:]
 }
 
@@ -77,6 +80,9 @@ func (p *page) branchPageElement(index uint16) *branchPageElement {
 
 // branchPageElements retrieves a list of branch nodes.
 func (p *page) branchPageElements() []branchPageElement {
+	if p.count == 0 {
+		return nil
+	}
 	return ((*[0x7FFFFFF]branchPageElement)(unsafe.Pointer(&p.ptr)))[:]
 }
 
