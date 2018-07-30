@@ -109,6 +109,10 @@ type DB struct {
 	ops struct {
 		writeAt func(b []byte, off int64) (n int, err error)
 	}
+
+	// Read only mode.
+	// When true, Update() and Begin(true) return ErrDatabaseReadOnly immediately.
+	readOnly bool
 }
 
 // Path returns the path to currently open database file.
@@ -142,19 +146,28 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	db.MaxBatchSize = DefaultMaxBatchSize
 	db.MaxBatchDelay = DefaultMaxBatchDelay
 
+	flag := os.O_RDWR
+	if options.ReadOnly {
+		flag = os.O_RDONLY
+		db.readOnly = true
+	}
+
 	// Open data file and separate sync handler for metadata writes.
 	db.path = path
-
 	var err error
-	if db.file, err = os.OpenFile(db.path, os.O_RDWR|os.O_CREATE, mode); err != nil {
+	if db.file, err = os.OpenFile(db.path, flag|os.O_CREATE, mode); err != nil {
 		_ = db.close()
 		return nil, err
 	}
 
-	// Lock file so that other processes using Bolt cannot use the database
-	// at the same time. This would cause corruption since the two processes
-	// would write meta pages and free pages separately.
-	if err := flock(db.file, options.Timeout); err != nil {
+	// Lock file so that other processes using Bolt in read-write mode cannot
+	// use the database  at the same time. This would cause corruption since
+	// the two processes would write meta pages and free pages separately.
+	// The database file is locked exclusively (only one process can grab the lock)
+	// if !options.ReadOnly.
+	// The database file is locked using the shared lock (more than one process may
+	// hold a lock at the same time) otherwise (options.ReadOnly is set).
+	if err := flock(db.file, !db.readOnly, options.Timeout); err != nil {
 		_ = db.close()
 		return nil, err
 	}
@@ -261,8 +274,8 @@ func (db *DB) munmap() error {
 // of the database. The minimum size is 1MB and doubles until it reaches 1GB.
 // Returns an error if the new mmap size is greater than the max allowed.
 func (db *DB) mmapSize(size int) (int, error) {
-	// Double the size from 1MB until 1GB.
-	for i := uint(20); i <= 30; i++ {
+	// Double the size from 32KB until 1GB.
+	for i := uint(15); i <= 30; i++ {
 		if size <= 1<<i {
 			return 1 << i, nil
 		}
@@ -364,8 +377,11 @@ func (db *DB) close() error {
 
 	// Close file handles.
 	if db.file != nil {
-		// Unlock the file.
-		_ = funlock(db.file)
+		// No need to unlock read-only file.
+		if !db.readOnly {
+			// Unlock the file.
+			_ = funlock(db.file)
+		}
 
 		// Close the file descriptor.
 		if err := db.file.Close(); err != nil {
@@ -431,6 +447,11 @@ func (db *DB) beginTx() (*Tx, error) {
 }
 
 func (db *DB) beginRWTx() (*Tx, error) {
+	// If the database was opened with Options.ReadOnly, return an error.
+	if db.readOnly {
+		return nil, ErrDatabaseReadOnly
+	}
+
 	// Obtain writer lock. This is released by the transaction when it closes.
 	// This enforces only one writer transaction at a time.
 	db.rwlock.Lock()
@@ -627,6 +648,10 @@ func (db *DB) allocate(count int) (*page, error) {
 	return p, nil
 }
 
+func (db *DB) IsReadOnly() bool {
+	return db.readOnly
+}
+
 // Options represents the options that can be set when opening a database.
 type Options struct {
 	// Timeout is the amount of time to wait to obtain a file lock.
@@ -636,6 +661,10 @@ type Options struct {
 
 	// Sets the DB.NoGrowSync flag before memory mapping the file.
 	NoGrowSync bool
+
+	// Open database in read-only mode. Uses flock(..., LOCK_SH |LOCK_NB) to
+	// grab a shared lock (UNIX).
+	ReadOnly bool
 }
 
 // DefaultOptions represent the options used if nil options are passed into Open().

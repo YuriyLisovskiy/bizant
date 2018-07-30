@@ -21,7 +21,7 @@ func fdatasync(db *DB) error {
 }
 
 // flock acquires an advisory lock on a file descriptor.
-func flock(f *os.File, _ time.Duration) error {
+func flock(f *os.File, _ bool, _ time.Duration) error {
 	return nil
 }
 
@@ -33,9 +33,11 @@ func funlock(f *os.File) error {
 // mmap memory maps a DB's data file.
 // Based on: https://github.com/edsrzf/mmap-go
 func mmap(db *DB, sz int) error {
-	// Truncate the database to the size of the mmap.
-	if err := db.file.Truncate(int64(sz)); err != nil {
-		return fmt.Errorf("truncate: %s", err)
+	if !db.readOnly {
+		// Truncate the database to the size of the mmap.
+		if err := db.file.Truncate(int64(sz)); err != nil {
+			return fmt.Errorf("truncate: %s", err)
+		}
 	}
 
 	// Open a file mapping handle.
