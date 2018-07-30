@@ -154,11 +154,24 @@ func (f *freelist) freed(pgid pgid) bool {
 
 // read initializes the freelist from a freelist page.
 func (f *freelist) read(p *page) {
-	ids := ((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0:p.count]
+	// If the page.count is at the max uint16 value (64k) then it's considered
+	// an overflow and the size of the freelist is stored as the first element.
+	idx, count := 0, int(p.count)
+	if count == 0xFFFF {
+		idx = 1
+		count = int(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0])
+	}
+
+	// Copy the list of page ids from the freelist.
+	ids := ((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[idx:count]
 	f.ids = make([]pgid, len(ids))
 	copy(f.ids, ids)
+
+	// Make sure they're sorted.
 	sort.Sort(pgids(f.ids))
-	f.buildcache()
+
+	// Rebuild the page cache.
+	f.reindex()
 }
 
 // write writes the page ids onto a freelist page. All free and pending ids are
@@ -168,15 +181,19 @@ func (f *freelist) write(p *page) error {
 	// Combine the old free pgids and pgids waiting on an open transaction.
 	ids := f.all()
 
-	// Make sure that the sum of all free pages is less than the max uint16 size.
-	if len(ids) >= 65565 {
-		return ErrFreelistOverflow
-	}
-
-	// Update the header and write the ids to the page.
+	// Update the header flag.
 	p.flags |= freelistPageFlag
-	p.count = uint16(len(ids))
-	copy(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:], ids)
+
+	// The page.count can only hold up to 64k elements so if we overflow that
+	// number then we handle it by putting the size in the first element.
+	if len(ids) < 0xFFFF {
+		p.count = uint16(len(ids))
+		copy(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:], ids)
+	} else {
+		p.count = 0xFFFF
+		((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0] = pgid(len(ids))
+		copy(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[1:], ids)
+	}
 
 	return nil
 }
@@ -185,17 +202,19 @@ func (f *freelist) write(p *page) error {
 func (f *freelist) reload(p *page) {
 	f.read(p)
 
-	// We need to filter out the pending pages from the available freelist
-	// so we rebuild the cache without the newly read freelist.
-	ids := f.ids
-	f.ids = nil
-	f.buildcache()
+	// Build a cache of only pending pages.
+	pcache := make(map[pgid]bool)
+	for _, pendingIDs := range f.pending {
+		for _, pendingID := range pendingIDs {
+			pcache[pendingID] = true
+		}
+	}
 
 	// Check each page in the freelist and build a new available freelist
 	// with any pages not in the pending lists.
 	var a []pgid
-	for _, id := range ids {
-		if !f.freed(id) {
+	for _, id := range f.ids {
+		if !pcache[id] {
 			a = append(a, id)
 		}
 	}
@@ -203,11 +222,11 @@ func (f *freelist) reload(p *page) {
 
 	// Once the available list is rebuilt then rebuild the free cache so that
 	// it includes the available and pending free pages.
-	f.buildcache()
+	f.reindex()
 }
 
-// buildcache rebuilds the free cache based on available and pending free lists.
-func (f *freelist) buildcache() {
+// reindex rebuilds the free cache based on available and pending free lists.
+func (f *freelist) reindex() {
 	f.cache = make(map[pgid]bool)
 	for _, id := range f.ids {
 		f.cache[id] = true
