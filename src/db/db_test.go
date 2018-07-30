@@ -359,9 +359,13 @@ func TestDB_String(t *testing.T) {
 func TestDBStats_Sub(t *testing.T) {
 	var a, b Stats
 	a.TxStats.PageCount = 3
+	a.FreePageN = 4
 	b.TxStats.PageCount = 10
+	b.FreePageN = 14
 	diff := b.Sub(&a)
 	assert.Equal(t, 7, diff.TxStats.PageCount)
+	// free page stats are copied from the receiver and not subtracted
+	assert.Equal(t, 14, diff.FreePageN)
 }
 
 // Ensure that meta with bad magic is invalid.
@@ -419,7 +423,7 @@ func TestDB_DoubleFree(t *testing.T) {
 		})
 	}()
 
-	assert.Equal(t, "tx 2: page 3 already freed in tx 0", msg)
+	assert.Equal(t, "assertion failed: page 3 already freed", msg)
 }
 
 func ExampleDB_Update() {

@@ -9,8 +9,8 @@ package db
 
 import (
 	"os"
-	"time"
 	"syscall"
+	"time"
 	"unsafe"
 )
 

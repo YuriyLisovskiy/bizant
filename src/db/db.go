@@ -149,7 +149,7 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	}
 
 	// Read in the freelist.
-	db.freelist = &freelist{pending: make(map[txid][]pgid)}
+	db.freelist = newFreelist()
 	db.freelist.read(db.page(db.meta().freelist))
 
 	// Mark the database as opened and return.
@@ -580,19 +580,15 @@ type Stats struct {
 // This is useful when obtaining stats at two different points and time and
 // you need the performance counters that occurred within that time span.
 func (s *Stats) Sub(other *Stats) Stats {
-	var diff Stats
-	if s == nil {
-		if other == nil {
-			return diff
-		} else {
-			return *other
-		}
-	}
-	diff = *s
 	if other == nil {
-		return diff
+		return *s
 	}
-	diff.TxN = other.TxN - diff.TxN
+	var diff Stats
+	diff.FreePageN = s.FreePageN
+	diff.PendingPageN = s.PendingPageN
+	diff.FreeAlloc = s.FreeAlloc
+	diff.FreelistInuse = s.FreelistInuse
+	diff.TxN = other.TxN - s.TxN
 	diff.TxStats = s.TxStats.Sub(&other.TxStats)
 	return diff
 }
