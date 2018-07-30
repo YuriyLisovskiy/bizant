@@ -80,7 +80,7 @@ coverage:
 
 test:
 	@echo Running tests...
-	@go test -v ${PACKAGES}
+	@go test ${PACKAGES}
 	@echo Done
 
 clean:
