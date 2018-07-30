@@ -31,13 +31,14 @@ const magic uint32 = 0xED0CDAED
 // IgnoreNoSync specifies whether the NoSync field of a DB is ignored when
 // syncing changes to a file.  This is required as some operating systems,
 // such as OpenBSD, do not have a unified buffer cache (UBC) and writes
-// must be synchronzied using the msync(2) syscall.
+// must be synchronized using the msync(2) syscall.
 const IgnoreNoSync = runtime.GOOS == "openbsd"
 
 // Default values if not set in a DB instance.
 const (
 	DefaultMaxBatchSize  int = 1000
 	DefaultMaxBatchDelay     = 10 * time.Millisecond
+	DefaultAllocSize         = 16 * 1024 * 1024
 )
 
 // DB represents a collection of buckets persisted to a file on disk.
@@ -90,11 +91,17 @@ type DB struct {
 	// Do not change concurrently with calls to Batch.
 	MaxBatchDelay time.Duration
 
+	// AllocSize is the amount of space allocated when the database
+	// needs to create new pages. This is done to amortize the cost
+	// of truncate() and fsync() when growing the data file.
+	AllocSize int
+
 	path     string
 	file     *os.File
 	dataref  []byte // mmap'ed readonly, write throws SEGV
 	data     *[maxMapSize]byte
 	datasz   int
+	filesz   int // current on disk file size
 	meta0    *meta
 	meta1    *meta
 	pageSize int
@@ -152,6 +159,7 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	// Set default values for later DB operations.
 	db.MaxBatchSize = DefaultMaxBatchSize
 	db.MaxBatchDelay = DefaultMaxBatchDelay
+	db.AllocSize = DefaultAllocSize
 
 	flag := os.O_RDWR
 	if options.ReadOnly {
@@ -415,7 +423,7 @@ func (db *DB) close() error {
 // will cause the calls to block and be serialized until the current write
 // transaction finishes.
 //
-// Transactions should not be depedent on one another. Opening a read
+// Transactions should not be dependent on one another. Opening a read
 // transaction and a write transaction in the same goroutine can cause the
 // writer to deadlock because the database periodically needs to re-mmap itself
 // as it grows and it cannot do that while a read transaction is open.
@@ -801,6 +809,36 @@ func (db *DB) allocate(count int) (*page, error) {
 	db.rwtx.meta.pgid += pgid(count)
 
 	return p, nil
+}
+
+// grow grows the size of the database to the given sz.
+func (db *DB) grow(sz int) error {
+	// Ignore if the new size is less than available file size.
+	if sz <= db.filesz {
+		return nil
+	}
+
+	// If the data is smaller than the alloc size then only allocate what's needed.
+	// Once it goes over the allocation size then allocate in chunks.
+	if db.datasz < db.AllocSize {
+		sz = db.datasz
+	} else {
+		sz += db.AllocSize
+	}
+
+	// Truncate and fsync to ensure file size metadata is flushed.
+	// https://github.com/boltdb/bolt/issues/284
+	if !db.NoGrowSync && !db.readOnly {
+		if err := db.file.Truncate(int64(sz)); err != nil {
+			return fmt.Errorf("file resize error: %s", err)
+		}
+		if err := db.file.Sync(); err != nil {
+			return fmt.Errorf("file sync error: %s", err)
+		}
+	}
+
+	db.filesz = sz
+	return nil
 }
 
 func (db *DB) IsReadOnly() bool {

@@ -173,6 +173,8 @@ func (tx *Tx) Commit() error {
 	// Free the old root bucket.
 	tx.meta.root.root = tx.root.root
 
+	opgid := tx.meta.pgid
+
 	// Free the freelist and allocate new pages for it. This will overestimate
 	// the size of the freelist but not underestimate the size (which would be bad).
 	tx.db.freelist.free(tx.meta.txid, tx.db.page(tx.meta.freelist))
@@ -186,6 +188,14 @@ func (tx *Tx) Commit() error {
 		return err
 	}
 	tx.meta.freelist = p.id
+
+	// If the high water mark has moved up then attempt to grow the database.
+	if tx.meta.pgid > opgid {
+		if err := tx.db.grow(int(tx.meta.pgid+1) * tx.db.pageSize); err != nil {
+			tx.rollback()
+			return err
+		}
+	}
 
 	// Write dirty pages to disk.
 	startTime = time.Now()
@@ -510,7 +520,7 @@ func (tx *Tx) writeMeta() error {
 }
 
 // page returns a reference to the page with a given id.
-// If page has been written to then a temporary bufferred page is returned.
+// If page has been written to then a temporary buffered page is returned.
 func (tx *Tx) page(id pgid) *page {
 	// Check the dirty pages first.
 	if tx.pages != nil {
