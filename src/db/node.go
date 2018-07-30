@@ -14,9 +14,9 @@ import (
 // node represents an in-memory, deserialized page.
 type node struct {
 	bucket     *Bucket
-	dirty      bool
 	isLeaf     bool
 	unbalanced bool
+	spilled    bool
 	key        []byte
 	pgid       pgid
 	parent     *node
@@ -42,13 +42,27 @@ func (n *node) minKeys() int {
 
 // size returns the size of the node after serialization.
 func (n *node) size() int {
-	var elementSize = n.pageElementSize()
-
-	var size = pageHeaderSize
-	for _, item := range n.inodes {
-		size += elementSize + len(item.key) + len(item.value)
+	sz, elsz := pageHeaderSize, n.pageElementSize()
+	for i := 0; i < len(n.inodes); i++ {
+		item := &n.inodes[i]
+		sz += elsz + len(item.key) + len(item.value)
 	}
-	return size
+	return sz
+}
+
+// sizeLessThan returns true if the node is less than a given size.
+// This is an optimization to avoid calculating a large node when we only need
+// to know if it fits inside a certain page size.
+func (n *node) sizeLessThan(v int) bool {
+	sz, elsz := pageHeaderSize, n.pageElementSize()
+	for i := 0; i < len(n.inodes); i++ {
+		item := &n.inodes[i]
+		sz += elsz + len(item.key) + len(item.value)
+		if sz >= v {
+			return false
+		}
+	}
+	return true
 }
 
 // pageElementSize returns the size of each page element based on the type of node.
@@ -179,6 +193,8 @@ func (n *node) write(p *page) {
 	} else {
 		p.flags |= branchPageFlag
 	}
+
+	_assert(len(n.inodes) < 0xFFFF, "inode overflow: %d (pgid=%d)", len(n.inodes), p.id)
 	p.count = uint16(len(n.inodes))
 
 	// Loop over each item and write it to the page.
@@ -238,14 +254,13 @@ func (n *node) split(pageSize int) []*node {
 // This should only be called from the split() function.
 func (n *node) splitTwo(pageSize int) (*node, *node) {
 	// Ignore the split if the page doesn't have at least enough nodes for
-	// two pages or if the data can fit on a single page.
-	sz := n.size()
-	if len(n.inodes) <= (minKeysPerPage*2) || sz < pageSize {
+	// two pages or if the nodes can fit in a single page.
+	if len(n.inodes) <= (minKeysPerPage*2) || n.sizeLessThan(pageSize) {
 		return n, nil
 	}
 
 	// Determine the threshold before starting a new node.
-	var fillPercent = n.bucket.tx.db.FillPercent
+	var fillPercent = n.bucket.FillPercent
 	if fillPercent < minFillPercent {
 		fillPercent = minFillPercent
 	} else if fillPercent > maxFillPercent {
@@ -305,6 +320,9 @@ func (n *node) splitIndex(threshold int) (index, sz int) {
 // Returns an error if dirty pages cannot be allocated.
 func (n *node) spill() error {
 	var tx = n.bucket.tx
+	if n.spilled {
+		return nil
+	}
 
 	// Spill child nodes first. Child nodes can materialize sibling nodes in
 	// the case of split-merge so we cannot use a range loop. We have to check
@@ -338,6 +356,7 @@ func (n *node) spill() error {
 		_assert(p.id < tx.meta.pgid, "pgid (%d) above high water mark (%d)", p.id, tx.meta.pgid)
 		node.pgid = p.id
 		node.write(p)
+		node.spilled = true
 
 		// Insert into parent inodes.
 		if node.parent != nil {
@@ -355,20 +374,11 @@ func (n *node) spill() error {
 		tx.stats.Spill++
 	}
 
-	// This is a special case where we need to write the parent if it is new
-	// and caused by a split in the root.
-	var parent = n.parent
-	if parent != nil && parent.pgid == 0 {
-		// Allocate contiguous space for the node.
-		p, err := tx.allocate((parent.size() / tx.db.pageSize) + 1)
-		if err != nil {
-			return err
-		}
-
-		// Write the new root.
-		_assert(p.id < tx.meta.pgid, "pgid (%d) above high water mark (%d)", p.id, tx.meta.pgid)
-		parent.pgid = p.id
-		parent.write(p)
+	// If the root node split and created a new root then we need to spill that
+	// as well. We'll clear out the children to make sure it doesn't try to respill.
+	if n.parent != nil && n.parent.pgid == 0 {
+		n.children = nil
+		return n.parent.spill()
 	}
 
 	return nil
