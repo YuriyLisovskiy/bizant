@@ -6,11 +6,11 @@
 package db
 
 import (
-	"fmt"
 	"os"
-	"syscall"
+	"fmt"
 	"time"
 	"unsafe"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 )

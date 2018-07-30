@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"sort"
 	"unsafe"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
 )
 
 // freelist represents a list of all pages that are available for allocation.
@@ -171,14 +173,14 @@ func (f *freelist) read(p *page) {
 	idx, count := 0, int(p.count)
 	if count == 0xFFFF {
 		idx = 1
-		count = int(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0])
+		count = int(((*[arch.MaxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0])
 	}
 
 	// Copy the list of page ids from the freelist.
 	if count == 0 {
 		f.ids = nil
 	} else {
-		ids := ((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[idx:count]
+		ids := ((*[arch.MaxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[idx:count]
 		f.ids = make([]pgid, len(ids))
 		copy(f.ids, ids)
 
@@ -206,11 +208,11 @@ func (f *freelist) write(p *page) error {
 		p.count = uint16(lenids)
 	} else if lenids < 0xFFFF {
 		p.count = uint16(lenids)
-		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:])
+		f.copyall(((*[arch.MaxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:])
 	} else {
 		p.count = 0xFFFF
-		((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0] = pgid(lenids)
-		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[1:])
+		((*[arch.MaxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0] = pgid(lenids)
+		f.copyall(((*[arch.MaxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[1:])
 	}
 
 	return nil

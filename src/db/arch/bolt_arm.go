@@ -3,18 +3,18 @@
 // Distributed under the BSD 3-Clause software license, see the accompanying
 // file LICENSE or https://opensource.org/licenses/BSD-3-Clause.
 
-package db
+package arch
 
 import "unsafe"
 
 // maxMapSize represents the largest mmap size supported by Bolt.
-const maxMapSize = 0x7FFFFFFF // 2GB
+const MaxMapSize = 0x7FFFFFFF // 2GB
 
 // maxAllocSize is the size used when creating array pointers.
-const maxAllocSize = 0xFFFFFFF
+const MaxAllocSize = 0xFFFFFFF
 
 // Are unaligned load/stores broken on this arch?
-var brokenUnaligned bool
+var BrokenUnaligned bool
 
 func init() {
 	// Simple check to see whether this arch handles unaligned load/stores
@@ -28,6 +28,5 @@ func init() {
 
 	raw := [6]byte{0xfe, 0xef, 0x11, 0x22, 0x22, 0x11}
 	val := *(*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&raw)) + 2))
-
 	brokenUnaligned = val != 0x11222211
 }

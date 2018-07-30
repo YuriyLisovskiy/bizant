@@ -6,11 +6,11 @@
 package db
 
 import (
-	"fmt"
 	"os"
-	"syscall"
+	"fmt"
 	"time"
 	"unsafe"
+	"syscall"
 )
 
 // LockFileEx code derived from golang build filemutex_windows.go @ v1.5.1
@@ -62,7 +62,6 @@ func flock(db *DB, mode os.FileMode, exclusive bool, timeout time.Duration) erro
 		return err
 	}
 	db.lockfile = f
-
 	var t time.Time
 	for {
 		// If we're beyond our timeout then return an error.
@@ -72,12 +71,10 @@ func flock(db *DB, mode os.FileMode, exclusive bool, timeout time.Duration) erro
 		} else if timeout > 0 && time.Since(t) > timeout {
 			return ErrTimeout
 		}
-
 		var flag uint32 = flagLockFailImmediately
 		if exclusive {
 			flag |= flagLockExclusive
 		}
-
 		err := lockFileEx(syscall.Handle(db.lockfile.Fd()), flag, 0, 1, 0, &syscall.Overlapped{})
 		if err == nil {
 			return nil
@@ -130,7 +127,6 @@ func mmap(db *DB, sz int) error {
 	// Convert to a byte array.
 	db.data = ((*[maxMapSize]byte)(unsafe.Pointer(addr)))
 	db.datasz = sz
-
 	return nil
 }
 
@@ -140,7 +136,6 @@ func munmap(db *DB) error {
 	if db.data == nil {
 		return nil
 	}
-
 	addr := (uintptr)(unsafe.Pointer(&db.data[0]))
 	if err := syscall.UnmapViewOfFile(addr); err != nil {
 		return os.NewSyscallError("UnmapViewOfFile", err)

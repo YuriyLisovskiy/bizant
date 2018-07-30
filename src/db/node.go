@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"sort"
 	"unsafe"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
 )
 
 // node represents an in-memory, deserialized page.
@@ -212,7 +214,7 @@ func (n *node) write(p *page) {
 	}
 
 	// Loop over each item and write it to the page.
-	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
+	b := (*[arch.MaxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
 	for i, item := range n.inodes {
 		_assert(len(item.key) > 0, "write: zero-length inode key")
 
@@ -237,7 +239,7 @@ func (n *node) write(p *page) {
 		// See: https://github.com/boltdb/bolt/pull/335
 		klen, vlen := len(item.key), len(item.value)
 		if len(b) < klen+vlen {
-			b = (*[maxAllocSize]byte)(unsafe.Pointer(&b[0]))[:]
+			b = (*[arch.MaxAllocSize]byte)(unsafe.Pointer(&b[0]))[:]
 		}
 
 		// Write data for the element to the end of the page.

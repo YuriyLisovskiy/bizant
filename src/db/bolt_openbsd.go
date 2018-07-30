@@ -6,8 +6,8 @@
 package db
 
 import (
-	"syscall"
 	"unsafe"
+	"syscall"
 )
 
 const (

@@ -5,9 +5,7 @@
 
 package db
 
-import (
-	"syscall"
-)
+import "syscall"
 
 // fdatasync flushes written data to a file descriptor.
 func fdatasync(db *DB) error {

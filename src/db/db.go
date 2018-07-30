@@ -6,17 +6,19 @@
 package db
 
 import (
-	"errors"
-	"fmt"
-	"hash/fnv"
-	"log"
 	"os"
-	"runtime"
-	"runtime/debug"
-	"strings"
+	"fmt"
+	"log"
 	"sync"
 	"time"
 	"unsafe"
+	"errors"
+	"strings"
+	"runtime"
+	"hash/fnv"
+	"runtime/debug"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
 )
 
 // The largest step that can be taken when remapping the mmap.
@@ -103,7 +105,7 @@ type DB struct {
 	file     *os.File
 	lockfile *os.File // windows only
 	dataref  []byte   // mmap'ed readonly, write throws SEGV
-	data     *[maxMapSize]byte
+	data     *[arch.MaxMapSize]byte
 	datasz   int
 	filesz   int // current on disk file size
 	meta0    *meta
@@ -166,7 +168,6 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	db.MaxBatchSize = DefaultMaxBatchSize
 	db.MaxBatchDelay = DefaultMaxBatchDelay
 	db.AllocSize = DefaultAllocSize
-
 	flag := os.O_RDWR
 	if options.ReadOnly {
 		flag = os.O_RDONLY
@@ -250,7 +251,6 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 func (db *DB) mmap(minsz int) error {
 	db.mmaplock.Lock()
 	defer db.mmaplock.Unlock()
-
 	info, err := db.file.Stat()
 	if err != nil {
 		return fmt.Errorf("mmap stat error: %s", err)
@@ -295,7 +295,6 @@ func (db *DB) mmap(minsz int) error {
 	if err0 != nil && err1 != nil {
 		return err0
 	}
-
 	return nil
 }
 
@@ -319,7 +318,7 @@ func (db *DB) mmapSize(size int) (int, error) {
 	}
 
 	// Verify the requested size is not above the maximum allowed.
-	if size > maxMapSize {
+	if size > arch.MaxMapSize {
 		return 0, fmt.Errorf("mmap too large")
 	}
 
@@ -337,10 +336,9 @@ func (db *DB) mmapSize(size int) (int, error) {
 	}
 
 	// If we've exceeded the max size then only grow up to the max size.
-	if sz > maxMapSize {
-		sz = maxMapSize
+	if sz > arch.MaxMapSize {
+		sz = arch.MaxMapSize
 	}
-
 	return int(sz), nil
 }
 
@@ -387,7 +385,6 @@ func (db *DB) init() error {
 	if err := fdatasync(db); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -396,13 +393,10 @@ func (db *DB) init() error {
 func (db *DB) Close() error {
 	db.rwlock.Lock()
 	defer db.rwlock.Unlock()
-
 	db.metalock.Lock()
 	defer db.metalock.Unlock()
-
 	db.mmaplock.RLock()
 	defer db.mmaplock.RUnlock()
-
 	return db.close()
 }
 
@@ -410,9 +404,7 @@ func (db *DB) close() error {
 	if !db.opened {
 		return nil
 	}
-
 	db.opened = false
-
 	db.freelist = nil
 
 	// Clear ops.
@@ -439,7 +431,6 @@ func (db *DB) close() error {
 		}
 		db.file = nil
 	}
-
 	db.path = ""
 	return nil
 }
@@ -502,7 +493,6 @@ func (db *DB) beginTx() (*Tx, error) {
 	db.stats.TxN++
 	db.stats.OpenTxN = n
 	db.statlock.Unlock()
-
 	return t, nil
 }
 
@@ -542,7 +532,6 @@ func (db *DB) beginRWTx() (*Tx, error) {
 	if minid > 0 {
 		db.freelist.release(minid - 1)
 	}
-
 	return t, nil
 }
 
@@ -606,7 +595,6 @@ func (db *DB) Update(fn func(*Tx) error) error {
 		_ = t.Rollback()
 		return err
 	}
-
 	return t.Commit()
 }
 
@@ -637,11 +625,9 @@ func (db *DB) View(fn func(*Tx) error) error {
 		_ = t.Rollback()
 		return err
 	}
-
 	if err := t.Rollback(); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -664,7 +650,6 @@ func (db *DB) View(fn func(*Tx) error) error {
 // Batch is only useful when there are multiple goroutines calling it.
 func (db *DB) Batch(fn func(*Tx) error) error {
 	errCh := make(chan error, 1)
-
 	db.batchMu.Lock()
 	if (db.batch == nil) || (db.batch != nil && len(db.batch.calls) >= db.MaxBatchSize) {
 		// There is no existing batch, or the existing batch is full; start a new one.
@@ -679,7 +664,6 @@ func (db *DB) Batch(fn func(*Tx) error) error {
 		go db.batch.trigger()
 	}
 	db.batchMu.Unlock()
-
 	err := <-errCh
 	if err == trySolo {
 		err = db.Update(fn)
@@ -715,7 +699,6 @@ func (b *batch) run() {
 		b.db.batch = nil
 	}
 	b.db.batchMu.Unlock()
-
 retry:
 	for len(b.calls) > 0 {
 		var failIdx = -1
@@ -728,7 +711,6 @@ retry:
 			}
 			return nil
 		})
-
 		if failIdx >= 0 {
 			// take the failing transaction out of the batch. it's
 			// safe to shorten b.calls here because db.batch no longer
@@ -856,7 +838,6 @@ func (db *DB) allocate(count int) (*page, error) {
 
 	// Move the page id high water mark.
 	db.rwtx.meta.pgid += pgid(count)
-
 	return p, nil
 }
 
@@ -887,7 +868,6 @@ func (db *DB) grow(sz int) error {
 			return fmt.Errorf("file sync error: %s", err)
 		}
 	}
-
 	db.filesz = sz
 	return nil
 }
@@ -1015,7 +995,6 @@ func (m *meta) write(p *page) {
 
 	// Calculate the checksum.
 	m.checksum = m.sum64()
-
 	m.copy(p.meta())
 }
 
