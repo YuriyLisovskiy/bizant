@@ -627,7 +627,7 @@ func TestDB_Consistency(t *testing.T) {
 	})
 }
 
-// Ensure that DB stats can be substracted from one another.
+// Ensure that DB stats can be subtracted from one another.
 func TestDBStats_Sub(t *testing.T) {
 	var a, b bolt.Stats
 	a.TxStats.PageCount = 3
@@ -904,8 +904,8 @@ func fileSize(path string) int64 {
 	return fi.Size()
 }
 
-// func warn(v ...interface{})              { fmt.Fprintln(os.Stderr, v...) }
-// func warnf(msg string, v ...interface{}) { fmt.Fprintf(os.Stderr, msg+"\n", v...) }
+func warn(v ...interface{})              { fmt.Fprintln(os.Stderr, v...) }
+func warnf(msg string, v ...interface{}) { fmt.Fprintf(os.Stderr, msg+"\n", v...) }
 
 // u64tob converts a uint64 into an 8-byte slice.
 func u64tob(v uint64) []byte {
