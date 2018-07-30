@@ -16,7 +16,7 @@ const (
 	MaxKeySize = 32768
 
 	// MaxValueSize is the maximum length of a value, in bytes.
-	MaxValueSize = 4294967295
+	MaxValueSize = (1 << 31) - 2
 )
 
 const (
@@ -104,6 +104,7 @@ func (b *Bucket) Cursor() *Cursor {
 
 // Bucket retrieves a nested bucket by name.
 // Returns nil if the bucket does not exist.
+// The bucket instance is only valid for the lifetime of the transaction.
 func (b *Bucket) Bucket(name []byte) *Bucket {
 	if b.buckets != nil {
 		if child := b.buckets[string(name)]; child != nil {
@@ -153,6 +154,7 @@ func (b *Bucket) openBucket(value []byte) *Bucket {
 
 // CreateBucket creates a new bucket at the given key and returns the new bucket.
 // Returns an error if the key already exists, if the bucket name is blank, or if the bucket name is too long.
+// The bucket instance is only valid for the lifetime of the transaction.
 func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 	if b.tx.db == nil {
 		return nil, ErrTxClosed
@@ -197,6 +199,7 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 
 // CreateBucketIfNotExists creates a new bucket if it doesn't already exist and returns a reference to it.
 // Returns an error if the bucket name is blank, or if the bucket name is too long.
+// The bucket instance is only valid for the lifetime of the transaction.
 func (b *Bucket) CreateBucketIfNotExists(key []byte) (*Bucket, error) {
 	child, err := b.CreateBucket(key)
 	if err == ErrBucketExists {
@@ -275,6 +278,7 @@ func (b *Bucket) Get(key []byte) []byte {
 
 // Put sets the value for a key in the bucket.
 // If the key exist then its previous value will be overwritten.
+// Supplied value must remain valid for the life of the transaction.
 // Returns an error if the bucket was created from a read-only transaction, if the key is blank, if the key is too large, or if the value is too large.
 func (b *Bucket) Put(key []byte, value []byte) error {
 	if b.tx.db == nil {
