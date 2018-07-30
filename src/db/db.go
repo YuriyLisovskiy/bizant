@@ -32,6 +32,12 @@ const magic uint32 = 0xED0CDAED
 // must be synchronzied using the msync(2) syscall.
 const IgnoreNoSync = runtime.GOOS == "openbsd"
 
+// Default values if not set in a DB instance.
+const (
+	DefaultMaxBatchSize  int = 1000
+	DefaultMaxBatchDelay     = 10 * time.Millisecond
+)
+
 // DB represents a collection of buckets persisted to a file on disk.
 // All data access is performed through transactions which can be obtained through the DB.
 // All the functions on DB will return a ErrDatabaseNotOpen if accessed before Open() is called.
@@ -54,6 +60,22 @@ type DB struct {
 	// THIS IS UNSAFE. PLEASE USE WITH CAUTION.
 	NoSync bool
 
+	// MaxBatchSize is the maximum size of a batch. Default value is
+	// copied from DefaultMaxBatchSize in Open.
+	//
+	// If <=0, disables batching.
+	//
+	// Do not change concurrently with calls to Batch.
+	MaxBatchSize int
+
+	// MaxBatchDelay is the maximum delay before a batch starts.
+	// Default value is copied from DefaultMaxBatchDelay in Open.
+	//
+	// If <=0, effectively disables batching.
+	//
+	// Do not change concurrently with calls to Batch.
+	MaxBatchDelay time.Duration
+
 	path     string
 	file     *os.File
 	dataref  []byte
@@ -67,6 +89,9 @@ type DB struct {
 	txs      []*Tx
 	freelist *freelist
 	stats    Stats
+
+	batchMu sync.Mutex
+	batch   *batch
 
 	rwlock   sync.Mutex   // Allows only one writer at a time.
 	metalock sync.Mutex   // Protects meta page access.
@@ -103,6 +128,10 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	if options == nil {
 		options = DefaultOptions
 	}
+
+	// Set default values for later DB operations.
+	db.MaxBatchSize = DefaultMaxBatchSize
+	db.MaxBatchDelay = DefaultMaxBatchDelay
 
 	// Open data file and separate sync handler for metadata writes.
 	db.path = path
@@ -236,9 +265,9 @@ func (db *DB) mmapSize(size int) (int, error) {
 	}
 
 	// If larger than 1GB then grow by 1GB at a time.
-	sz := int64(size) + int64(maxMmapStep)
+	sz := int64(size)
 	if remainder := sz % int64(maxMmapStep); remainder > 0 {
-		sz -= remainder
+		sz += int64(maxMmapStep) - remainder
 	}
 
 	// Ensure that the mmap size is a multiple of the page size.
@@ -699,13 +728,8 @@ func _assert(condition bool, msg string, v ...interface{}) {
 	}
 }
 
-func warn(v ...interface{}) {
-	fmt.Fprintln(os.Stderr, v...)
-}
-
-func warnf(msg string, v ...interface{}) {
-	fmt.Fprintf(os.Stderr, msg+"\n", v...)
-}
+func warn(v ...interface{})              { fmt.Fprintln(os.Stderr, v...) }
+func warnf(msg string, v ...interface{}) { fmt.Fprintf(os.Stderr, msg+"\n", v...) }
 
 func printstack() {
 	stack := strings.Join(strings.Split(string(debug.Stack()), "\n")[2:], "\n")
