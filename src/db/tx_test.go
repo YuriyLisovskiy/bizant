@@ -6,14 +6,12 @@
 package db
 
 import (
-	"bytes"
-	"errors"
+	"os"
 	"fmt"
 	"log"
-	"os"
+	"bytes"
+	"errors"
 	"testing"
-
-	"github.com/boltdb/bolt"
 )
 
 // Ensure that committing a closed transaction returns an error.
@@ -24,16 +22,13 @@ func TestTx_Commit_ErrTxClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if _, err := tx.CreateBucket([]byte("foo")); err != nil {
 		t.Fatal(err)
 	}
-
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := tx.Commit(); err != bolt.ErrTxClosed {
+	if err := tx.Commit(); err != ErrTxClosed {
 		t.Fatalf("unexpected error: %s", err)
 	}
 }
@@ -42,16 +37,14 @@ func TestTx_Commit_ErrTxClosed(t *testing.T) {
 func TestTx_Rollback_ErrTxClosed(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if err := tx.Rollback(); err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.Rollback(); err != bolt.ErrTxClosed {
+	if err := tx.Rollback(); err != ErrTxClosed {
 		t.Fatalf("unexpected error: %s", err)
 	}
 }
@@ -64,7 +57,7 @@ func TestTx_Commit_ErrTxNotWritable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.Commit(); err != bolt.ErrTxNotWritable {
+	if err := tx.Commit(); err != ErrTxNotWritable {
 		t.Fatal(err)
 	}
 }
@@ -73,34 +66,29 @@ func TestTx_Commit_ErrTxNotWritable(t *testing.T) {
 func TestTx_Cursor(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		if _, err := tx.CreateBucket([]byte("widgets")); err != nil {
 			t.Fatal(err)
 		}
-
 		if _, err := tx.CreateBucket([]byte("woojits")); err != nil {
 			t.Fatal(err)
 		}
-
 		c := tx.Cursor()
 		if k, v := c.First(); !bytes.Equal(k, []byte("widgets")) {
 			t.Fatalf("unexpected key: %v", k)
 		} else if v != nil {
 			t.Fatalf("unexpected value: %v", v)
 		}
-
 		if k, v := c.Next(); !bytes.Equal(k, []byte("woojits")) {
 			t.Fatalf("unexpected key: %v", k)
 		} else if v != nil {
 			t.Fatalf("unexpected value: %v", v)
 		}
-
 		if k, v := c.Next(); k != nil {
 			t.Fatalf("unexpected key: %v", k)
 		} else if v != nil {
 			t.Fatalf("unexpected value: %v", k)
 		}
-
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -111,9 +99,9 @@ func TestTx_Cursor(t *testing.T) {
 func TestTx_CreateBucket_ErrTxNotWritable(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		_, err := tx.CreateBucket([]byte("foo"))
-		if err != bolt.ErrTxNotWritable {
+		if err != ErrTxNotWritable {
 			t.Fatalf("unexpected error: %s", err)
 		}
 		return nil
@@ -133,8 +121,7 @@ func TestTx_CreateBucket_ErrTxClosed(t *testing.T) {
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-
-	if _, err := tx.CreateBucket([]byte("foo")); err != bolt.ErrTxClosed {
+	if _, err := tx.CreateBucket([]byte("foo")); err != ErrTxClosed {
 		t.Fatalf("unexpected error: %s", err)
 	}
 }
@@ -143,7 +130,7 @@ func TestTx_CreateBucket_ErrTxClosed(t *testing.T) {
 func TestTx_Bucket(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		if _, err := tx.CreateBucket([]byte("widgets")); err != nil {
 			t.Fatal(err)
 		}
@@ -160,12 +147,11 @@ func TestTx_Bucket(t *testing.T) {
 func TestTx_Get_NotFound(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		if err := b.Put([]byte("foo"), []byte("bar")); err != nil {
 			t.Fatal(err)
 		}
@@ -184,7 +170,7 @@ func TestTx_CreateBucket(t *testing.T) {
 	defer db.MustClose()
 
 	// Create a bucket.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -197,7 +183,7 @@ func TestTx_CreateBucket(t *testing.T) {
 	}
 
 	// Read the bucket through a separate transaction.
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		if tx.Bucket([]byte("widgets")) == nil {
 			t.Fatal("expected bucket")
 		}
@@ -211,7 +197,7 @@ func TestTx_CreateBucket(t *testing.T) {
 func TestTx_CreateBucketIfNotExists(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		// Create bucket.
 		if b, err := tx.CreateBucketIfNotExists([]byte("widgets")); err != nil {
 			t.Fatal(err)
@@ -225,14 +211,13 @@ func TestTx_CreateBucketIfNotExists(t *testing.T) {
 		} else if b == nil {
 			t.Fatal("expected bucket")
 		}
-
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Read the bucket through a separate transaction.
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		if tx.Bucket([]byte("widgets")) == nil {
 			t.Fatal("expected bucket")
 		}
@@ -246,15 +231,13 @@ func TestTx_CreateBucketIfNotExists(t *testing.T) {
 func TestTx_CreateBucketIfNotExists_ErrBucketNameRequired(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists([]byte{}); err != bolt.ErrBucketNameRequired {
+	if err := db.Update(func(tx *Tx) error {
+		if _, err := tx.CreateBucketIfNotExists([]byte{}); err != ErrBucketNameRequired {
 			t.Fatalf("unexpected error: %s", err)
 		}
-
-		if _, err := tx.CreateBucketIfNotExists(nil); err != bolt.ErrBucketNameRequired {
+		if _, err := tx.CreateBucketIfNotExists(nil); err != ErrBucketNameRequired {
 			t.Fatalf("unexpected error: %s", err)
 		}
-
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -267,7 +250,7 @@ func TestTx_CreateBucket_ErrBucketExists(t *testing.T) {
 	defer db.MustClose()
 
 	// Create a bucket.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		if _, err := tx.CreateBucket([]byte("widgets")); err != nil {
 			t.Fatal(err)
 		}
@@ -277,8 +260,8 @@ func TestTx_CreateBucket_ErrBucketExists(t *testing.T) {
 	}
 
 	// Create the same bucket again.
-	if err := db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucket([]byte("widgets")); err != bolt.ErrBucketExists {
+	if err := db.Update(func(tx *Tx) error {
+		if _, err := tx.CreateBucket([]byte("widgets")); err != ErrBucketExists {
 			t.Fatalf("unexpected error: %s", err)
 		}
 		return nil
@@ -291,8 +274,8 @@ func TestTx_CreateBucket_ErrBucketExists(t *testing.T) {
 func TestTx_CreateBucket_ErrBucketNameRequired(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucket(nil); err != bolt.ErrBucketNameRequired {
+	if err := db.Update(func(tx *Tx) error {
+		if _, err := tx.CreateBucket(nil); err != ErrBucketNameRequired {
 			t.Fatalf("unexpected error: %s", err)
 		}
 		return nil
@@ -307,7 +290,7 @@ func TestTx_DeleteBucket(t *testing.T) {
 	defer db.MustClose()
 
 	// Create a bucket and add a value.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -321,7 +304,7 @@ func TestTx_DeleteBucket(t *testing.T) {
 	}
 
 	// Delete the bucket and make sure we can't get the value.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		if err := tx.DeleteBucket([]byte("widgets")); err != nil {
 			t.Fatal(err)
 		}
@@ -332,8 +315,7 @@ func TestTx_DeleteBucket(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		// Create the bucket again and make sure there's not a phantom value.
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
@@ -359,7 +341,7 @@ func TestTx_DeleteBucket_ErrTxClosed(t *testing.T) {
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.DeleteBucket([]byte("foo")); err != bolt.ErrTxClosed {
+	if err := tx.DeleteBucket([]byte("foo")); err != ErrTxClosed {
 		t.Fatalf("unexpected error: %s", err)
 	}
 }
@@ -368,8 +350,8 @@ func TestTx_DeleteBucket_ErrTxClosed(t *testing.T) {
 func TestTx_DeleteBucket_ReadOnly(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.View(func(tx *bolt.Tx) error {
-		if err := tx.DeleteBucket([]byte("foo")); err != bolt.ErrTxNotWritable {
+	if err := db.View(func(tx *Tx) error {
+		if err := tx.DeleteBucket([]byte("foo")); err != ErrTxNotWritable {
 			t.Fatalf("unexpected error: %s", err)
 		}
 		return nil
@@ -382,8 +364,8 @@ func TestTx_DeleteBucket_ReadOnly(t *testing.T) {
 func TestTx_DeleteBucket_NotFound(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
-		if err := tx.DeleteBucket([]byte("widgets")); err != bolt.ErrBucketNotFound {
+	if err := db.Update(func(tx *Tx) error {
+		if err := tx.DeleteBucket([]byte("widgets")); err != ErrBucketNotFound {
 			t.Fatalf("unexpected error: %s", err)
 		}
 		return nil
@@ -397,7 +379,7 @@ func TestTx_DeleteBucket_NotFound(t *testing.T) {
 func TestTx_ForEach_NoError(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -405,8 +387,7 @@ func TestTx_ForEach_NoError(t *testing.T) {
 		if err := b.Put([]byte("foo"), []byte("bar")); err != nil {
 			t.Fatal(err)
 		}
-
-		if err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		if err := tx.ForEach(func(name []byte, b *Bucket) error {
 			return nil
 		}); err != nil {
 			t.Fatal(err)
@@ -421,7 +402,7 @@ func TestTx_ForEach_NoError(t *testing.T) {
 func TestTx_ForEach_WithError(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -429,9 +410,8 @@ func TestTx_ForEach_WithError(t *testing.T) {
 		if err := b.Put([]byte("foo"), []byte("bar")); err != nil {
 			t.Fatal(err)
 		}
-
 		marker := errors.New("marker")
-		if err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		if err := tx.ForEach(func(name []byte, b *Bucket) error {
 			return marker
 		}); err != marker {
 			t.Fatalf("unexpected error: %s", err)
@@ -446,9 +426,8 @@ func TestTx_ForEach_WithError(t *testing.T) {
 func TestTx_OnCommit(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	var x int
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		tx.OnCommit(func() { x += 1 })
 		tx.OnCommit(func() { x += 2 })
 		if _, err := tx.CreateBucket([]byte("widgets")); err != nil {
@@ -466,9 +445,8 @@ func TestTx_OnCommit(t *testing.T) {
 func TestTx_OnCommit_Rollback(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	var x int
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		tx.OnCommit(func() { x += 1 })
 		tx.OnCommit(func() { x += 2 })
 		if _, err := tx.CreateBucket([]byte("widgets")); err != nil {
@@ -486,9 +464,8 @@ func TestTx_OnCommit_Rollback(t *testing.T) {
 func TestTx_CopyFile(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	path := tempfile()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -503,19 +480,16 @@ func TestTx_CopyFile(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		return tx.CopyFile(path, 0600)
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	db2, err := bolt.Open(path, 0600, nil)
+	db2, err := Open(path, 0600, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db2.View(func(tx *bolt.Tx) error {
+	if err := db2.View(func(tx *Tx) error {
 		if v := tx.Bucket([]byte("widgets")).Get([]byte("foo")); !bytes.Equal(v, []byte("bar")) {
 			t.Fatalf("unexpected value: %v", v)
 		}
@@ -526,7 +500,6 @@ func TestTx_CopyFile(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
 	if err := db2.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -557,7 +530,7 @@ func (f *failWriter) Write(p []byte) (n int, err error) {
 func TestTx_CopyFile_Error_Meta(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -572,8 +545,7 @@ func TestTx_CopyFile_Error_Meta(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		return tx.Copy(&failWriter{})
 	}); err == nil || err.Error() != "meta 0 copy: error injected for tests" {
 		t.Fatalf("unexpected error: %v", err)
@@ -584,7 +556,7 @@ func TestTx_CopyFile_Error_Meta(t *testing.T) {
 func TestTx_CopyFile_Error_Normal(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
@@ -599,8 +571,7 @@ func TestTx_CopyFile_Error_Normal(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		return tx.Copy(&failWriter{3 * db.Info().PageSize})
 	}); err == nil || err.Error() != "error injected for tests" {
 		t.Fatalf("unexpected error: %v", err)
@@ -609,14 +580,14 @@ func TestTx_CopyFile_Error_Normal(t *testing.T) {
 
 func ExampleTx_Rollback() {
 	// Open the database.
-	db, err := bolt.Open(tempfile(), 0666, nil)
+	db, err := Open(tempfile(), 0666, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer os.Remove(db.Path())
 
 	// Create a bucket.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		_, err := tx.CreateBucket([]byte("widgets"))
 		return err
 	}); err != nil {
@@ -624,7 +595,7 @@ func ExampleTx_Rollback() {
 	}
 
 	// Set a value for a key.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		return tx.Bucket([]byte("widgets")).Put([]byte("foo"), []byte("bar"))
 	}); err != nil {
 		log.Fatal(err)
@@ -644,7 +615,7 @@ func ExampleTx_Rollback() {
 	}
 
 	// Ensure that our original value is still set.
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		value := tx.Bucket([]byte("widgets")).Get([]byte("foo"))
 		fmt.Printf("The value for 'foo' is still: %s\n", value)
 		return nil
@@ -656,21 +627,18 @@ func ExampleTx_Rollback() {
 	if err := db.Close(); err != nil {
 		log.Fatal(err)
 	}
-
-	// Output:
-	// The value for 'foo' is still: bar
 }
 
 func ExampleTx_CopyFile() {
 	// Open the database.
-	db, err := bolt.Open(tempfile(), 0666, nil)
+	db, err := Open(tempfile(), 0666, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer os.Remove(db.Path())
 
 	// Create a bucket and a key.
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := db.Update(func(tx *Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			return err
@@ -685,7 +653,7 @@ func ExampleTx_CopyFile() {
 
 	// Copy the database to another file.
 	toFile := tempfile()
-	if err := db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *Tx) error {
 		return tx.CopyFile(toFile, 0666)
 	}); err != nil {
 		log.Fatal(err)
@@ -693,13 +661,13 @@ func ExampleTx_CopyFile() {
 	defer os.Remove(toFile)
 
 	// Open the cloned database.
-	db2, err := bolt.Open(toFile, 0666, nil)
+	db2, err := Open(toFile, 0666, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Ensure that the key exists in the copy.
-	if err := db2.View(func(tx *bolt.Tx) error {
+	if err := db2.View(func(tx *Tx) error {
 		value := tx.Bucket([]byte("widgets")).Get([]byte("foo"))
 		fmt.Printf("The value for 'foo' in the clone is: %s\n", value)
 		return nil
@@ -711,11 +679,7 @@ func ExampleTx_CopyFile() {
 	if err := db.Close(); err != nil {
 		log.Fatal(err)
 	}
-
 	if err := db2.Close(); err != nil {
 		log.Fatal(err)
 	}
-
-	// Output:
-	// The value for 'foo' in the clone is: bar
 }

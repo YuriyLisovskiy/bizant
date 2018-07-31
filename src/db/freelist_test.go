@@ -84,7 +84,7 @@ func TestFreelist_allocate(t *testing.T) {
 	if id := int(f.allocate(1)); id != 0 {
 		t.Fatalf("exp=0; got=%v", id)
 	}
-	if var exp []pgid; !reflect.DeepEqual(exp, f.ids) {
+	if exp := []pgid{}; !reflect.DeepEqual(exp, f.ids) {
 		t.Fatalf("exp=%v; got=%v", exp, f.ids)
 	}
 }

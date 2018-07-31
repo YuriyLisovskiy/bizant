@@ -533,7 +533,6 @@ func TestDB_Update_Closed(t *testing.T) {
 func TestDB_Update_ManualCommit(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	var panicked bool
 	if err := db.Update(func(tx *Tx) error {
 		func() {
@@ -542,7 +541,6 @@ func TestDB_Update_ManualCommit(t *testing.T) {
 					panicked = true
 				}
 			}()
-
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -559,7 +557,6 @@ func TestDB_Update_ManualCommit(t *testing.T) {
 func TestDB_Update_ManualRollback(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	var panicked bool
 	if err := db.Update(func(tx *Tx) error {
 		func() {
@@ -568,7 +565,6 @@ func TestDB_Update_ManualRollback(t *testing.T) {
 					panicked = true
 				}
 			}()
-
 			if err := tx.Rollback(); err != nil {
 				t.Fatal(err)
 			}
@@ -585,7 +581,6 @@ func TestDB_Update_ManualRollback(t *testing.T) {
 func TestDB_View_ManualCommit(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	var panicked bool
 	if err := db.View(func(tx *Tx) error {
 		func() {
@@ -594,7 +589,6 @@ func TestDB_View_ManualCommit(t *testing.T) {
 					panicked = true
 				}
 			}()
-
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -611,7 +605,6 @@ func TestDB_View_ManualCommit(t *testing.T) {
 func TestDB_View_ManualRollback(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	var panicked bool
 	if err := db.View(func(tx *Tx) error {
 		func() {
@@ -620,7 +613,6 @@ func TestDB_View_ManualRollback(t *testing.T) {
 					panicked = true
 				}
 			}()
-
 			if err := tx.Rollback(); err != nil {
 				t.Fatal(err)
 			}
@@ -645,7 +637,6 @@ func TestDB_Update_Panic(t *testing.T) {
 				t.Log("recover: update", r)
 			}
 		}()
-
 		if err := db.Update(func(tx *Tx) error {
 			if _, err := tx.CreateBucket([]byte("widgets")); err != nil {
 				t.Fatal(err)
@@ -681,7 +672,6 @@ func TestDB_Update_Panic(t *testing.T) {
 func TestDB_View_Error(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	if err := db.View(func(tx *Tx) error {
 		return errors.New("xxx")
 	}); err == nil || err.Error() != "xxx" {
@@ -693,7 +683,6 @@ func TestDB_View_Error(t *testing.T) {
 func TestDB_View_Panic(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	if err := db.Update(func(tx *Tx) error {
 		if _, err := tx.CreateBucket([]byte("widgets")); err != nil {
 			t.Fatal(err)
@@ -710,7 +699,6 @@ func TestDB_View_Panic(t *testing.T) {
 				t.Log("recover: view", r)
 			}
 		}()
-
 		if err := db.View(func(tx *Tx) error {
 			if tx.Bucket([]byte("widgets")) == nil {
 				t.Fatal("expected bucket")
@@ -742,7 +730,6 @@ func TestDB_Stats(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
 	stats := db.Stats()
 	if stats.TxStats.PageCount != 2 {
 		t.Fatalf("unexpected TxStats.PageCount: %d", stats.TxStats.PageCount)
@@ -763,7 +750,6 @@ func TestDB_Consistency(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
 	for i := 0; i < 10; i++ {
 		if err := db.Update(func(tx *Tx) error {
 			if err := tx.Bucket([]byte("widgets")).Put([]byte("foo"), []byte("bar")); err != nil {
@@ -774,44 +760,37 @@ func TestDB_Consistency(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
 	if err := db.Update(func(tx *Tx) error {
 		if p, _ := tx.Page(0); p == nil {
 			t.Fatal("expected page")
 		} else if p.Type != "meta" {
 			t.Fatalf("unexpected page type: %s", p.Type)
 		}
-
 		if p, _ := tx.Page(1); p == nil {
 			t.Fatal("expected page")
 		} else if p.Type != "meta" {
 			t.Fatalf("unexpected page type: %s", p.Type)
 		}
-
 		if p, _ := tx.Page(2); p == nil {
 			t.Fatal("expected page")
 		} else if p.Type != "free" {
 			t.Fatalf("unexpected page type: %s", p.Type)
 		}
-
 		if p, _ := tx.Page(3); p == nil {
 			t.Fatal("expected page")
 		} else if p.Type != "free" {
 			t.Fatalf("unexpected page type: %s", p.Type)
 		}
-
 		if p, _ := tx.Page(4); p == nil {
 			t.Fatal("expected page")
 		} else if p.Type != "leaf" {
 			t.Fatalf("unexpected page type: %s", p.Type)
 		}
-
 		if p, _ := tx.Page(5); p == nil {
 			t.Fatal("expected page")
 		} else if p.Type != "freelist" {
 			t.Fatalf("unexpected page type: %s", p.Type)
 		}
-
 		if p, _ := tx.Page(6); p != nil {
 			t.Fatal("unexpected page")
 		}
@@ -843,7 +822,6 @@ func TestDBStats_Sub(t *testing.T) {
 func TestDB_Batch(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
 	if err := db.Update(func(tx *Tx) error {
 		if _, err := tx.CreateBucket([]byte("widgets")); err != nil {
 			t.Fatal(err)
@@ -1156,7 +1134,6 @@ func BenchmarkDBBatchAutomatic(b *testing.B) {
 		var wg sync.WaitGroup
 		for round := 0; round < 1000; round++ {
 			wg.Add(1)
-
 			go func(id uint32) {
 				defer wg.Done()
 				<-start

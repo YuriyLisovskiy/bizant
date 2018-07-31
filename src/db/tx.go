@@ -156,7 +156,7 @@ func (tx *Tx) Commit() error {
 		return ErrTxNotWritable
 	}
 
-	// TODO(benbjohnson): Use vectorized I/O to write out dirty pages.
+	// TODO: Use vectorized I/O to write out dirty pages.
 
 	// Rebalance nodes which have had deletions.
 	var startTime = time.Now()
@@ -175,7 +175,6 @@ func (tx *Tx) Commit() error {
 
 	// Free the old root bucket.
 	tx.meta.root.root = tx.root.root
-
 	opgid := tx.meta.pgid
 
 	// Free the freelist and allocate new pages for it. This will overestimate
@@ -238,7 +237,6 @@ func (tx *Tx) Commit() error {
 	for _, fn := range tx.commitHandlers {
 		fn()
 	}
-
 	return nil
 }
 
@@ -352,7 +350,6 @@ func (tx *Tx) WriteTo(w io.Writer) (n int64, err error) {
 	if err != nil {
 		return n, err
 	}
-
 	return n, f.Close()
 }
 
@@ -364,7 +361,6 @@ func (tx *Tx) CopyFile(path string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-
 	err = tx.Copy(f)
 	if err != nil {
 		_ = f.Close()
@@ -473,7 +469,6 @@ func (tx *Tx) allocate(count int) (*page, error) {
 	// Update statistics.
 	tx.stats.PageCount++
 	tx.stats.PageAlloc += count * tx.db.pageSize
-
 	return p, nil
 }
 
@@ -537,7 +532,6 @@ func (tx *Tx) write() error {
 		if int(p.overflow) != 0 {
 			continue
 		}
-
 		buf := (*[arch.MaxAllocSize]byte)(unsafe.Pointer(p))[:tx.db.pageSize]
 
 		// See https://go.googlesource.com/go/+/f03c9202c43e0abb130669852082117ca50aa9b1
@@ -546,7 +540,6 @@ func (tx *Tx) write() error {
 		}
 		tx.db.pagePool.Put(buf)
 	}
-
 	return nil
 }
 
@@ -569,7 +562,6 @@ func (tx *Tx) writeMeta() error {
 
 	// Update statistics.
 	tx.stats.Write++
-
 	return nil
 }
 
@@ -626,7 +618,6 @@ func (tx *Tx) Page(id int) (*PageInfo, error) {
 	} else {
 		info.Type = p.typ()
 	}
-
 	return info, nil
 }
 
