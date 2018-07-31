@@ -69,7 +69,7 @@ freebsd-arm:
 freebsd-amd64:
 	@GOOS=freebsd GOARCH=${ARCH_amd64} go build -o bin/freebsd/${ARCH_amd64}/${BINARY}.out ${FLAGS}
 
-PACKAGES = ./src/consensus ./src/core ./src/core/types ./src/core/types/tx_io ./src/network/protocol ./src/secp256k1 ./src/utils ./src/wallet # ./src/db
+PACKAGES = ./src/consensus ./src/core ./src/core/types ./src/core/types/tx_io ./src/network/protocol ./src/secp256k1 ./src/utils ./src/wallet ./src/db
 
 coverage:
 	@echo Running tests...
