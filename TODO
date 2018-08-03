@@ -1,7 +1,10 @@
 # TODO List
 
-- implement database
+Important:
+- fix bug: while syncing some block is being missed
+- fix transaction verification after receiving it
+
+Other:
 - add checking balances only of user's own addresses
 - add database resynchronization while reading blocks error
-- fix transaction verification after receiving it
 - add block verification before adding it to local blockchain database
