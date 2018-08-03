@@ -9,10 +9,7 @@
 
 package db
 
-import (
-	"fmt"
-	"errors"
-)
+import "errors"
 
 // Get gets data from database bucket by given key.
 func (db *DB) Get(key, bucket []byte) ([]byte, error) {
@@ -20,11 +17,11 @@ func (db *DB) Get(key, bucket []byte) ([]byte, error) {
 	err := db.View(func(tx *Tx) error {
 		b := tx.Bucket(bucket)
 		if b == nil {
-			return errors.New(fmt.Sprintf("bucket '%x' does not exist", bucket))
+			return ErrBucketNotFound
 		}
 		result = b.Get(key)
 		if result == nil {
-			return errors.New(fmt.Sprintf("key '%x' does not exist", key))
+			return ErrKeyNotFound
 		}
 		return nil
 	})
@@ -90,7 +87,7 @@ func (db *DB) Delete(key, bucket []byte, useBatch bool) error {
 		var err error
 		b := tx.Bucket(bucket)
 		if b == nil {
-			return errors.New(fmt.Sprintf("bucket '%x' does not exist", bucket))
+			return ErrBucketNotFound
 		}
 		err = b.Delete(key)
 		if err != nil {

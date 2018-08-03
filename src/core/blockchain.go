@@ -108,7 +108,7 @@ func (bc *BlockChain) AddBlock(block types.Block) {
 	if blockInDb != nil {
 		return
 	}
-	if err != nil {
+	if err != nil && err != db_pkg.ErrKeyNotFound {
 		log.Panic(err)
 	}
 

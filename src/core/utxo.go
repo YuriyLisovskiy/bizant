@@ -6,6 +6,7 @@ package core
 
 import (
 	"log"
+	"fmt"
 	"errors"
 	"encoding/hex"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
-	"fmt"
 )
 
 type UTXOSet struct {
