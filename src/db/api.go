@@ -19,6 +19,9 @@ func (db *DB) Get(key, bucket []byte) ([]byte, error) {
 	var result []byte
 	err := db.View(func(tx *Tx) error {
 		b := tx.Bucket(bucket)
+		if b == nil {
+			return errors.New(fmt.Sprintf("bucket '%x' does not exist", bucket))
+		}
 		result = b.Get(key)
 		if result == nil {
 			return errors.New(fmt.Sprintf("key '%x' does not exist", key))
