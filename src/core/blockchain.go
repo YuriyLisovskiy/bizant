@@ -13,36 +13,46 @@ import (
 	"errors"
 	"encoding/hex"
 
-	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
 )
 
 type BlockChain struct {
 	tip []byte
-	db  *bolt.DB
+	db  *db_pkg.DB
 }
 
 func CreateBlockChain(address, nodeID string) BlockChain {
 	utils.DBFile = fmt.Sprintf(utils.DBFile, nodeID)
 	if utils.DBExists(utils.DBFile) {
-		fmt.Println("Blockchain already exists.")
+		fmt.Printf("%s already exists.\n", utils.DBFile)
 		os.Exit(1)
 	}
-	var tip []byte
 	cbTx := NewCoinBaseTX(address, 0)
 	genesis, err := NewGenesisBlock(cbTx)
 	if err != nil {
 		log.Panic(err)
 	}
-	db, err := bolt.Open(utils.DBFile, 0600, nil)
+	db, err := db_pkg.Open(utils.DBFile, 0600, nil)
 	if err != nil {
 		log.Panic(err)
 	}
-	err = db.Update(func(tx *bolt.Tx) error {
+	keys := [][]byte{
+		genesis.Hash,
+		utils.LAST_BLOCK_HASH,
+	}
+	values := [][]byte{
+		genesis.Serialize(),    // genesis.Hash
+		genesis.Hash,           // utils.LAST_BLOCK_HASH
+	}
+	err = db.PutArray(keys, values, utils.BLOCKS_BUCKET, false)
+
+/*
+	err = db.Update(func(tx *db_pkg.Tx) error {
 		b, err := tx.CreateBucket([]byte(utils.BLOCKS_BUCKET))
 		if err != nil {
 			log.Panic(err)
@@ -55,13 +65,14 @@ func CreateBlockChain(address, nodeID string) BlockChain {
 		if err != nil {
 			log.Panic(err)
 		}
-		tip = genesis.Hash
 		return nil
 	})
+*/
+
 	if err != nil {
 		log.Panic(err)
 	}
-	return BlockChain{tip, db}
+	return BlockChain{genesis.Hash, db}
 }
 
 func NewBlockChain(nodeID string) BlockChain {
@@ -70,40 +81,55 @@ func NewBlockChain(nodeID string) BlockChain {
 		fmt.Println("No existing blockchain found. Create one first.")
 		os.Exit(1)
 	}
-	var tip []byte
-	db, err := bolt.Open(utils.DBFile, 0600, nil)
+	db, err := db_pkg.Open(utils.DBFile, 0600, nil)
 	if err != nil {
 		log.Panic(err)
 	}
-	err = db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
-		tip = b.Get([]byte("l"))
-		return nil
-	})
+
+	tip, err := db.Get(utils.LAST_BLOCK_HASH, utils.BLOCKS_BUCKET)
+
+//	err = db.View(func(tx *db_pkg.Tx) error {
+//		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
+//		tip = b.Get([]byte("l"))
+//		return nil
+//	})
 	if err != nil {
 		log.Panic(err)
 	}
 	return BlockChain{tip, db}
 }
 
+// AddBlock writes given block to the database if it does not exist.
 func (bc *BlockChain) AddBlock(block types.Block) {
+
+	// Check if given block already exists in the database.
+	// If exists then returns from function, else performs adding new block logic.
+	blockInDb, err := bc.db.Get(block.Hash, utils.BLOCKS_BUCKET)
+	if blockInDb != nil {
+		return
+	}
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// Lock thread while changing database content.
 	vars.DBMutex.Lock()
-	err := bc.db.Batch(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
-		blockInDb := b.Get(block.Hash)
-		if blockInDb != nil {
-			return nil
-		}
+	err = bc.db.Batch(func(tx *db_pkg.Tx) error {
+		b := tx.Bucket(utils.BLOCKS_BUCKET)
+
+		// Write new block to the database
 		blockData := block.Serialize()
 		err := b.Put(block.Hash, blockData)
 		if err != nil {
 			log.Panic(err)
 		}
-		lastHash := b.Get([]byte("l"))
+
+		// Check if given block is the newest one.
+		lastHash := b.Get(utils.LAST_BLOCK_HASH)
 		lastBlockData := b.Get(lastHash)
 		lastBlock := DeserializeBlock(lastBlockData)
 		if block.Height > lastBlock.Height {
-			err = b.Put([]byte("l"), block.Hash)
+			err = b.Put(utils.LAST_BLOCK_HASH, block.Hash)
 			if err != nil {
 				log.Panic(err)
 			}
@@ -111,18 +137,29 @@ func (bc *BlockChain) AddBlock(block types.Block) {
 		}
 		return nil
 	})
-	vars.DBMutex.Unlock()
 	if err != nil {
 		log.Panic(err)
 	}
+	vars.DBMutex.Unlock()
 }
 
+// GetBestHeight returns the height of the last block.
 func (bc *BlockChain) GetBestHeight() int {
 	var lastBlock types.Block
-	err := bc.db.View(func(tx *bolt.Tx) error {
+	err := bc.db.View(func(tx *db_pkg.Tx) error {
 		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
-		lastHash := b.Get([]byte("l"))
+
+		// Retrieve the link to the last block is written in the database.
+		lastHash := b.Get(utils.LAST_BLOCK_HASH)
+		if lastHash == nil {
+			return errors.New("bc.GetBestHeight: last block hash does not exist")
+		}
+
+		// Get the last block from the database to retrieve its height.
 		blockData := b.Get(lastHash)
+		if blockData == nil {
+			return errors.New("bc.GetBestHeight: last block does not exist or last hash is invalid")
+		}
 		lastBlock = DeserializeBlock(blockData)
 		return nil
 	})
@@ -132,9 +169,17 @@ func (bc *BlockChain) GetBestHeight() int {
 	return lastBlock.Height
 }
 
+// GetBlock retrieves a block by given hash and deserialize it.
 func (bc *BlockChain) GetBlock(blockHash []byte) (types.Block, error) {
 	var block types.Block
-	err := bc.db.View(func(tx *bolt.Tx) error {
+	blockData, err := bc.db.Get(blockHash, utils.BLOCKS_BUCKET)
+	if err != nil {
+		return block, err
+	}
+	return DeserializeBlock(blockData), nil
+
+/*
+	err := bc.db.View(func(tx *db_pkg.Tx) error {
 		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
 		blockData := b.Get(blockHash)
 		if blockData == nil {
@@ -143,10 +188,7 @@ func (bc *BlockChain) GetBlock(blockHash []byte) (types.Block, error) {
 		block = DeserializeBlock(blockData)
 		return nil
 	})
-	if err != nil {
-		return block, err
-	}
-	return block, nil
+*/
 }
 
 func (bc *BlockChain) GetBlockHashes(height int) [][]byte {
@@ -194,16 +236,15 @@ func (bc *BlockChain) FindUTXO() map[string]tx_io.TXOutputs {
 	return UTXO
 }
 
+// Iterator creates and returns a new blockchain iterator
 func (bc *BlockChain) Iterator() BlockChainIterator {
-	err := bc.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
-		bc.tip = b.Get([]byte("l"))
-		return nil
-	})
+
+	// Retrieve last block hash.
+	tip, err := bc.db.Get(utils.LAST_BLOCK_HASH, utils.BLOCKS_BUCKET)
 	if err != nil {
 		log.Panic(err)
 	}
-
+	bc.tip = tip
 	return BlockChainIterator{bc.tip, bc.db}
 }
 
@@ -230,7 +271,7 @@ func NewUTXOTransaction(targetWallet *wallet.Wallet, to string, amount, fee floa
 		outputs = append(outputs, tx_io.NewTXOutput(acc-amount, from)) // a change
 	}
 	tx := types.Transaction{
-		Hash:        nil,
+		Hash:      nil,
 		VIn:       inputs,
 		VOut:      outputs,
 		Timestamp: time.Now().Unix(),
@@ -241,10 +282,14 @@ func NewUTXOTransaction(targetWallet *wallet.Wallet, to string, amount, fee floa
 	return utxoSet.BlockChain.SignTransaction(tx, targetWallet.PrivateKey)
 }
 
+// MineBlock generates new block.
 func (bc *BlockChain) MineBlock(minerAddress string, transactions []types.Transaction) (types.Block, error) {
 	var lastHash []byte
 	var lastHeight int
 	fees := 0.0
+
+	// Verify all given transactions
+	// If transaction is invalid, ignore it and send an error to its owner
 	for _, tx := range transactions {
 		if !bc.VerifyTransaction(tx) {
 
@@ -254,9 +299,18 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []types.Transa
 			fees += tx.Fee
 		}
 	}
-	err := bc.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
+
+	// Retrieve last block height.
+	err := bc.db.View(func(tx *db_pkg.Tx) error {
+		b := tx.Bucket(utils.BLOCKS_BUCKET)
+		if b == nil {
+			return errors.New(fmt.Sprintf("bucket '%x' does not exist", utils.BLOCKS_BUCKET))
+		}
+
+		// Get a link to the last block.
 		lastHash = b.Get([]byte("l"))
+
+		// Get and deserialize the last block.
 		blockData := b.Get(lastHash)
 		block := DeserializeBlock(blockData)
 		lastHeight = block.Height
@@ -265,20 +319,29 @@ func (bc *BlockChain) MineBlock(minerAddress string, transactions []types.Transa
 	if err != nil {
 		log.Panic(err)
 	}
+
+	// Add coin base transaction to a list of transaction.
 	transactions = append(transactions, NewCoinBaseTX(minerAddress, fees))
+
+	// Generate new block.
 	newBlock, err := NewBlock(transactions, lastHash, lastHeight+1)
 	if err != nil {
 		fmt.Println(err.Error())
 		return types.Block{}, err
 	}
+
+	// Lock thread for safe database update.
 	vars.DBMutex.Lock()
-	err = bc.db.Batch(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
+	err = bc.db.Batch(func(tx *db_pkg.Tx) error {
+		b := tx.Bucket(utils.BLOCKS_BUCKET)
+		if b == nil {
+			return errors.New(fmt.Sprintf("bucket '%x' does not exist", utils.BLOCKS_BUCKET))
+		}
 		err := b.Put(newBlock.Hash, newBlock.Serialize())
 		if err != nil {
 			log.Panic(err)
 		}
-		err = b.Put([]byte("l"), newBlock.Hash)
+		err = b.Put(utils.LAST_BLOCK_HASH, newBlock.Hash)
 		if err != nil {
 			log.Panic(err)
 		}

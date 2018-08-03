@@ -6,4 +6,6 @@ package utils
 
 var (
 	DBFile = "BlockChain_%s.db"
+	BLOCKS_BUCKET = []byte("blocks")
+	LAST_BLOCK_HASH = []byte("l")
 )

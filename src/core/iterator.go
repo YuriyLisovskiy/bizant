@@ -8,29 +8,33 @@ import (
 	"log"
 	"encoding/hex"
 
-	"github.com/boltdb/bolt"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 )
 
 type BlockChainIterator struct {
 	currentHash []byte
-	db          *bolt.DB
+	db          *db_pkg.DB
 }
 
 func (i *BlockChainIterator) Next() types.Block {
-	var block types.Block
-	err := i.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
+	encodedBlock, err := i.db.Get(i.currentHash, utils.BLOCKS_BUCKET)
+	if err != nil {
+		log.Panic(err)
+	}
+	block := DeserializeBlock(encodedBlock)
+	i.currentHash = block.PrevBlockHash
+	return block
+
+/*
+	err := i.db.View(func(tx *db_pkg.Tx) error {
+		b := tx.Bucket(utils.BLOCKS_BUCKET)
 		encodedBlock := b.Get(i.currentHash)
 		block = DeserializeBlock(encodedBlock)
 		return nil
 	})
-	if err != nil {
-		log.Panic(err)
-	}
-	i.currentHash = block.PrevBlockHash
-	return block
+*/
 }
 
 func (i *BlockChainIterator) End() bool {

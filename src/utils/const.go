@@ -6,7 +6,4 @@ package utils
 
 import "math/big"
 
-const (
-	WORD_BYTES    = (32 << (uint64(^big.Word(0)) >> 63)) / 8
-	BLOCKS_BUCKET = "blocks"
-)
+const WORD_BYTES = (32 << (uint64(^big.Word(0)) >> 63)) / 8
