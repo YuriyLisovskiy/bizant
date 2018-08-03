@@ -11,6 +11,5 @@ const (
 	MINING_REWARD     = 50.0
 	MIN_CURRENCY_UNIT = 0.000001
 	MIN_FEE_PER_BYTE  = 20 * MIN_CURRENCY_UNIT
-	UTXO_BUCKET       = "chainstate"
 	MAX_NONCE         = math.MaxInt32
 )

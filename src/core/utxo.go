@@ -6,12 +6,14 @@ package core
 
 import (
 	"log"
+	"errors"
 	"encoding/hex"
 
-	"github.com/boltdb/bolt"
+	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
+	"fmt"
 )
 
 type UTXOSet struct {
@@ -22,8 +24,11 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount float64) (float6
 	unspentOutputs := make(map[string][]int)
 	accumulated := float64(0)
 	db := u.BlockChain.db
-	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(vars.UTXO_BUCKET))
+	err := db.View(func(tx *db_pkg.Tx) error {
+		b := tx.Bucket(vars.UTXO_BUCKET)
+		if b == nil {
+			return errors.New(fmt.Sprintf("bucket '%x' does not exist", vars.UTXO_BUCKET))
+		}
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			txID := hex.EncodeToString(k)
@@ -46,8 +51,11 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount float64) (float6
 func (u UTXOSet) FindUTXO(pubKeyHash []byte) []tx_io.TXOutput {
 	db := u.BlockChain.db
 	var UTXOs []tx_io.TXOutput
-	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(vars.UTXO_BUCKET))
+	err := db.View(func(tx *db_pkg.Tx) error {
+		b := tx.Bucket(vars.UTXO_BUCKET)
+		if b == nil {
+			return errors.New(fmt.Sprintf("bucket '%x' does not exist", vars.UTXO_BUCKET))
+		}
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			outs := tx_io.DeserializeOutputs(v)
@@ -68,8 +76,11 @@ func (u UTXOSet) FindUTXO(pubKeyHash []byte) []tx_io.TXOutput {
 func (u UTXOSet) CountTransactions() int {
 	db := u.BlockChain.db
 	counter := 0
-	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(vars.UTXO_BUCKET))
+	err := db.View(func(tx *db_pkg.Tx) error {
+		b := tx.Bucket(vars.UTXO_BUCKET)
+		if b == nil {
+			return errors.New(fmt.Sprintf("bucket '%x' does not exist", vars.UTXO_BUCKET))
+		}
 		c := b.Cursor()
 		for k, _ := c.First(); k != nil; k, _ = c.Next() {
 			counter++
@@ -84,13 +95,12 @@ func (u UTXOSet) CountTransactions() int {
 
 func (u UTXOSet) Reindex() {
 	db := u.BlockChain.db
-	bucketName := []byte(vars.UTXO_BUCKET)
-	err := db.Batch(func(tx *bolt.Tx) error {
-		err := tx.DeleteBucket(bucketName)
-		if err != nil && err != bolt.ErrBucketNotFound {
+	err := db.Batch(func(tx *db_pkg.Tx) error {
+		err := tx.DeleteBucket(vars.UTXO_BUCKET)
+		if err != nil && err != db_pkg.ErrBucketNotFound {
 			log.Panic(err)
 		}
-		_, err = tx.CreateBucket(bucketName)
+		_, err = tx.CreateBucket(vars.UTXO_BUCKET)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -100,8 +110,11 @@ func (u UTXOSet) Reindex() {
 		log.Panic(err)
 	}
 	UTXO := u.BlockChain.FindUTXO()
-	err = db.Batch(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketName)
+	err = db.Batch(func(tx *db_pkg.Tx) error {
+		b := tx.Bucket(vars.UTXO_BUCKET)
+		if b == nil {
+			return errors.New(fmt.Sprintf("bucket '%x' does not exist", vars.UTXO_BUCKET))
+		}
 		for txID, outs := range UTXO {
 			key, err := hex.DecodeString(txID)
 			if err != nil {
@@ -119,8 +132,11 @@ func (u UTXOSet) Reindex() {
 func (u UTXOSet) Update(block types.Block) {
 	db := u.BlockChain.db
 	vars.DBMutex.Lock()
-	err := db.Batch(func(tx *bolt.Tx) error {
+	err := db.Batch(func(tx *db_pkg.Tx) error {
 		b := tx.Bucket([]byte(vars.UTXO_BUCKET))
+		if b == nil {
+			return errors.New(fmt.Sprintf("bucket '%x' does not exist", vars.UTXO_BUCKET))
+		}
 		for _, tx := range block.Transactions {
 			if tx.IsCoinBase() == false {
 				for _, vin := range tx.VIn {
