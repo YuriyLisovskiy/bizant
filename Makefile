@@ -73,22 +73,15 @@ PACKAGES = ./src/consensus ./src/core ./src/core/types ./src/core/types/tx_io ./
 
 coverage:
 	@echo Running tests...
-	@go test -v -covermode=count -coverprofile=coverage.out ${PACKAGES}
+	@go test -v -timeout 1h -covermode=count -coverprofile=coverage.out ${PACKAGES}
 	@echo Generating coverage report...
 	@go tool cover -html coverage.out -o coverage.html
 	@echo Done
 
 test:
 	@echo Running tests...
-	@go test ${PACKAGES}
+	@go test -timeout 1h -covermode=count -coverprofile=coverage.out ${PACKAGES}
 	@echo Done
 
 clean:
 	@-rm -rf bin/
-
-renewchain:
-	make build
-	cp Genesis.db BlockChain_3000.db
-	cp Genesis.db BlockChain_3001.db
-	clear
-	./bin/linux/amd64/blockchain startnode
