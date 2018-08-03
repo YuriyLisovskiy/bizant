@@ -15,6 +15,8 @@ const (
 	C_VERSION   = "version"
 	C_GETDATA   = "getdata"
 	C_GETBLOCKS = "getblocks"
+	C_MESSAGE   = "msg"
+	C_SYNCED    = "synced"
 )
 
 const (

@@ -48,3 +48,7 @@ type ping struct {
 type pong struct {
 	AddrFrom string
 }
+
+type msg struct {
+	Type string
+}

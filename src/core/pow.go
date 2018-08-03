@@ -48,7 +48,7 @@ func (pow *ProofOfWork) Run() (int, []byte, error) {
 	var hash [32]byte
 	nonce := 0
 	for nonce < vars.MAX_NONCE {
-		if atomic.LoadInt32(&vars.Mining) == 1 {
+		if atomic.LoadInt32(&vars.Syncing) == 1 {
 			return 0, []byte{}, errors.New("mining interrupt")
 		}
 		data := pow.prepareData(nonce)

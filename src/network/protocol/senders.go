@@ -112,3 +112,7 @@ func (self *Protocol) SendVersion(addrFrom, addrTo string) bool {
 		),
 	)
 }
+
+func (self *Protocol) SendMessage(addrTo, msgType string) bool {
+	return self.sendData(addrTo, MakeRequest(msg{Type: msgType}, C_MESSAGE))
+}

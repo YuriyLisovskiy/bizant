@@ -20,6 +20,7 @@ func (cli *CLI) startNode(nodeID string, minerAddress string) error {
 			return errors.New(fmt.Sprintf("wrong miner address %s", minerAddress))
 		}
 	}
-	net.StartServer(nodeID, minerAddress)
+	server := net.Server{}
+	server.Start(nodeID, minerAddress)
 	return nil
 }

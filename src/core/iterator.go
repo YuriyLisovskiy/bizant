@@ -11,7 +11,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
-)
+	)
 
 type BlockChainIterator struct {
 	currentHash []byte

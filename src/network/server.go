@@ -15,7 +15,15 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
+	"sync/atomic"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 )
+
+type Server struct {
+	protocol      protocol.Protocol
+	pingService   services.PingService
+	miningService services.MiningService
+}
 
 func handleConnection(conn net.Conn, proto *protocol.Protocol) {
 	request, err := ioutil.ReadAll(conn)
@@ -43,15 +51,17 @@ func handleConnection(conn net.Conn, proto *protocol.Protocol) {
 		proto.HandlePing(request)
 	case protocol.C_PONG:
 		proto.HandlePong(request)
-	case protocol.C_ERROR:
-		proto.HandleError(request)
+	case protocol.C_MESSAGE:
+		proto.HandleMessage(request)
+//	case protocol.C_ERROR:
+//		proto.HandleError(request)
 	default:
 		utils.PrintLog("Unknown command!\n")
 	}
 	conn.Close()
 }
 
-func StartServer(nodeID, minerAddress string) {
+func (self *Server) Start(nodeID, minerAddress string) {
 	static.SelfNodeAddress = fmt.Sprintf("localhost:%s", nodeID)
 	if _, ok := static.KnownNodes[static.SelfNodeAddress]; ok {
 		delete(static.KnownNodes, static.SelfNodeAddress)
@@ -63,26 +73,19 @@ func StartServer(nodeID, minerAddress string) {
 	defer ln.Close()
 	bc := core.NewBlockChain(nodeID)
 
-	newProtocol := protocol.Protocol{
+	self.protocol = protocol.Protocol{
 		Config: &protocol.Configuration{
 			Chain: &bc,
 			Nodes: &static.KnownNodes,
 		},
 	}
-
 	pingService := &services.PingService{}
-	pingService.Start(static.SelfNodeAddress, &newProtocol)
-	if len(minerAddress) > 0 {
-		miningService := &services.MiningService{MinerAddress: minerAddress}
-		miningService.Start(&newProtocol, &static.MemPool)
-	}
+	pingService.Start(static.SelfNodeAddress, &self.protocol)
+	go self.SyncDB()
 	go func() {
-		for nodeAddr := range static.KnownNodes {
-			if nodeAddr != static.SelfNodeAddress {
-				if newProtocol.SendVersion(static.SelfNodeAddress, nodeAddr) {
-					break
-				}
-			}
+		if len(minerAddress) > 0 {
+			miningService := &services.MiningService{MinerAddress: minerAddress}
+			miningService.Start(&self.protocol, &static.MemPool)
 		}
 	}()
 	for {
@@ -90,6 +93,20 @@ func StartServer(nodeID, minerAddress string) {
 		if err != nil {
 			log.Panic(err)
 		}
-		go handleConnection(conn, &newProtocol)
+		go handleConnection(conn, &self.protocol)
+	}
+}
+
+func (self *Server) SyncDB() {
+	atomic.StoreInt32(&vars.Syncing, 1)
+	for nodeAddr := range static.KnownNodes {
+		if nodeAddr != static.SelfNodeAddress {
+			if self.protocol.SendVersion(static.SelfNodeAddress, nodeAddr) {
+				break
+			}
+		}
+	}
+	if len(static.KnownNodes) < 1 {
+		atomic.StoreInt32(&vars.Syncing, 0)
 	}
 }

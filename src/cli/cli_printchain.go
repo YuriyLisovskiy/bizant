@@ -5,10 +5,8 @@
 package cli
 
 import (
+			"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"fmt"
-	"encoding/json"
-
-	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 )
 
 func (cli *CLI) printChain(nodeID string) error {
@@ -16,11 +14,13 @@ func (cli *CLI) printChain(nodeID string) error {
 	bci := bc.Iterator()
 	for !bci.End() {
 		block := bci.Next()
-		data, err := json.MarshalIndent(block, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
+//		data, err := json.MarshalIndent(block, "", "  ")
+//		if err != nil {
+//			return err
+//		}
+//		fmt.Println(string(data))
+		fmt.Printf("\nBlock HASH: %x\n", block.Hash)
+		fmt.Printf("Prev Block HASH: %x\n", block.PrevBlockHash)
 	}
 	bc.CloseDB(true)
 	return nil

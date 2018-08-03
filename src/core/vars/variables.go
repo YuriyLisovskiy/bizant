@@ -7,7 +7,7 @@ package vars
 import "sync"
 
 var (
-	Mining      int32
+	Syncing      int32
 	DBMutex     = &sync.Mutex{}
 	UTXO_BUCKET = []byte("chainstate")
 )

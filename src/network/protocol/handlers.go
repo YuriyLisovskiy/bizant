@@ -37,7 +37,6 @@ func (self *Protocol) HandleAddr(request []byte) {
 }
 
 func (self *Protocol) HandleBlock(request []byte) {
-	atomic.StoreInt32(&vars.Mining, 1)
 	var buff bytes.Buffer
 	payload := block{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -58,8 +57,8 @@ func (self *Protocol) HandleBlock(request []byte) {
 	} else {
 		UTXOSet := core.UTXOSet{BlockChain: *self.Config.Chain}
 		UTXOSet.Reindex()
+		atomic.StoreInt32(&vars.Syncing, 0)
 	}
-	atomic.StoreInt32(&vars.Mining, 0)
 }
 
 func (self *Protocol) HandleInv(request []byte) {
@@ -76,7 +75,6 @@ func (self *Protocol) HandleInv(request []byte) {
 	case C_BLOCK:
 		static.BlocksInTransit = payload.Items
 		blockHash := payload.Items[0]
-		self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash)
 		var newInTransit [][]byte
 		for _, b := range static.BlocksInTransit {
 			if bytes.Compare(b, blockHash) != 0 {
@@ -84,6 +82,7 @@ func (self *Protocol) HandleInv(request []byte) {
 			}
 		}
 		static.BlocksInTransit = newInTransit
+		self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash)
 	case C_TX:
 		txID := payload.Items[0]
 		if static.MemPool[hex.EncodeToString(txID)].Hash == nil {
@@ -206,9 +205,13 @@ func (self *Protocol) HandleVersion(request []byte) {
 	myBestHeight := self.Config.Chain.GetBestHeight()
 	foreignerBestHeight := payload.BestHeight
 	if myBestHeight < foreignerBestHeight {
+		atomic.StoreInt32(&vars.Syncing, 1)
 		self.SendGetBlocks(static.SelfNodeAddress, payload.AddrFrom)
 	} else if myBestHeight > foreignerBestHeight {
 		self.SendVersion(static.SelfNodeAddress, payload.AddrFrom)
+	} else {
+		self.SendMessage(payload.AddrFrom, C_SYNCED)
+		atomic.StoreInt32(&vars.Syncing, 0)
 	}
 	static.KnownNodes[payload.AddrFrom] = true
 	//	if !utils.NodeIsKnown(payload.AddrFrom, KnownNodes) {
@@ -246,6 +249,23 @@ func (self *Protocol) HandlePong(request []byte) {
 		static.KnownNodes[payload.AddrFrom] = true
 	}
 	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(static.KnownNodes)))
+}
+
+func (self *Protocol) HandleMessage(request []byte) {
+	var buff bytes.Buffer
+	payload := msg{}
+	buff.Write(request[COMMAND_LENGTH:])
+	dec := gob.NewDecoder(&buff)
+	err := dec.Decode(&payload)
+	if err != nil {
+		log.Panic(err)
+	}
+	switch payload.Type {
+	case C_SYNCED:
+		atomic.StoreInt32(&vars.Syncing, 0)
+	default:
+		utils.PrintLog("Unknown msg type!\n")
+	}
 }
 
 func (self *Protocol) HandleError(request []byte) {
