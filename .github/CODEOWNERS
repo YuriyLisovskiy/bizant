@@ -1,0 +1,11 @@
+# Lines starting with '#' are comments.
+# Each line is a file pattern followed by one or more owners.
+
+src/cli        @YuriyLisovskiy
+src/consensus  @YuriyLisovskiy
+src/core       @YuriyLisovskiy
+src/db         @benbjohnson @YuriyLisovskiy
+src/network    @YuriyLisovskiy
+src/secp256k1  @sipa
+src/utils      @YuriyLisovskiy
+src/wallet     @YuriyLisovskiy
