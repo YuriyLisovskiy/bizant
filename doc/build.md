@@ -7,7 +7,7 @@ Before Build
 Build requires:
 * The [Go programming language](https://golang.org), minimum version required: `go1.10`.
 * [make](https://www.gnu.org/software/make/manual/make.html) - automation tool to build the project automatically.
-* [git](https://git-scm.com) - version control system to download dependencies from [Github](https://github.com) repositories.
+* [git](https://git-scm.com) - version control system to download dependencies from [GitHub](https://github.com) repositories.
 
 Testing
 ---------------------
