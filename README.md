@@ -17,5 +17,10 @@ Read [contributing](.github/CONTRIBUTING.md).
 ### Author
 * [Yuriy Lisovskiy](https://github.com/YuriyLisovskiy)
 
+#### Donations
+* Bitcoin: `1KfafTH4fSodRHw6Lc9nnGs58sibXrYEv7`
+* Ether: `0x53c554400ca9d6dd5c56739c27bd79fd14fca851`
+* Bitcoin Cash: `qrxtu27d9me0h3336yjcqjw6fz9g3esley8cf09ylc`
+
 ### License
 [Block Chain Go](https://github.com/YuriyLisovskiy/blockchain-go) is licensed under the terms of the [GNU General Public License v3.0](https://opensource.org/licenses/GPL-3.0), see the [LICENSE](LICENSE) file for more information.
