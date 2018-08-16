@@ -20,13 +20,7 @@ Build
 ---------------------
 Build binary for target platform:
 ```bash
-$ make target
-```
-See [`supported-platforms.md`](supported-platforms.md) for more info.
-
-Build binaries for all supported platforms:
-```bash
-$ make cross
+$ make
 ```
 
 This will build [blockchain-go](https://github.com/YuriyLisovskiy/blockchain-go) as well if the dependencies are met.
