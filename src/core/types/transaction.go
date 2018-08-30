@@ -16,15 +16,15 @@
 package types
 
 import (
-	"log"
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
-	"crypto/sha256"
+	"log"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
-	"github.com/YuriyLisovskiy/blockchain-go/src/secp256k1"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/secp256k1"
 )
 
 type Transaction struct {
@@ -67,7 +67,7 @@ func (tx *Transaction) Sign(privateKey []byte, prevTXs map[string]Transaction) T
 		}
 	}
 
-//	fmt.Printf("\n\nPUB KEY (sign): %x\n", append(privateKey.PublicKey.X.Bytes(), privateKey.PublicKey.Y.Bytes()...))
+	//	fmt.Printf("\n\nPUB KEY (sign): %x\n", append(privateKey.PublicKey.X.Bytes(), privateKey.PublicKey.Y.Bytes()...))
 
 	txCopy := tx.TrimmedCopy()
 
@@ -81,7 +81,7 @@ func (tx *Transaction) Sign(privateKey []byte, prevTXs map[string]Transaction) T
 			log.Panic(err)
 		}
 		tx.VIn[inID].Signature = signature
-	//	txCopy.VIn[inID].PubKey = nil
+		//	txCopy.VIn[inID].PubKey = nil
 	}
 	return *tx
 }
@@ -116,13 +116,13 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 	}
 	txCopy := tx.TrimmedCopy()
 
-//	fmt.Printf("LOG: tx hash: %x == tx copy hash: %x ? %t",
-//		tx.CalcHash(), txCopy.CalcHash(),
-//		fmt.Sprintf("%x", tx.CalcHash()) == fmt.Sprintf("%x", txCopy.CalcHash()),
-//	)
+	//	fmt.Printf("LOG: tx hash: %x == tx copy hash: %x ? %t",
+	//		tx.CalcHash(), txCopy.CalcHash(),
+	//		fmt.Sprintf("%x", tx.CalcHash()) == fmt.Sprintf("%x", txCopy.CalcHash()),
+	//	)
 	for inID, vin := range tx.VIn {
 		prevTx := prevTXs[hex.EncodeToString(vin.PreviousTx)]
-	//	txCopy.VIn[inID].Signature = nil
+		//	txCopy.VIn[inID].Signature = nil
 		txCopy.VIn[inID].PubKey = prevTx.VOut[vin.VOut].PubKeyHash
 		/*
 		r := big.Int{}
@@ -131,19 +131,19 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 		r.SetBytes(vin.Signature[:(sigLen / 2)])
 		s.SetBytes(vin.Signature[(sigLen / 2):])
 		*/
-	//	x, y := big.Int{}, big.Int{}
-	//	x.SetBytes(vin.PubKey[:(len(vin.PubKey) / 2)])
-	//	y.SetBytes(vin.PubKey[(len(vin.PubKey) / 2):])
+		//	x, y := big.Int{}, big.Int{}
+		//	x.SetBytes(vin.PubKey[:(len(vin.PubKey) / 2)])
+		//	y.SetBytes(vin.PubKey[(len(vin.PubKey) / 2):])
 
-	//	pubKey := ecdsa.PublicKey{X: &x, Y: &y, Curve: secp256k1.S256()}
+		//	pubKey := ecdsa.PublicKey{X: &x, Y: &y, Curve: secp256k1.S256()}
 
-	//	fmt.Printf("\nVIN PUB KEY (verify): %x\n\n", vin.PubKey)
-	//	fmt.Printf("\nPUB KEY (verify): %x\n\n\n", pubKey)
+		//	fmt.Printf("\nVIN PUB KEY (verify): %x\n\n", vin.PubKey)
+		//	fmt.Printf("\nPUB KEY (verify): %x\n\n\n", pubKey)
 
 		if !secp256k1.VerifySignature(vin.PubKey, tx.Hash, vin.Signature) {
 			return false
 		}
-	//	txCopy.VIn[inID].PubKey = nil
+		//	txCopy.VIn[inID].PubKey = nil
 	}
 	return true
 }

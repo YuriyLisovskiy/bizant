@@ -16,15 +16,15 @@
 package wallet
 
 import (
-	"os"
-	"log"
-	"fmt"
 	"bytes"
-	"errors"
-	"io/ioutil"
 	"encoding/gob"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/secp256k1"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/secp256k1"
 )
 
 type Wallets struct {

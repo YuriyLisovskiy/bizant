@@ -16,16 +16,16 @@
 package wallet
 
 import (
-	"log"
 	"bytes"
-	"crypto/rand"
 	"crypto/ecdsa"
-	"crypto/sha256"
-	"golang.org/x/crypto/ripemd160"
-
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/secp256k1"
 	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"log"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/secp256k1"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"golang.org/x/crypto/ripemd160"
 )
 
 type Wallet struct {
@@ -63,7 +63,7 @@ func ValidateAddress(address string) bool {
 	pubKeyHash := utils.Base58Decode([]byte(address))
 	actualChecksum := pubKeyHash[len(pubKeyHash)-ADDRESS_CHECKSUM_LEN:]
 	version := pubKeyHash[0]
-	pubKeyHash = pubKeyHash[1: len(pubKeyHash)-ADDRESS_CHECKSUM_LEN]
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-ADDRESS_CHECKSUM_LEN]
 	targetChecksum := checksum(append([]byte{version}, pubKeyHash...))
 	return bytes.Compare(actualChecksum, targetChecksum) == 0
 }

@@ -16,9 +16,9 @@
 package types
 
 import (
-	"log"
 	"bytes"
 	"encoding/gob"
+	"log"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/consensus"
 )

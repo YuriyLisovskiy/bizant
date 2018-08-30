@@ -14,7 +14,7 @@ all: coverage
 dependencies:
 	@bash dependencies.sh
 
-PACKAGES = ./src/consensus ./src/core ./src/core/types ./src/core/types/tx_io ./src/network/protocol ./src/secp256k1 ./src/utils ./src/wallet ./src/db
+PACKAGES = ./src/consensus ./src/core ./src/core/types ./src/core/types/tx_io ./src/network/protocol ./src/crypto/secp256k1 ./src/utils ./src/wallet ./src/db
 
 coverage: test
 	@echo Generating coverage report...
