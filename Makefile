@@ -14,7 +14,13 @@ all: coverage
 dependencies:
 	@bash dependencies.sh
 
-PACKAGES = ./src/consensus ./src/core ./src/core/types ./src/core/types/tx_io ./src/network/protocol ./src/crypto/secp256k1 ./src/utils ./src/wallet ./src/db
+
+PKG_SHA3_UTILS = ./src/crypto/sha3/utils/nist
+PKG_SHA3 = $(PKG_SHA3_UTILS)
+PKG_CRYPTO = ./src/crypto/secp256k1 $(PKG_SHA3)
+PKG_CORE = ./src/core ./src/core/types ./src/core/types/tx_io
+
+PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/wallet ./src/db
 
 coverage: test
 	@echo Generating coverage report...
