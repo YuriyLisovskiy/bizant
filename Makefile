@@ -1,7 +1,3 @@
-# Copyright (c) 2018 Yuriy Lisovskiy
-# Distributed under the GNU General Public License v3.0 software license,
-# see the accompanying file LICENSE or https://opensource.org/licenses/GPL-3.0
-
 BINARY = blockchain
 COVERAGE = coverage
 FLAGS = main.go
@@ -17,11 +13,10 @@ dependencies:
 
 PKG_SHA3_UTILS = ./src/crypto/sha3/utils/nist
 PKG_SHA3 = $(PKG_SHA3_UTILS) ./src/crypto/sha3/blake ./src/crypto/sha3/bmw ./src/crypto/sha3/cubehash ./src/crypto/sha3/echo ./src/crypto/sha3/groestl ./src/crypto/sha3/jh ./src/crypto/sha3/keccak ./src/crypto/sha3/luffa ./src/crypto/sha3/shavite ./src/crypto/sha3/simd ./src/crypto/sha3/skein
-PKG_CRYPTO = ./src/crypto/secp256k1 $(PKG_SHA3)
+PKG_CRYPTO = ./src/crypto/secp256k1 $(PKG_SHA3) ./src/crypto/x11
 PKG_CORE = ./src/core ./src/core/types ./src/core/types/tx_io
 
-PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/wallet
-# PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/wallet ./src/db
+PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/wallet ./src/db
 
 coverage: test
 	@echo Generating coverage report...
@@ -35,3 +30,4 @@ test:
 
 clean:
 	@-rm -rf bin/ $(COVERAGE).out $(COVERAGE).html
+
