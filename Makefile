@@ -16,11 +16,12 @@ dependencies:
 
 
 PKG_SHA3_UTILS = ./src/crypto/sha3/utils/nist
-PKG_SHA3 = $(PKG_SHA3_UTILS)
+PKG_SHA3 = $(PKG_SHA3_UTILS) ./src/crypto/sha3/blake ./src/crypto/sha3/bmw ./src/crypto/sha3/cubehash ./src/crypto/sha3/echo ./src/crypto/sha3/groestl ./src/crypto/sha3/jh ./src/crypto/sha3/keccak ./src/crypto/sha3/luffa ./src/crypto/sha3/shavite ./src/crypto/sha3/simd ./src/crypto/sha3/skein
 PKG_CRYPTO = ./src/crypto/secp256k1 $(PKG_SHA3)
 PKG_CORE = ./src/core ./src/core/types ./src/core/types/tx_io
 
-PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/wallet ./src/db
+PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/wallet
+# PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/wallet ./src/db
 
 coverage: test
 	@echo Generating coverage report...
