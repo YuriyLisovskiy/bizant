@@ -17,7 +17,6 @@ package core
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
@@ -25,6 +24,7 @@ import (
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/x11"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
@@ -63,7 +63,7 @@ func (pow *ProofOfWork) Run() (int, []byte, error) {
 			return 0, []byte{}, errors.New("mining interrupt")
 		}
 		data := pow.prepareData(nonce)
-		hash = sha256.Sum256(data)
+		hash = x11.Sum256(data)
 		utils.PrintLog(fmt.Sprintf("Mining a new block: %x", hash))
 		hashInt.SetBytes(hash[:])
 		if hashInt.Cmp(pow.target) == -1 {
@@ -79,7 +79,7 @@ func (pow *ProofOfWork) Run() (int, []byte, error) {
 func (pow *ProofOfWork) Validate() bool {
 	var hashInt big.Int
 	data := pow.prepareData(pow.block.Nonce)
-	hash := sha256.Sum256(data)
+	hash := x11.Sum256(data)
 	hashInt.SetBytes(hash[:])
 	isValid := hashInt.Cmp(pow.target) == -1
 	return isValid

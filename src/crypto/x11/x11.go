@@ -45,84 +45,106 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/shavite"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/simd"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/skein"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/utils"
 )
 
-// Hash contains the state objects
-// required to perform the x11.Hash.
-type Hash struct {
+var (
 	tha [64]byte
 	thb [64]byte
 
-	blake    utils.Digest
-	bmw      utils.Digest
-	cubehash utils.Digest
-	echo     utils.Digest
-	groestl  utils.Digest
-	jh       utils.Digest
-	keccak   utils.Digest
-	luffa    utils.Digest
-	shavite  utils.Digest
-	simd     utils.Digest
-	skein    utils.Digest
+	blakeHash = blake.New()
+	bmwHash = bmw.New()
+	groestlHash = groestl.New()
+	skeinHash = skein.New()
+	jhHash = jh.New()
+	keccakHash = keccak.New()
+	luffaHash = luffa.New()
+	cubehashHash = cubehash.New()
+	shaviteHash = shavite.New()
+	simdHash = simd.New()
+	echoHash = echo.New()
+)
+
+// Hash computes the hash from the src bytes and returns 32-byte hash.
+func Sum256(src []byte) [32]byte {
+	ta := tha[:]
+	tb := thb[:]
+
+	blakeHash.Write(src)
+	blakeHash.Close(tb, 0, 0)
+
+	bmwHash.Write(tb)
+	bmwHash.Close(ta, 0, 0)
+
+	groestlHash.Write(ta)
+	groestlHash.Close(tb, 0, 0)
+
+	skeinHash.Write(tb)
+	skeinHash.Close(ta, 0, 0)
+
+	jhHash.Write(ta)
+	jhHash.Close(tb, 0, 0)
+
+	keccakHash.Write(tb)
+	keccakHash.Close(ta, 0, 0)
+
+	luffaHash.Write(ta)
+	luffaHash.Close(tb, 0, 0)
+
+	cubehashHash.Write(tb)
+	cubehashHash.Close(ta, 0, 0)
+
+	shaviteHash.Write(ta)
+	shaviteHash.Close(tb, 0, 0)
+
+	simdHash.Write(tb)
+	simdHash.Close(ta, 0, 0)
+
+	echoHash.Write(ta)
+	echoHash.Close(tb, 0, 0)
+
+	var res [32]byte
+	copy(res[:], tb)
+
+	return res
 }
 
-// New returns a new object to compute a x11 hash.
-func New() *Hash {
-	ref := &Hash{}
+// Hash computes the hash from the src bytes and returns 64-byte hash.
+func Sum512(src []byte) [64]byte {
+	ta := tha[:]
+	tb := thb[:]
 
-	ref.blake = blake.New()
-	ref.bmw = bmw.New()
-	ref.cubehash = cubehash.New()
-	ref.echo = echo.New()
-	ref.groestl = groestl.New()
-	ref.jh = jh.New()
-	ref.keccak = keccak.New()
-	ref.luffa = luffa.New()
-	ref.shavite = shavite.New()
-	ref.simd = simd.New()
-	ref.skein = skein.New()
+	blakeHash.Write(src)
+	blakeHash.Close(tb, 0, 0)
 
-	return ref
-}
+	bmwHash.Write(tb)
+	bmwHash.Close(ta, 0, 0)
 
-// Hash computes the hash from the src bytes and stores the result in dst.
-func (ref *Hash) Sum(src []byte) [64]byte {
-	ta := ref.tha[:]
-	tb := ref.thb[:]
+	groestlHash.Write(ta)
+	groestlHash.Close(tb, 0, 0)
 
-	ref.blake.Write(src)
-	ref.blake.Close(tb, 0, 0)
+	skeinHash.Write(tb)
+	skeinHash.Close(ta, 0, 0)
 
-	ref.bmw.Write(tb)
-	ref.bmw.Close(ta, 0, 0)
+	jhHash.Write(ta)
+	jhHash.Close(tb, 0, 0)
 
-	ref.groestl.Write(ta)
-	ref.groestl.Close(tb, 0, 0)
+	keccakHash.Write(tb)
+	keccakHash.Close(ta, 0, 0)
 
-	ref.skein.Write(tb)
-	ref.skein.Close(ta, 0, 0)
+	luffaHash.Write(ta)
+	luffaHash.Close(tb, 0, 0)
 
-	ref.jh.Write(ta)
-	ref.jh.Close(tb, 0, 0)
+	cubehashHash.Write(tb)
+	cubehashHash.Close(ta, 0, 0)
 
-	ref.keccak.Write(tb)
-	ref.keccak.Close(ta, 0, 0)
+	shaviteHash.Write(ta)
+	shaviteHash.Close(tb, 0, 0)
 
-	ref.luffa.Write(ta)
-	ref.luffa.Close(tb, 0, 0)
+	simdHash.Write(tb)
+	simdHash.Close(ta, 0, 0)
 
-	ref.cubehash.Write(tb)
-	ref.cubehash.Close(ta, 0, 0)
-
-	ref.shavite.Write(ta)
-	ref.shavite.Close(tb, 0, 0)
-
-	ref.simd.Write(tb)
-	ref.simd.Close(ta, 0, 0)
-
-	ref.echo.Write(ta)
-	ref.echo.Close(tb, 0, 0)
+	echoHash.Write(ta)
+	echoHash.Close(tb, 0, 0)
 
 	var res [64]byte
 	copy(res[:], tb)
