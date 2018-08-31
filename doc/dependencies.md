@@ -6,4 +6,3 @@ The dependencies which are currently used by [Block Chain Go](https://github.com
 | Dependency | Version | Link |
 | --- | --- | --- |
 | crypto |  | https://github.com/golang/crypto |
-| secp256k1 |  | https://github.com/YuriyLisovskiy/secp256k1 |

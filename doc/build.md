@@ -9,6 +9,13 @@ Build requires:
 * [make](https://www.gnu.org/software/make/manual/make.html) - automation tool to build the project automatically.
 * [git](https://git-scm.com) - version control system to download dependencies from [GitHub](https://github.com) repositories.
 
+#### Install dependencies
+You can install required [Go](https://golang.org) libraries and submodules manually, see [manual-installation.md](manual-installation.md),
+or use [dependencies.sh](../dependencies.sh) script:
+```bash
+$ make dependencies
+```
+
 Testing
 ---------------------
 Run tests:
@@ -34,16 +41,3 @@ These libraries are required:
  Library     | Purpose          | Description
  ------------|------------------|----------------------
  crypto      | Cryptography     | Supplementary Go cryptography libraries
-
-Submodules
----------------------
-Module      | Purpose                  | Description
-------------|--------------------------|----------------------
-secp256k1   | Digital signature        | Optimized C library for EC operations on curve secp256k1
-
-#### Install dependencies
-You can install required [Go](https://golang.org) libraries and submodules manually, see [manual-installation.md](manual-installation.md),
-or use [dependencies.sh](../dependencies.sh) script:
-```bash
-$ make dependencies
-```

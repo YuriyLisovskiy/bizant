@@ -3,7 +3,6 @@
 if hash go 2>/dev/null
 then
     echo Downloading Golang required libraries...
-    go get github.com/stretchr/testify
     go get -u golang.org/x/crypto/...
     echo Done.
 else
