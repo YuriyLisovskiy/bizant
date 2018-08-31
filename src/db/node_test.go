@@ -20,8 +20,8 @@
 package db
 
 import (
-	"unsafe"
 	"testing"
+	"unsafe"
 )
 
 // Ensure that a node can insert a key/value.

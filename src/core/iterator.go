@@ -16,13 +16,13 @@
 package core
 
 import (
-	"log"
 	"encoding/hex"
+	"log"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
-	)
+	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+)
 
 type BlockChainIterator struct {
 	currentHash []byte

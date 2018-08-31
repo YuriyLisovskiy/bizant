@@ -16,8 +16,8 @@
 package cli
 
 import (
-	"os"
 	"fmt"
+	"os"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 )

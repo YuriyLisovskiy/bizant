@@ -16,14 +16,14 @@
 package core
 
 import (
-	"log"
-	"time"
 	"bytes"
 	"encoding/gob"
+	"log"
+	"time"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 )
 
 func NewBlock(transactions []types.Transaction, prevBlockHash []byte, height int) (types.Block, error) {

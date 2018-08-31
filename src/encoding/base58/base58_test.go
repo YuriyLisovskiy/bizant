@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-package utils
+package base58
 
 import "testing"
 
@@ -77,13 +77,13 @@ var Base58Decode_Data = []struct {
 
 func TestBase58Decode(test *testing.T) {
 	for j, data := range Base58Decode_Data {
-		actual := Base58Decode(data.input)
+		actual := Decode(data.input)
 			if len(actual) != len(data.expected) {
-				test.Errorf("utils.TestBase58Decode[%d], size: %d != %d", j, len(actual), len(data.expected))
+				test.Errorf("base58.TestBase58Decode[%d], size: %d != %d", j, len(actual), len(data.expected))
 			}
 			for i, b := range actual {
 				if b != data.expected[i] {
-					test.Errorf("utils.TestBase58Decode[%d], data: %x !=\n\t\t\t\t\t%x", j, actual, data.expected)
+					test.Errorf("base58.TestBase58Decode[%d], data: %x !=\n\t\t\t\t\t%x", j, actual, data.expected)
 				}
 			}
 	}
@@ -149,13 +149,54 @@ var Base58Encode_Data = []struct {
 
 func TestBase58Encode(test *testing.T) {
 	for j, data := range Base58Encode_Data {
-		actual := Base58Encode(data.input)
+		actual := Encode(data.input)
 		if len(actual) != len(data.expected) {
-			test.Errorf("utils.TestBase58Encode[%d], size: %d != %d", j, len(actual), len(data.expected))
+			test.Errorf("base58.TestBase58Encode[%d], size: %d != %d", j, len(actual), len(data.expected))
 		}
 		for i, b := range actual {
 			if b != data.expected[i] {
-				test.Errorf("utils.TestBase58Encode[%d], data: %s != %s", j, actual, data.expected)
+				test.Errorf("base58.TestBase58Encode[%d], data: %s != %s", j, actual, data.expected)
+			}
+		}
+	}
+}
+
+var ReverseBytes_Data = []struct{
+	input []byte
+	expected []byte
+} {
+	{
+		input: []byte{0, 0, 0, 0, 0, 0, 0, 10},
+		expected: []byte{10, 0, 0, 0, 0, 0, 0, 0},
+	},
+	{
+		input: []byte{0, 0, 0, 0, 0, 0, 0, 0},
+		expected: []byte{0, 0, 0, 0, 0, 0, 0, 0},
+	},
+	{
+		input: []byte{0, 0, 0, 54, 157, 86, 18, 54},
+		expected: []byte{54, 18, 86, 157, 54, 0, 0, 0},
+	},
+	{
+		input: []byte{0, 0, 0, 0, 0, 1, 35, 66},
+		expected: []byte{66, 35, 1, 0, 0, 0, 0, 0},
+	},
+	{
+		input: []byte{0, 0, 0, 0, 0, 2, 233, 45},
+		expected: []byte{45, 233, 2, 0, 0, 0, 0, 0},
+	},
+}
+
+func TestReverseBytes(test *testing.T) {
+	for j, data := range ReverseBytes_Data {
+		actual := data.input
+		reverseBytes(actual)
+		if len(actual) != len(data.expected) {
+			test.Errorf("base58.TestReverseBytes[%d], size: %d != %d", j, len(actual), len(data.expected))
+		}
+		for i, b := range actual {
+			if b != data.expected[i] {
+				test.Errorf("base58.TestReverseBytes[%d], data: %s != %s", j, actual, data.expected)
 			}
 		}
 	}

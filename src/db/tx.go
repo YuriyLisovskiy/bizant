@@ -20,13 +20,13 @@
 package db
 
 import (
+	"fmt"
 	"io"
 	"os"
-	"fmt"
 	"sort"
+	"strings"
 	"time"
 	"unsafe"
-	"strings"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
 )

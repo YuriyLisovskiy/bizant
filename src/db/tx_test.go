@@ -20,11 +20,11 @@
 package db
 
 import (
-	"os"
-	"fmt"
-	"log"
 	"bytes"
 	"errors"
+	"fmt"
+	"log"
+	"os"
 	"testing"
 )
 

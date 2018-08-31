@@ -20,11 +20,11 @@
 package db
 
 import (
-	"sort"
-	"unsafe"
-	"testing"
-	"reflect"
 	"math/rand"
+	"reflect"
+	"sort"
+	"testing"
+	"unsafe"
 )
 
 // Ensure that a page is added to a transaction's freelist.

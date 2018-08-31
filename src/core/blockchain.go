@@ -16,20 +16,20 @@
 package core
 
 import (
-	"os"
+	"bytes"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
-	"bytes"
-	"errors"
-	"encoding/hex"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
-	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
-	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 )
 
 type BlockChain struct {
@@ -57,28 +57,28 @@ func CreateBlockChain(address, nodeID string) BlockChain {
 		utils.LAST_BLOCK_HASH,
 	}
 	values := [][]byte{
-		genesis.Serialize(),    // genesis.Hash
-		genesis.Hash,           // utils.LAST_BLOCK_HASH
+		genesis.Serialize(), // genesis.Hash
+		genesis.Hash,        // utils.LAST_BLOCK_HASH
 	}
 	err = db.PutArray(keys, values, utils.BLOCKS_BUCKET, false)
 
-/*
-	err = db.Update(func(tx *db_pkg.Tx) error {
-		b, err := tx.CreateBucket([]byte(utils.BLOCKS_BUCKET))
-		if err != nil {
-			log.Panic(err)
-		}
-		err = b.Put(genesis.Hash, genesis.Serialize())
-		if err != nil {
-			log.Panic(err)
-		}
-		err = b.Put([]byte("l"), genesis.Hash)
-		if err != nil {
-			log.Panic(err)
-		}
-		return nil
-	})
-*/
+	/*
+		err = db.Update(func(tx *db_pkg.Tx) error {
+			b, err := tx.CreateBucket([]byte(utils.BLOCKS_BUCKET))
+			if err != nil {
+				log.Panic(err)
+			}
+			err = b.Put(genesis.Hash, genesis.Serialize())
+			if err != nil {
+				log.Panic(err)
+			}
+			err = b.Put([]byte("l"), genesis.Hash)
+			if err != nil {
+				log.Panic(err)
+			}
+			return nil
+		})
+	*/
 
 	if err != nil {
 		log.Panic(err)
@@ -99,11 +99,11 @@ func NewBlockChain(nodeID string) BlockChain {
 
 	tip, err := db.Get(utils.LAST_BLOCK_HASH, utils.BLOCKS_BUCKET)
 
-//	err = db.View(func(tx *db_pkg.Tx) error {
-//		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
-//		tip = b.Get([]byte("l"))
-//		return nil
-//	})
+	//	err = db.View(func(tx *db_pkg.Tx) error {
+	//		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
+	//		tip = b.Get([]byte("l"))
+	//		return nil
+	//	})
 	if err != nil {
 		log.Panic(err)
 	}
@@ -189,17 +189,17 @@ func (bc *BlockChain) GetBlock(blockHash []byte) (types.Block, error) {
 	}
 	return DeserializeBlock(blockData), nil
 
-/*
-	err := bc.db.View(func(tx *db_pkg.Tx) error {
-		b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
-		blockData := b.Get(blockHash)
-		if blockData == nil {
-			return errors.New("block is not found")
-		}
-		block = DeserializeBlock(blockData)
-		return nil
-	})
-*/
+	/*
+		err := bc.db.View(func(tx *db_pkg.Tx) error {
+			b := tx.Bucket([]byte(utils.BLOCKS_BUCKET))
+			blockData := b.Get(blockHash)
+			if blockData == nil {
+				return errors.New("block is not found")
+			}
+			block = DeserializeBlock(blockData)
+			return nil
+		})
+	*/
 }
 
 func (bc *BlockChain) GetBlockHashes(height int) [][]byte {

@@ -20,17 +20,17 @@
 package db
 
 import (
-	"os"
+	"bytes"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
-	"bytes"
-	"errors"
+	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
-	"math/rand"
 	"testing/quick"
-	"encoding/binary"
 )
 
 // Ensure that a bucket that gets a non-existent key returns nil.

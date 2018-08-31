@@ -16,16 +16,16 @@
 package core
 
 import (
-	"fmt"
 	"bytes"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync/atomic"
-	"crypto/sha256"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type ProofOfWork struct {

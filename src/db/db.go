@@ -20,17 +20,17 @@
 package db
 
 import (
-	"os"
+	"errors"
 	"fmt"
 	"log"
+	"os"
+	"runtime"
 	"sync"
 	"time"
 	"unsafe"
-	"errors"
-	"runtime"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
-	)
+)
 
 // The largest step that can be taken when remapping the mmap.
 const maxMmapStep = 1 << 30 // 1GB

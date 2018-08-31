@@ -20,8 +20,8 @@
 package db
 
 import (
-	"os"
 	"fmt"
+	"os"
 	"sort"
 	"unsafe"
 

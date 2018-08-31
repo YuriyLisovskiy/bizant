@@ -20,23 +20,23 @@
 package db
 
 import (
-	"os"
-	"fmt"
-	"log"
-	"flag"
-	"sort"
-	"sync"
-	"time"
 	"bytes"
-	"unsafe"
-	"regexp"
+	"encoding/binary"
 	"errors"
-	"testing"
-	"strings"
+	"flag"
+	"fmt"
 	"hash/fnv"
 	"io/ioutil"
+	"log"
+	"os"
 	"path/filepath"
-	"encoding/binary"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+	"unsafe"
 )
 
 var statsFlag = flag.Bool("stats", false, "show performance stats")

@@ -21,8 +21,8 @@ package db
 
 import (
 	"fmt"
-	"unsafe"
 	"hash/fnv"
+	"unsafe"
 )
 
 type meta struct {

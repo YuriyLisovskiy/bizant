@@ -20,11 +20,11 @@
 package db
 
 import (
-	"fmt"
-	"sync"
 	"bytes"
-	"testing"
+	"fmt"
 	"math/rand"
+	"sync"
+	"testing"
 )
 
 func TestSimulate_1op_1p(t *testing.T)     { testSimulate(t, 1, 1) }

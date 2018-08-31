@@ -16,8 +16,8 @@
 package cli
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"

@@ -16,16 +16,16 @@
 package services
 
 import (
-	"fmt"
-	"sync/atomic"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"sync/atomic"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type MiningService struct {

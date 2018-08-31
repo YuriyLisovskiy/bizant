@@ -16,10 +16,11 @@
 package cli
 
 import (
-	"fmt"
 	"errors"
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
+	"fmt"
+
 	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
+	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 )
 
 func (cli *CLI) startNode(nodeID string, minerAddress string) error {

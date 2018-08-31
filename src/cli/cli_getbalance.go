@@ -16,11 +16,11 @@
 package cli
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/encoding/base58"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 )
 
@@ -31,7 +31,7 @@ func (cli *CLI) getBalance(address, nodeID string) error {
 	bc := core.NewBlockChain(nodeID)
 	UTXOSet := core.UTXOSet{BlockChain: bc}
 	balance := 0.0
-	pubKeyHash := utils.Base58Decode([]byte(address))
+	pubKeyHash := base58.Decode([]byte(address))
 	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
 	UTXOs := UTXOSet.FindUTXO(pubKeyHash)
 	for _, out := range UTXOs {

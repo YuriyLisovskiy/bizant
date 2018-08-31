@@ -16,9 +16,9 @@
 package consensus
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
-	"encoding/hex"
 )
 
 func TestNewMerkleNode(test *testing.T) {

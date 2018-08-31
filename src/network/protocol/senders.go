@@ -16,11 +16,11 @@
 package protocol
 
 import (
-	"io"
-	"net"
-	"fmt"
-	"log"
 	"bytes"
+	"fmt"
+	"io"
+	"log"
+	"net"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 )

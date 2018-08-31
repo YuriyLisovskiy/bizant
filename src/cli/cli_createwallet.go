@@ -17,6 +17,7 @@ package cli
 
 import (
 	"fmt"
+
 	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 )
 

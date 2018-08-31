@@ -20,9 +20,9 @@
 package db
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
-	"bytes"
 )
 
 // Cursor represents an iterator that can traverse over all key/value pairs in a bucket in sorted order.

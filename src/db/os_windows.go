@@ -20,11 +20,11 @@
 package db
 
 import (
-	"os"
 	"fmt"
+	"os"
+	"syscall"
 	"time"
 	"unsafe"
-	"syscall"
 )
 
 // LockFileEx code derived from golang build filemutex_windows.go @ v1.5.1

@@ -16,8 +16,9 @@
 package cli
 
 import (
-			"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"fmt"
+
+	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 )
 
 func (cli *CLI) printChain(nodeID string) error {

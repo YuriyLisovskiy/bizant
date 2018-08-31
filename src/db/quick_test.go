@@ -20,14 +20,14 @@
 package db
 
 import (
-	"os"
-	"fmt"
-	"flag"
-	"time"
 	"bytes"
-	"reflect"
+	"flag"
+	"fmt"
 	"math/rand"
+	"os"
+	"reflect"
 	"testing/quick"
+	"time"
 )
 
 // testing/quick defaults to 5 iterations and a random seed.

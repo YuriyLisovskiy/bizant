@@ -20,8 +20,8 @@
 package db
 
 import (
-	"sort"
 	"reflect"
+	"sort"
 	"testing"
 	"testing/quick"
 )

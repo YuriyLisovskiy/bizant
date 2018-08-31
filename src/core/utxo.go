@@ -16,15 +16,15 @@
 package core
 
 import (
-	"log"
-	"fmt"
-	"errors"
 	"encoding/hex"
+	"errors"
+	"fmt"
+	"log"
 
-	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
-	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types/tx_io"
+	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
+	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
 )
 
 type UTXOSet struct {

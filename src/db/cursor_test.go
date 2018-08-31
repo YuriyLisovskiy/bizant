@@ -20,15 +20,15 @@
 package db
 
 import (
-	"os"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
-	"sort"
-	"bytes"
+	"os"
 	"reflect"
+	"sort"
 	"testing"
 	"testing/quick"
-	"encoding/binary"
 )
 
 // Ensure that a cursor can return a reference to the bucket that created it.

@@ -17,17 +17,17 @@ package network
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
-	"io/ioutil"
 	"sync/atomic"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
+	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type Server struct {

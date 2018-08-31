@@ -16,10 +16,10 @@
 package protocol
 
 import (
-	"fmt"
-	"log"
 	"bytes"
 	"encoding/gob"
+	"fmt"
+	"log"
 )
 
 func ExtractCommand(request []byte) []byte {

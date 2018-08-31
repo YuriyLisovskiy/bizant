@@ -18,7 +18,7 @@ package tx_io
 import (
 	"bytes"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
+	"github.com/YuriyLisovskiy/blockchain-go/src/encoding/base58"
 )
 
 type TXOutput struct {
@@ -27,7 +27,7 @@ type TXOutput struct {
 }
 
 func (out *TXOutput) Lock(address []byte) {
-	pubKeyHash := utils.Base58Decode(address)
+	pubKeyHash := base58.Decode(address)
 	pubKeyHash = pubKeyHash[1: len(pubKeyHash)-4]
 	out.PubKeyHash = pubKeyHash
 }

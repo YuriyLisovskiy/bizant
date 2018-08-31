@@ -22,11 +22,11 @@
 package db
 
 import (
-	"os"
 	"fmt"
+	"os"
+	"syscall"
 	"time"
 	"unsafe"
-	"syscall"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
 )

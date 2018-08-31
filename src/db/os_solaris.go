@@ -20,11 +20,11 @@
 package db
 
 import (
-	"os"
 	"fmt"
+	"os"
+	"syscall"
 	"time"
 	"unsafe"
-	"syscall"
 
 	"golang.org/x/sys/unix"
 )

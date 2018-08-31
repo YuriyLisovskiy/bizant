@@ -16,9 +16,9 @@
 package tx_io
 
 import (
-	"log"
 	"bytes"
 	"encoding/gob"
+	"log"
 )
 
 type TXOutputs struct {

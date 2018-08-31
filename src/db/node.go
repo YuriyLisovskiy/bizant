@@ -20,9 +20,9 @@
 package db
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
-	"bytes"
 	"unsafe"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/db/arch"
