@@ -17,6 +17,7 @@ package utils
 
 var (
 	DBFile = "BlockChain_%s.db"
+	WalletFile = "wallet_%s.dat"
 	BLOCKS_BUCKET = []byte("blocks")
 	LAST_BLOCK_HASH = []byte("l")
 )

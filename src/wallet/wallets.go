@@ -25,6 +25,7 @@ import (
 	"os"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/secp256k1"
+	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type Wallets struct {
@@ -62,7 +63,7 @@ func (ws Wallets) GetWallet(address string) (Wallet, error) {
 }
 
 func (ws *Wallets) LoadFromFile(nodeID string) error {
-	walletFile := fmt.Sprintf(walletFile, nodeID)
+	walletFile := fmt.Sprintf(utils.WalletFile, nodeID)
 	if _, err := os.Stat(walletFile); os.IsNotExist(err) {
 		return err
 	}
@@ -83,7 +84,7 @@ func (ws *Wallets) LoadFromFile(nodeID string) error {
 
 func (ws Wallets) SaveToFile(nodeID string) {
 	var content bytes.Buffer
-	walletFile := fmt.Sprintf(walletFile, nodeID)
+	walletFile := fmt.Sprintf(utils.WalletFile, nodeID)
 	gob.Register(secp256k1.S256())
 	encoder := gob.NewEncoder(&content)
 	err := encoder.Encode(ws)

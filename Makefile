@@ -19,7 +19,7 @@ PKG_SHA3 = $(PKG_SHA3_UTILS) $(SHA3)/blake512 $(SHA3)/bmw512 $(SHA3)/cubehash512
 PKG_CRYPTO = $(CRYPTO)/secp256k1 $(PKG_SHA3) $(CRYPTO)/x11
 PKG_CORE = $(CORE) $(CORE)/types $(CORE)/types/tx_io
 
-PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/encoding/base58 ./src/wallet ./src/db
+PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/encoding/base58 ./src/wallet ./src/config ./src/db
 
 coverage: test
 	@echo Generating coverage report...
@@ -28,7 +28,7 @@ coverage: test
 
 test:
 	@echo Running tests...
-	@go test -v -timeout 1h -covermode=count -coverprofile=$(COVERAGE).out $(PACKAGES)
+	@go test -v -timeout 3h -covermode=count -coverprofile=$(COVERAGE).out $(PACKAGES)
 	@echo Done
 
 clean:

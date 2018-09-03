@@ -13,8 +13,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-package utils
+package config
 
-import "math/big"
+import (
+	"errors"
+	"net"
+)
 
-const WORD_BYTES = (32 << (uint64(^big.Word(0)) >> 63)) / 8
+// getIp returns local ip of current node. TODO: change IP to global
+func getIp() (string, error) {
+	addresses, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+	for _, address := range addresses {
+		if ipNet, ok := address.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+			if ipNet.IP.To4() != nil {
+				return ipNet.IP.String(), nil
+			}
+		}
+	}
+	return "", errors.New("can't get node ip address")
+}
