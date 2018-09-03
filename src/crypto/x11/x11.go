@@ -38,7 +38,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/bmw"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/cubehash"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/echo"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/groestl"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/groestl512"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/jh"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/keccak"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/luffa"
@@ -53,7 +53,7 @@ var (
 
 	blakeHash = blake.New()
 	bmwHash = bmw.New()
-	groestlHash = groestl.New()
+	groestlHash = groestl512.New()
 	skeinHash = skein.New()
 	jhHash = jh.New()
 	keccakHash = keccak.New()
