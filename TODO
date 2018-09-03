@@ -5,7 +5,6 @@ Important:
 - fix transaction verification after receiving it
 
 Other:
-- add node config
 - add checking balances only of user's own addresses
 - add database resynchronization while reading blocks error
 - add block verification before adding it to local blockchain database
