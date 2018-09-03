@@ -2,7 +2,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![Language](https://img.shields.io/badge/Go-v1.10-blue.svg)](https://golang.org/)
 [![Build Status](https://travis-ci.org/YuriyLisovskiy/blockchain-go.svg?branch=master)](https://travis-ci.org/YuriyLisovskiy/blockchain-go)
-[![Coverage Status](https://coveralls.io/repos/github/YuriyLisovskiy/blockchain-go/badge.svg?branch=master)](https://coveralls.io/github/YuriyLisovskiy/blockchain-go?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/YuriyLisovskiy/blockchain-go/badge.svg)](https://coveralls.io/github/YuriyLisovskiy/blockchain-go)
 
 [Block Chain Go](https://github.com/YuriyLisovskiy/blockchain-go) is my personal project to learn, experiment and build around block chain technology written in [Go programming language](https://golang.org). This project is not affiliated with [Blockchain](https://www.blockchain.com) development and is not its [golang](https://golang.org) implementation.
 
