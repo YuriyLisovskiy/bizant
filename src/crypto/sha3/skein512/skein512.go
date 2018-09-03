@@ -15,7 +15,7 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-package skein
+package skein512
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ type digest struct {
 	b [BlockSize]byte
 }
 
-// New returns a new digest to compute a BLAKE512 hash.
+// New returns a new digest to compute a SKEIN512 hash.
 func New() utils.Digest {
 	ref := &digest{}
 	ref.Reset()

@@ -1,21 +1,3 @@
-// ISC License
-// 
-// Copyright (c) 2017-2018 The DashX developers
-// Copyright (c) 2016 The Dash developers
-// 
-// Permission to use, copy, modify, and distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-// OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-//
-//
 // Copyright (c) 2018 Yuriy Lisovskiy
 //
 // This program is free software: you can redistribute it and/or modify
@@ -34,34 +16,34 @@
 package x11
 
 import (
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/blake"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/bmw"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/cubehash"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/echo"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/blake512"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/bmw512"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/cubehash512"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/echo512"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/groestl512"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/jh"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/keccak"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/luffa"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/shavite"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/simd"
-	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/skein"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/jh512"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/keccak512"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/luffa512"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/shavite512"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/simd512"
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/sha3/skein512"
 )
 
 var (
 	tha [64]byte
 	thb [64]byte
 
-	blakeHash = blake.New()
-	bmwHash = bmw.New()
+	blakeHash = blake512.New()
+	bmwHash = bmw512.New()
 	groestlHash = groestl512.New()
-	skeinHash = skein.New()
-	jhHash = jh.New()
-	keccakHash = keccak.New()
-	luffaHash = luffa.New()
-	cubehashHash = cubehash.New()
-	shaviteHash = shavite.New()
-	simdHash = simd.New()
-	echoHash = echo.New()
+	skeinHash = skein512.New()
+	jhHash = jh512.New()
+	keccakHash = keccak512.New()
+	luffaHash = luffa512.New()
+	cubehashHash = cubehash512.New()
+	shaviteHash = shavite512.New()
+	simdHash = simd512.New()
+	echoHash = echo512.New()
 )
 
 // Hash computes the hash from the src bytes and returns 32-byte hash.

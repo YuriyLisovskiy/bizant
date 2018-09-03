@@ -10,11 +10,14 @@ all: coverage
 dependencies:
 	@bash dependencies.sh
 
+CRYPTO = ./src/crypto
+CORE = ./src/core
+SHA3 = $(CRYPTO)/sha3
 
-PKG_SHA3_UTILS = ./src/crypto/sha3/utils/nist
-PKG_SHA3 = $(PKG_SHA3_UTILS) ./src/crypto/sha3/blake ./src/crypto/sha3/bmw ./src/crypto/sha3/cubehash ./src/crypto/sha3/echo ./src/crypto/sha3/groestl ./src/crypto/sha3/jh ./src/crypto/sha3/keccak ./src/crypto/sha3/luffa ./src/crypto/sha3/shavite ./src/crypto/sha3/simd ./src/crypto/sha3/skein
-PKG_CRYPTO = ./src/crypto/secp256k1 $(PKG_SHA3) ./src/crypto/x11
-PKG_CORE = ./src/core ./src/core/types ./src/core/types/tx_io
+PKG_SHA3_UTILS = $(SHA3)/utils/nist
+PKG_SHA3 = $(PKG_SHA3_UTILS) $(SHA3)/blake512 $(SHA3)/bmw512 $(SHA3)/cubehash512 $(SHA3)/echo512 $(SHA3)/groestl512 $(SHA3)/jh512 $(SHA3)/keccak512 $(SHA3)/luffa512 $(SHA3)/shavite512 $(SHA3)/simd512 $(SHA3)/skein512
+PKG_CRYPTO = $(CRYPTO)/secp256k1 $(PKG_SHA3) $(CRYPTO)/x11
+PKG_CORE = $(CORE) $(CORE)/types $(CORE)/types/tx_io
 
 PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) ./src/network/protocol ./src/utils ./src/encoding/base58 ./src/wallet ./src/db
 
