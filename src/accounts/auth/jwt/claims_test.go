@@ -94,3 +94,35 @@ func TestClaims_SetTime(t *testing.T) {
 		t.Errorf("jwt.TestClaims_SetTime: %d != %d", exp.Unix(), tm.Unix())
 	}
 }
+
+func TestClaims_GetStringErr(t *testing.T) {
+	claims := NewClaims()
+	claims.Set("key1", "val1")
+	_, err := claims.GetString("key2")
+	if err == nil {
+		t.Errorf("jwt.TestClaims_GetStringErr: func does not return an error")
+	}
+	if err.Error() != ErrClaimDoesNotExist.Error() {
+		t.Errorf("jwt.TestClaims_GetStringErr: func returns an invalid error")
+	}
+	claims.Set("key2", 2)
+	_, err = claims.GetString("key2")
+	if err == nil {
+		t.Errorf("jwt.TestClaims_GetStringErr: func does not return an error")
+	}
+	if err.Error() != ErrClaimNotAString.Error() {
+		t.Errorf("jwt.TestClaims_GetStringErr: func returns an invalid error")
+	}
+}
+
+func TestClaims_GetTimeErr(t *testing.T) {
+	claims := NewClaims()
+	claims.Set("key1", "val1")
+	_, err := claims.GetTime("key1")
+	if err == nil {
+		t.Errorf("jwt.TestClaims_GetTimeErr: func does not return an error")
+	}
+	if err.Error() != ErrClaimNotAnInt64.Error() {
+		t.Errorf("jwt.TestClaims_GetTimeErr: func returns an invalid error")
+	}
+}
