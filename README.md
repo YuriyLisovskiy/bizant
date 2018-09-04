@@ -6,6 +6,7 @@
 
 [Block Chain Go](https://github.com/YuriyLisovskiy/blockchain-go) is my personal project to learn, experiment and build around block chain technology written in [Go programming language](https://golang.org). This project is not affiliated with [Blockchain](https://www.blockchain.com) development and is not its [golang](https://golang.org) implementation.
 
+### Build and install
 See [docs](doc) for build instructions.
 
 ### Issues
