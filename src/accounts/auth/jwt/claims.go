@@ -15,12 +15,9 @@
 
 package jwt
 
-import (
-	"errors"
-	"time"
-)
+import "time"
 
-// Claims contains the claims of a JWT token.
+// Claims represents a list of claims of a JWT token.
 //
 //  Registered Claim Names (source: https://tools.ietf.org/html/rfc7519#section-4.1)
 //
@@ -127,7 +124,7 @@ func (self *Claims) SetTime(key string, value time.Time) {
 func (self Claims) Get(key string) (interface{}, error) {
 	result, ok := self.claims[key]
 	if !ok {
-		return "", errors.New("claim doesn't exist")
+		return "", ErrClaimDoesNotExist
 	}
 	return result, nil
 }
@@ -136,11 +133,11 @@ func (self Claims) Get(key string) (interface{}, error) {
 func (self *Claims) GetString(key string) (string, error) {
 	raw, err := self.Get(key)
 	if err != nil {
-		return "", errors.New("claim not found")
+		return "", err
 	}
 	str, ok := raw.(string)
 	if !ok {
-		return "", errors.New("claim isn't a valid string")
+		return "", ErrClaimNotAString
 	}
 	return str, nil
 }
@@ -149,11 +146,11 @@ func (self *Claims) GetString(key string) (string, error) {
 func (self *Claims) GetTime(key string) (time.Time, error) {
 	raw, err := self.Get(key)
 	if err != nil {
-		return time.Unix(0, 0), errors.New("claim not found")
+		return time.Unix(0, 0), err
 	}
 	timeFloat, ok := raw.(int64)
 	if !ok {
-		return time.Unix(0, 0), errors.New("claim isn't a valid int64")
+		return time.Unix(0, 0), ErrClaimNotAnInt64
 	}
 	return time.Unix(int64(timeFloat), 0), nil
 }
