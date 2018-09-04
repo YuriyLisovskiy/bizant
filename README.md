@@ -4,10 +4,14 @@
 [![Build Status](https://travis-ci.org/YuriyLisovskiy/blockchain-go.svg?branch=master)](https://travis-ci.org/YuriyLisovskiy/blockchain-go)
 [![Coverage Status](https://coveralls.io/repos/github/YuriyLisovskiy/blockchain-go/badge.svg)](https://coveralls.io/github/YuriyLisovskiy/blockchain-go)
 
-[Block Chain Go](https://github.com/YuriyLisovskiy/blockchain-go) is my personal project to learn, experiment and build around block chain technology written in [Go programming language](https://golang.org). This project is not affiliated with [Blockchain](https://www.blockchain.com) development and is not its [golang](https://golang.org) implementation.
+[Block Chain Go](https://github.com/YuriyLisovskiy/blockchain-go) is my personal project to learn,
+experiment and build around block chain technology written in
+[Go programming language](https://golang.org). This project is
+not affiliated with [Blockchain](https://www.blockchain.com) development and is not its
+[golang](https://golang.org) implementation.
 
 ### Build and install
-See [docs](doc) for build instructions.
+See [build](build) for more information.
 
 ### Issues
 Read [issue template](.github/ISSUE_TEMPLATE.md) before opening a new issue.
