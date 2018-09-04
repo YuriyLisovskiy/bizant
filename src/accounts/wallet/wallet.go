@@ -23,9 +23,9 @@ import (
 	"crypto/sha256"
 	"log"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/ripemd160"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/secp256k1"
 	"github.com/YuriyLisovskiy/blockchain-go/src/encoding/base58"
-	"golang.org/x/crypto/ripemd160"
 )
 
 type Wallet struct {
