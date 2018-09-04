@@ -18,11 +18,12 @@ package cli
 import (
 	"fmt"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 )
 
-func (cli *CLI) reindexUTXO(nodeID string) {
-	chain := core.NewBlockChain(nodeID)
+func (cli *CLI) reindexUTXO(cfg config.Config) {
+	chain := core.NewBlockChain(cfg)
 	UTXOSet := core.UTXOSet{BlockChain: chain}
 	UTXOSet.Reindex()
 	count := UTXOSet.CountTransactions()

@@ -21,21 +21,22 @@ import (
 	"fmt"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
 )
 
-func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error {
+func (cli *CLI) send(from, to string, amount, fee float64, cfg config.Config) error {
 	if !wallet.ValidateAddress(from) {
 		return errors.New("ERROR: Sender address is not valid")
 	}
 	if !wallet.ValidateAddress(to) {
 		return errors.New("ERROR: Recipient address is not valid")
 	}
-	bc := core.NewBlockChain(nodeID)
+	bc := core.NewBlockChain(cfg)
 	utxoSet := core.UTXOSet{BlockChain: bc}
-	wallets, err := wallet.NewWallets(nodeID)
+	wallets, err := wallet.NewWallets(cfg)
 	if err != nil {
 		return err
 	}

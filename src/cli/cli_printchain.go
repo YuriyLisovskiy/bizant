@@ -18,11 +18,12 @@ package cli
 import (
 	"fmt"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 )
 
-func (cli *CLI) printChain(nodeID string) error {
-	bc := core.NewBlockChain(nodeID)
+func (cli *CLI) printChain(cfg config.Config) error {
+	bc := core.NewBlockChain(cfg)
 	bci := bc.Iterator()
 	for !bci.End() {
 		block := bci.Next()

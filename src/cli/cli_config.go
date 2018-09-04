@@ -13,11 +13,38 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-package utils
+package cli
 
-var (
-	DBFile = "BlockChain_%d.db"
-	WalletFile = "wallets_%d.dat"
-	BLOCKS_BUCKET = []byte("blocks")
-	LAST_BLOCK_HASH = []byte("l")
-)
+import "github.com/YuriyLisovskiy/blockchain-go/src/config"
+
+func (cli *CLI) setConfig(ip string, port int, chainPath, walletsPath string) error {
+	cfg := config.Config{}
+	var err error
+	if config.Exists() {
+		cfg, err = config.LoadConfig()
+		if err != nil {
+			return err
+		}
+	}
+	if ip != "" {
+		cfg = cfg.SetIp(ip)
+	}
+	if port != -1 {
+		cfg = cfg.SetPort(port)
+	}
+	if chainPath != "" {
+		cfg = cfg.SetChainPath(chainPath)
+	}
+	if walletsPath != "" {
+		cfg = cfg.SetWalletsPath(walletsPath)
+	}
+	return cfg.Save()
+}
+
+func (cli *CLI) setDefaultConfig() error {
+	cfg, err := config.Default()
+	if err != nil {
+		return err
+	}
+	return cfg.Save()
+}

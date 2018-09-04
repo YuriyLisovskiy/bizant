@@ -19,11 +19,12 @@ import (
 	"fmt"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 )
 
-func (cli *CLI) createWallet(nodeID string) {
-	wallets, _ := wallet.NewWallets(nodeID)
+func (cli *CLI) createWallet(cfg config.Config) {
+	wallets, _ := wallet.NewWallets(cfg)
 	address := wallets.CreateWallet()
-	wallets.SaveToFile(nodeID)
+	wallets.SaveToFile(cfg)
 	fmt.Printf("Your new address: %s\n", address)
 }

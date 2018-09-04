@@ -20,14 +20,15 @@ import (
 	"fmt"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 )
 
-func (cli *CLI) createBlockChain(address, nodeId string) error {
+func (cli *CLI) createBlockChain(address string, cfg config.Config) error {
 	if !wallet.ValidateAddress(address) {
 		return errors.New(fmt.Sprintf("ERROR: Address '%s' is not valid", address))
 	}
-	bc := core.CreateBlockChain(address, nodeId)
+	bc := core.CreateBlockChain(address, cfg)
 	UTXOSet := core.UTXOSet{BlockChain: bc}
 	UTXOSet.Reindex()
 	bc.CloseDB(true)

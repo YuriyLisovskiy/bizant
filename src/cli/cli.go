@@ -17,8 +17,10 @@ package cli
 
 import (
 	"fmt"
+	"log"
 	"os"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 )
 
@@ -26,6 +28,7 @@ type CLI struct{}
 
 func (cli *CLI) printUsage() {
 	fmt.Println("Usage:")
+	fmt.Print("  config\n    -ip string\n\tNode ip address\n    -port\n\tNode id\n    -path.chain\n\tPath to block chain database\n    -path.wallets\n\tPath to wallets location\n    -default\n\tSet default config\n\n")
 	fmt.Print("  createblockchain\n    -address string\n\tThe address to send genesis block reward to\n\n")
 	fmt.Print("  createwallet\n\tGenerates a new key-pair and saves it into the wallet file\n\n")
 	fmt.Print("  getbalance\n    -address string\n\tThe address to get balance for\n\n")
@@ -45,21 +48,29 @@ func (cli *CLI) validateArgs() {
 
 func (cli *CLI) Run() {
 	cli.validateArgs()
-	nodeID := os.Getenv("NODE_ID")
-	if nodeID == "" {
-		fmt.Printf("NODE_ID env. var is not set!")
-		os.Exit(1)
-	}
+
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
+
+	configIp := configCmd.String("ip", "", "Node ip address")
+	configPort := configCmd.Int("port", -1, "Node id")
+	configChainPath := configCmd.String("path.chain", "", "Path to block chain database")
+	configWalletsPath := configCmd.String("path.wallets", "", "Path to wallets location")
+	configDefault := configCmd.Bool("default", false, "Set default config")
+
 	createBlockChainAddress := createBlockChainCmd.String("address", "", "The address to send genesis block reward to")
+
 	sendFrom := sendCmd.String("from", "", "Source wallet address")
 	sendTo := sendCmd.String("to", "", "Destination wallet address")
 	sendAmount := sendCmd.Float64("amount", 0, "Amount to send")
 	sendFee := sendCmd.Float64("fee", vars.MIN_FEE_PER_BYTE, "Mine immediately on the same node")
+
 	startNodeMiner := startNodeCmd.String("mine", "", "Enable mining mode")
+
 	switch os.Args[1] {
 	case "balance":
 		checkError(getBalanceCmd.Parse(os.Args[2:]))
+	case "config":
+		checkError(configCmd.Parse(os.Args[2:]))
 	case "createblockchain":
 		checkError(createBlockChainCmd.Parse(os.Args[2:]))
 	case "createwallet":
@@ -78,45 +89,53 @@ func (cli *CLI) Run() {
 		cli.printUsage()
 		os.Exit(1)
 	}
+	if configCmd.Parsed() {
+		if *configDefault {
+			cli.setDefaultConfig()
+		} else {
+			cli.setConfig(*configIp, *configPort, *configChainPath, *configWalletsPath)
+		}
+	}
+	if !config.Exists() {
+		log.Println(ErrConfigNotFound)
+		return
+	}
+	cfg, err := config.LoadConfig()
+	checkError(err)
 	if getBalanceCmd.Parsed() {
 		if *getBalanceAddress == "" {
 			getBalanceCmd.Usage()
 			os.Exit(1)
 		}
-		checkError(cli.getBalance(*getBalanceAddress, nodeID))
+		checkError(cli.getBalance(*getBalanceAddress, cfg))
 	}
 	if createBlockChainCmd.Parsed() {
 		if *createBlockChainAddress == "" {
 			createBlockChainCmd.Usage()
 			os.Exit(1)
 		}
-		checkError(cli.createBlockChain(*createBlockChainAddress, nodeID))
+		checkError(cli.createBlockChain(*createBlockChainAddress, cfg))
 	}
 	if createWalletCmd.Parsed() {
-		cli.createWallet(nodeID)
+		cli.createWallet(cfg)
 	}
 	if listAddressesCmd.Parsed() {
-		checkError(cli.listAddresses(nodeID))
+		checkError(cli.listAddresses(cfg))
 	}
 	if printChainCmd.Parsed() {
-		checkError(cli.printChain(nodeID))
+		checkError(cli.printChain(cfg))
 	}
 	if reindexUTXOCmd.Parsed() {
-		cli.reindexUTXO(nodeID)
+		cli.reindexUTXO(cfg)
 	}
 	if sendCmd.Parsed() {
 		if *sendFrom == "" || *sendTo == "" || *sendAmount <= 0 {
 			sendCmd.Usage()
 			os.Exit(1)
 		}
-		checkError(cli.send(*sendFrom, *sendTo, *sendAmount, *sendFee, nodeID))
+		checkError(cli.send(*sendFrom, *sendTo, *sendAmount, *sendFee, cfg))
 	}
 	if startNodeCmd.Parsed() {
-		nodeID := os.Getenv("NODE_ID")
-		if nodeID == "" {
-			startNodeCmd.Usage()
-			os.Exit(1)
-		}
-		checkError(cli.startNode(nodeID, *startNodeMiner))
+		checkError(cli.startNode(*startNodeMiner))
 	}
 }

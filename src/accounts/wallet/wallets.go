@@ -24,18 +24,18 @@ import (
 	"log"
 	"os"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/crypto/secp256k1"
-	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type Wallets struct {
 	Wallets map[string]*Wallet
 }
 
-func NewWallets(nodeID string) (*Wallets, error) {
+func NewWallets(cfg config.Config) (*Wallets, error) {
 	wallets := Wallets{}
 	wallets.Wallets = make(map[string]*Wallet)
-	err := wallets.LoadFromFile(nodeID)
+	err := wallets.LoadFromFile(cfg)
 	return &wallets, err
 }
 
@@ -62,12 +62,11 @@ func (ws Wallets) GetWallet(address string) (Wallet, error) {
 	return *wallet, nil
 }
 
-func (ws *Wallets) LoadFromFile(nodeID string) error {
-	walletFile := fmt.Sprintf(utils.WalletFile, nodeID)
-	if _, err := os.Stat(walletFile); os.IsNotExist(err) {
+func (ws *Wallets) LoadFromFile(cfg config.Config) error {
+	if _, err := os.Stat(cfg.WalletsPath); os.IsNotExist(err) {
 		return err
 	}
-	fileContent, err := ioutil.ReadFile(walletFile)
+	fileContent, err := ioutil.ReadFile(cfg.WalletsPath)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -82,16 +81,15 @@ func (ws *Wallets) LoadFromFile(nodeID string) error {
 	return nil
 }
 
-func (ws Wallets) SaveToFile(nodeID string) {
+func (ws Wallets) SaveToFile(cfg config.Config) {
 	var content bytes.Buffer
-	walletFile := fmt.Sprintf(utils.WalletFile, nodeID)
 	gob.Register(secp256k1.S256())
 	encoder := gob.NewEncoder(&content)
 	err := encoder.Encode(ws)
 	if err != nil {
 		log.Panic(err)
 	}
-	err = ioutil.WriteFile(walletFile, content.Bytes(), 0644)
+	err = ioutil.WriteFile(cfg.WalletsPath, content.Bytes(), 0644)
 	if err != nil {
 		log.Panic(err)
 	}

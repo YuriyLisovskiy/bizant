@@ -19,6 +19,7 @@ import "flag"
 
 var (
 	getBalanceCmd       = flag.NewFlagSet("balance", flag.ExitOnError)
+	configCmd           = flag.NewFlagSet("config", flag.ExitOnError)
 	createBlockChainCmd = flag.NewFlagSet("createblockchain", flag.ExitOnError)
 	createWalletCmd     = flag.NewFlagSet("createwallet", flag.ExitOnError)
 	listAddressesCmd    = flag.NewFlagSet("listaddresses", flag.ExitOnError)

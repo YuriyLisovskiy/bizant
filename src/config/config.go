@@ -17,9 +17,11 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
@@ -40,13 +42,10 @@ type Config struct {
 	WalletsPath string `json:"wallets_path"`
 }
 
-// NewConfig returns new default configuration.
-func NewConfig() Config {
-	return Config{}
-}
-
 // Default returns default node configuration.
-func (cfg Config) Default() (Config, error) {
+func Default() (Config, error) {
+	var cfg Config
+
 	// get path of running app
 	absPath, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
@@ -68,8 +67,8 @@ func (cfg Config) Default() (Config, error) {
 	// setup data
 	cfg.Ip = ip
 	cfg.Port = 8000
-	cfg.ChainPath = absPath + "/data/" + utils.DBFile
-	cfg.WalletsPath = absPath + "/data/" + utils.WalletFile
+	cfg.ChainPath = absPath + "/data/" + fmt.Sprintf(utils.DBFile, cfg.Port)
+	cfg.WalletsPath = absPath + "/data/" + fmt.Sprintf(utils.WalletFile, cfg.Port)
 
 	return cfg, nil
 }
@@ -83,6 +82,12 @@ func (cfg Config) SetIp(ip string) Config {
 // SetPort sets node's port.
 func (cfg Config) SetPort(port int) Config {
 	cfg.Port = port
+	if cfg.ChainPath != "" {
+		cfg.ChainPath = cfg.ChainPath[:strings.LastIndex(cfg.ChainPath, "/")+1] + fmt.Sprintf(utils.DBFile, cfg.Port)
+	}
+	if cfg.WalletsPath != "" {
+		cfg.WalletsPath = cfg.WalletsPath[:strings.LastIndex(cfg.WalletsPath, "/")+1] + fmt.Sprintf(utils.WalletFile, cfg.Port)
+	}
 	return cfg
 }
 
@@ -99,7 +104,7 @@ func (cfg Config) SetWalletsPath(path string) Config {
 }
 
 // Exists checks if configuration file exists on disk.
-func (cfg Config) Exists() bool {
+func Exists() bool {
 	_, err := os.Stat(configLocation)
 	return !os.IsNotExist(err)
 }
@@ -107,7 +112,7 @@ func (cfg Config) Exists() bool {
 // Save marshals config and saves it to a file.
 func (cfg Config) Save() error {
 	// marshal config content to json
-	bCfg, err := json.Marshal(cfg)
+	bCfg, err := json.MarshalIndent(cfg, "", "\t")
 	if err != nil {
 		return err
 	}

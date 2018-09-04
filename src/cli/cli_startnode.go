@@ -20,11 +20,19 @@ import (
 	"fmt"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
 )
 
-func (cli *CLI) startNode(nodeID string, minerAddress string) error {
-	fmt.Printf("Starting node %s\n", nodeID)
+func (cli *CLI) startNode(minerAddress string) error {
+	if !config.Exists() {
+		return ErrConfigNotFound
+	}
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Starting node %d\n", cfg.Port)
 	if len(minerAddress) > 0 {
 		if wallet.ValidateAddress(minerAddress) {
 			fmt.Println("Mining is on. Address to receive rewards: ", minerAddress)
@@ -33,6 +41,6 @@ func (cli *CLI) startNode(nodeID string, minerAddress string) error {
 		}
 	}
 	server := net.Server{}
-	server.Start(nodeID, minerAddress)
+	server.Start(cfg, minerAddress)
 	return nil
 }

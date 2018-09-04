@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"log"
 	"os"
 	"time"
@@ -37,8 +38,8 @@ type BlockChain struct {
 	db  *db_pkg.DB
 }
 
-func CreateBlockChain(address, nodeID string) BlockChain {
-	utils.DBFile = fmt.Sprintf(utils.DBFile, nodeID)
+func CreateBlockChain(address string, cfg config.Config) BlockChain {
+	utils.DBFile = cfg.ChainPath
 	if utils.DBExists(utils.DBFile) {
 		fmt.Printf("%s already exists.\n", utils.DBFile)
 		os.Exit(1)
@@ -86,13 +87,13 @@ func CreateBlockChain(address, nodeID string) BlockChain {
 	return BlockChain{genesis.Hash, db}
 }
 
-func NewBlockChain(nodeID string) BlockChain {
-	utils.DBFile = fmt.Sprintf(utils.DBFile, nodeID)
+func NewBlockChain(cfg config.Config) BlockChain {
+	utils.DBFile = cfg.ChainPath
 	if utils.DBExists(utils.DBFile) == false {
 		fmt.Println("No existing blockchain found. Create one first.")
 		os.Exit(1)
 	}
-	db, err := db_pkg.Open(utils.DBFile, 0600, nil)
+	db, err := db_pkg.Open(cfg.ChainPath, 0600, nil)
 	if err != nil {
 		log.Panic(err)
 	}

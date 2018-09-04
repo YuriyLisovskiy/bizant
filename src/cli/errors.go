@@ -13,11 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-package utils
+package cli
 
-var (
-	DBFile = "BlockChain_%d.db"
-	WalletFile = "wallets_%d.dat"
-	BLOCKS_BUCKET = []byte("blocks")
-	LAST_BLOCK_HASH = []byte("l")
-)
+import "errors"
+
+var ErrConfigNotFound = errors.New("config not found")

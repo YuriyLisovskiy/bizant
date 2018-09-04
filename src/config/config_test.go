@@ -16,6 +16,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,11 +36,10 @@ func TestConfig_Default(t *testing.T) {
 	expected := Config{
 		Ip: ip,
 		Port: 8000,
-		ChainPath: absPath + "/data/" + utils.DBFile,
-		WalletsPath: absPath + "/data/" + utils.WalletFile,
+		ChainPath: absPath + "/data/" + fmt.Sprintf(utils.DBFile, 8000),
+		WalletsPath: absPath + "/data/" + fmt.Sprintf(utils.WalletFile, 8000),
 	}
-	actual := NewConfig()
-	actual, err = actual.Default()
+	actual, err := Default()
 	if err != nil {
 		t.Errorf("config.TestConfig_Defualt: can't test config")
 	}
@@ -58,7 +58,7 @@ func TestConfig_Default(t *testing.T) {
 }
 
 func TestConfig_SetIp(t *testing.T) {
-	cfg := NewConfig()
+	cfg := Config{}
 	cfg = cfg.SetIp("127.0.0.1")
 	if cfg.Ip != "127.0.0.1" {
 		t.Errorf("config.TestConfig_SetIp: %s != %s", cfg.Ip, "127.0.0.1")
@@ -66,7 +66,7 @@ func TestConfig_SetIp(t *testing.T) {
 }
 
 func TestConfig_SetPort(t *testing.T) {
-	cfg := NewConfig()
+	cfg := Config{}
 	cfg = cfg.SetPort(3000)
 	if cfg.Port != 3000 {
 		t.Errorf("config.TestConfig_SetPort: %d != %d", cfg.Port, 3000)
@@ -74,7 +74,7 @@ func TestConfig_SetPort(t *testing.T) {
 }
 
 func TestConfig_SetChainPath(t *testing.T) {
-	cfg := NewConfig()
+	cfg := Config{}
 	cfg = cfg.SetChainPath("some/path/to/chain")
 	if cfg.ChainPath != "some/path/to/chain" {
 		t.Errorf("config.TestConfig_SetChainPath: %s != %s", cfg.ChainPath, "some/path/to/chain")
@@ -82,7 +82,7 @@ func TestConfig_SetChainPath(t *testing.T) {
 }
 
 func TestConfig_SetWalletsPath(t *testing.T) {
-	cfg := NewConfig()
+	cfg := Config{}
 	cfg = cfg.SetWalletsPath("some/wallets/path")
 	if cfg.WalletsPath != "some/wallets/path" {
 		t.Errorf("config.TestConfig_SetWalletsPath: %s != %s", cfg.WalletsPath, "some/wallets/path")
@@ -90,8 +90,8 @@ func TestConfig_SetWalletsPath(t *testing.T) {
 }
 
 func TestConfig_Exists(t *testing.T) {
-	cfg := NewConfig()
-	exists := cfg.Exists()
+	cfg := Config{}
+	exists := Exists()
 	if exists != false {
 		t.Errorf("config.TestConfig_Exists: %t != %t", exists, false)
 	}
@@ -99,7 +99,7 @@ func TestConfig_Exists(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	exists = cfg.Exists()
+	exists = Exists()
 	if exists != true {
 		t.Errorf("config.TestConfig_Exists: %t != %t", exists, true)
 	}
@@ -107,8 +107,7 @@ func TestConfig_Exists(t *testing.T) {
 }
 
 func TestConfig_Load(t *testing.T) {
-	expected := NewConfig()
-	expected, err := expected.Default()
+	expected, err := Default()
 	if err != nil {
 		t.Errorf("config.TestConfig_Load: can't test config")
 	}

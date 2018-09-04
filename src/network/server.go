@@ -22,6 +22,7 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
@@ -72,8 +73,8 @@ func handleConnection(conn net.Conn, proto *protocol.Protocol) {
 	conn.Close()
 }
 
-func (self *Server) Start(nodeID, minerAddress string) {
-	static.SelfNodeAddress = fmt.Sprintf("localhost:%s", nodeID)
+func (self *Server) Start(cfg config.Config, minerAddress string) {
+	static.SelfNodeAddress = fmt.Sprintf("%s:%d", cfg.Ip, cfg.Port)
 	if _, ok := static.KnownNodes[static.SelfNodeAddress]; ok {
 		delete(static.KnownNodes, static.SelfNodeAddress)
 	}
@@ -82,7 +83,7 @@ func (self *Server) Start(nodeID, minerAddress string) {
 		log.Panic(err)
 	}
 	defer ln.Close()
-	bc := core.NewBlockChain(nodeID)
+	bc := core.NewBlockChain(cfg)
 
 	self.protocol = protocol.Protocol{
 		Config: &protocol.Configuration{

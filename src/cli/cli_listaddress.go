@@ -19,10 +19,11 @@ import (
 	"fmt"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 )
 
-func (cli *CLI) listAddresses(nodeID string) error {
-	wallets, err := wallet.NewWallets(nodeID)
+func (cli *CLI) listAddresses(cfg config.Config) error {
+	wallets, err := wallet.NewWallets(cfg)
 	if err != nil {
 		return err
 	}
