@@ -3,4 +3,3 @@ The following are developer notes on how to build [Block Chain Go](https://githu
 
 * [Build](build.md)
 * [Dependencies](dependencies.md)
-* [Manual installation of project dependencies](manual-installation.md)
