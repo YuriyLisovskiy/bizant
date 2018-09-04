@@ -18,7 +18,7 @@ package tx_io
 import (
 	"bytes"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 )
 
 type TXInput struct {

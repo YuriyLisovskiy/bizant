@@ -18,7 +18,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 )
 
 func (cli *CLI) createWallet(nodeID string) {

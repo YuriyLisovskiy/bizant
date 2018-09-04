@@ -19,9 +19,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/YuriyLisovskiy/blockchain-go/src/encoding/base58"
+	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/encoding/base58"
 )
 
 func (cli *CLI) getBalance(address, nodeID string) error {

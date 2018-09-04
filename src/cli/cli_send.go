@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
 	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 )
 
 func (cli *CLI) send(from, to string, amount, fee float64, nodeID string) error {

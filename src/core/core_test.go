@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 )
 
 func TestNewCoinBaseTX(test *testing.T) {

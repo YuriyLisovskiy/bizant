@@ -19,8 +19,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
 )
 
 func (cli *CLI) createBlockChain(address, nodeId string) error {

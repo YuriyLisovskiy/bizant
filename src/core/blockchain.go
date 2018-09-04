@@ -29,7 +29,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
 	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
-	"github.com/YuriyLisovskiy/blockchain-go/src/wallet"
+	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 )
 
 type BlockChain struct {

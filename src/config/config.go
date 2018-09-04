@@ -111,7 +111,7 @@ func (cfg Config) Save() error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(configLocation, bCfg, 0644)
+	return ioutil.WriteFile(configLocation, bCfg, 0666)
 }
 
 // Load loads config from file.
