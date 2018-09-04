@@ -2,7 +2,7 @@ BINARY = blockchain
 COVERAGE = coverage
 FLAGS = main.go
 
-all: coverage
+all:
 	@echo Building the binary for target platform...
 	@go build -o bin/${BINARY} ${FLAGS}
 	@echo Done.
@@ -23,14 +23,11 @@ PKG_ACCOUNTS = $(ACCOUNTS)/wallet
 
 PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) $(PKG_ACCOUNTS) ./src/network/protocol ./src/utils ./src/encoding/base58 ./src/config ./src/db
 
-coverage: test
-	@echo Generating coverage report...
-	@go tool cover -html $(COVERAGE).out -o $(COVERAGE).html
-	@echo Done
-
 test:
 	@echo Running tests...
 	@go test -v -timeout 3h -covermode=count -coverprofile=$(COVERAGE).out $(PACKAGES)
+	@echo Generating coverage report...
+	@go tool cover -html $(COVERAGE).out -o $(COVERAGE).html
 	@echo Done
 
 clean:
