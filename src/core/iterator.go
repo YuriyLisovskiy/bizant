@@ -20,22 +20,22 @@ import (
 	"log"
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
-	db_pkg "github.com/YuriyLisovskiy/blockchain-go/src/db"
+	"github.com/YuriyLisovskiy/blockchain-go/src/db"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
 type BlockChainIterator struct {
 	currentHash []byte
-	db          *db_pkg.DB
+	db          *db.DB
 }
 
-func (i *BlockChainIterator) Next() types.Block {
-	encodedBlock, err := i.db.Get(i.currentHash, utils.BLOCKS_BUCKET)
+func (bci *BlockChainIterator) Next() types.Block {
+	encodedBlock, err := bci.db.Get(bci.currentHash, utils.BLOCKS_BUCKET)
 	if err != nil {
 		log.Panic(err)
 	}
 	block := DeserializeBlock(encodedBlock)
-	i.currentHash = block.PrevBlockHash
+	bci.currentHash = block.PrevBlockHash
 	return block
 
 /*
@@ -48,6 +48,6 @@ func (i *BlockChainIterator) Next() types.Block {
 */
 }
 
-func (i *BlockChainIterator) End() bool {
-	return hex.EncodeToString(i.currentHash) == hex.EncodeToString([]byte{})
+func (bci *BlockChainIterator) End() bool {
+	return hex.EncodeToString(bci.currentHash) == hex.EncodeToString([]byte{})
 }

@@ -26,11 +26,11 @@ import (
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
+	"github.com/YuriyLisovskiy/blockchain-go/src/p2p/static"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
-func (self *Protocol) HandleAddr(request []byte) {
+func (*Protocol) HandleAddr(request []byte) {
 	var buff bytes.Buffer
 	payload := addr{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -47,7 +47,7 @@ func (self *Protocol) HandleAddr(request []byte) {
 	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(static.KnownNodes)))
 }
 
-func (self *Protocol) HandleBlock(request []byte) {
+func (p *Protocol) HandleBlock(request []byte) {
 	var buff bytes.Buffer
 	payload := block{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -59,20 +59,20 @@ func (self *Protocol) HandleBlock(request []byte) {
 	blockData := payload.Block
 	block := core.DeserializeBlock(blockData)
 	utils.PrintLog("Received a new block!\n")
-	self.Config.Chain.AddBlock(block)
+	p.Config.Chain.AddBlock(block)
 	utils.PrintLog(fmt.Sprintf("Added block %x\n", block.Hash))
 	if len(static.BlocksInTransit) > 0 {
 		blockHash := static.BlocksInTransit[0]
-		self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash)
+		p.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash)
 		static.BlocksInTransit = static.BlocksInTransit[1:]
 	} else {
-		UTXOSet := core.UTXOSet{BlockChain: *self.Config.Chain}
+		UTXOSet := core.UTXOSet{BlockChain: *p.Config.Chain}
 		UTXOSet.Reindex()
 		atomic.StoreInt32(&vars.Syncing, 0)
 	}
 }
 
-func (self *Protocol) HandleInv(request []byte) {
+func (p *Protocol) HandleInv(request []byte) {
 	var buff bytes.Buffer
 	payload := inv{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -93,17 +93,17 @@ func (self *Protocol) HandleInv(request []byte) {
 			}
 		}
 		static.BlocksInTransit = newInTransit
-		self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash)
+		p.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blockHash)
 	case C_TX:
 		txID := payload.Items[0]
 		if static.MemPool[hex.EncodeToString(txID)].Hash == nil {
-			self.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_TX, txID)
+			p.SendGetData(static.SelfNodeAddress, payload.AddrFrom, C_TX, txID)
 		}
 	default:
 	}
 }
 
-func (self *Protocol) HandleGetBlocks(request []byte) {
+func (p *Protocol) HandleGetBlocks(request []byte) {
 	var buff bytes.Buffer
 	payload := getblocks{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -112,11 +112,11 @@ func (self *Protocol) HandleGetBlocks(request []byte) {
 	if err != nil {
 		log.Panic(err)
 	}
-	blocks := self.Config.Chain.GetBlockHashes(payload.BestHeight)
-	self.SendInv(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blocks)
+	blocks := p.Config.Chain.GetBlockHashes(payload.BestHeight)
+	p.SendInv(static.SelfNodeAddress, payload.AddrFrom, C_BLOCK, blocks)
 }
 
-func (self *Protocol) HandleGetData(request []byte) {
+func (p *Protocol) HandleGetData(request []byte) {
 	var buff bytes.Buffer
 	payload := getdata{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -127,21 +127,21 @@ func (self *Protocol) HandleGetData(request []byte) {
 	}
 	switch payload.Type {
 	case C_BLOCK:
-		block, err := self.Config.Chain.GetBlock([]byte(payload.ID))
+		block, err := p.Config.Chain.GetBlock([]byte(payload.ID))
 		if err != nil {
 			return
 		}
-		self.SendBlock(static.SelfNodeAddress, payload.AddrFrom, block)
+		p.SendBlock(static.SelfNodeAddress, payload.AddrFrom, block)
 	case C_TX:
 		txID := hex.EncodeToString(payload.ID)
 		tx := static.MemPool[txID]
-		self.SendTx(static.SelfNodeAddress, payload.AddrFrom, tx)
+		p.SendTx(static.SelfNodeAddress, payload.AddrFrom, tx)
 		// delete(mempool, txID)
 	default:
 	}
 }
 
-func (self *Protocol) HandleTx(request []byte) {
+func (p *Protocol) HandleTx(request []byte) {
 	var buff bytes.Buffer
 	payload := tx{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -154,7 +154,7 @@ func (self *Protocol) HandleTx(request []byte) {
 	tx := core.DeserializeTransaction(txData)
 	static.MemPool[hex.EncodeToString(tx.Hash)] = tx
 
-	if !self.Config.Chain.VerifyTransaction(tx) {
+	if !p.Config.Chain.VerifyTransaction(tx) {
 		utils.PrintLog(fmt.Sprintf("Invalid transaction %x\n", tx.Hash))
 		data, err := json.MarshalIndent(tx, "", "  ")
 		if err == nil {
@@ -204,7 +204,7 @@ func (self *Protocol) HandleTx(request []byte) {
 	*/
 }
 
-func (self *Protocol) HandleVersion(request []byte) {
+func (p *Protocol) HandleVersion(request []byte) {
 	var buff bytes.Buffer
 	payload := version{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -213,15 +213,15 @@ func (self *Protocol) HandleVersion(request []byte) {
 	if err != nil {
 		log.Panic(err)
 	}
-	myBestHeight := self.Config.Chain.GetBestHeight()
+	myBestHeight := p.Config.Chain.GetBestHeight()
 	foreignerBestHeight := payload.BestHeight
 	if myBestHeight < foreignerBestHeight {
 		atomic.StoreInt32(&vars.Syncing, 1)
-		self.SendGetBlocks(static.SelfNodeAddress, payload.AddrFrom)
+		p.SendGetBlocks(static.SelfNodeAddress, payload.AddrFrom)
 	} else if myBestHeight > foreignerBestHeight {
-		self.SendVersion(static.SelfNodeAddress, payload.AddrFrom)
+		p.SendVersion(static.SelfNodeAddress, payload.AddrFrom)
 	} else {
-		self.SendMessage(payload.AddrFrom, C_SYNCED)
+		p.SendMessage(payload.AddrFrom, C_SYNCED)
 		atomic.StoreInt32(&vars.Syncing, 0)
 	}
 	static.KnownNodes[payload.AddrFrom] = true
@@ -230,12 +230,12 @@ func (self *Protocol) HandleVersion(request []byte) {
 	//	}
 	for address := range static.KnownNodes {
 		if address != static.SelfNodeAddress {
-			self.SendAddr(address)
+			p.SendAddr(address)
 		}
 	}
 }
 
-func (self *Protocol) HandlePing(request []byte) bool {
+func (p *Protocol) HandlePing(request []byte) bool {
 	var buff bytes.Buffer
 	payload := ping{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -244,10 +244,10 @@ func (self *Protocol) HandlePing(request []byte) bool {
 	if err != nil {
 		log.Panic(err)
 	}
-	return self.SendPong(static.SelfNodeAddress, payload.AddrFrom)
+	return p.SendPong(static.SelfNodeAddress, payload.AddrFrom)
 }
 
-func (self *Protocol) HandlePong(request []byte) {
+func (*Protocol) HandlePong(request []byte) {
 	var buff bytes.Buffer
 	payload := pong{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -262,7 +262,7 @@ func (self *Protocol) HandlePong(request []byte) {
 	utils.PrintLog(fmt.Sprintf("Peers %d\n", len(static.KnownNodes)))
 }
 
-func (self *Protocol) HandleMessage(request []byte) {
+func (*Protocol) HandleMessage(request []byte) {
 	var buff bytes.Buffer
 	payload := msg{}
 	buff.Write(request[COMMAND_LENGTH:])
@@ -279,7 +279,7 @@ func (self *Protocol) HandleMessage(request []byte) {
 	}
 }
 
-func (self *Protocol) HandleError(request []byte) {
+func (*Protocol) HandleError(request []byte) {
 
 	// TODO: implement protocol error handling
 

@@ -21,7 +21,7 @@ PKG_CRYPTO = $(CRYPTO)/secp256k1 $(PKG_SHA3) $(CRYPTO)/x11 $(CRYPTO)/ripemd160
 PKG_CORE = $(CORE) $(CORE)/types $(CORE)/types/tx_io
 PKG_ACCOUNTS = $(ACCOUNTS)/wallet $(ACCOUNTS)/auth/jwt
 
-PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) $(PKG_ACCOUNTS) ./src/network/protocol ./src/utils ./src/encoding/base58 ./src/config ./src/db
+PACKAGES =  $(PKG_CORE) $(PKG_CRYPTO) $(PKG_ACCOUNTS) ./src/p2p/protocol ./src/utils ./src/encoding/base58 ./src/config ./src/db
 
 test:
 	@echo Running tests...

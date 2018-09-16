@@ -25,11 +25,11 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 )
 
-func (self *Protocol) sendData(addr string, request []byte) bool {
+func (p *Protocol) sendData(addr string, request []byte) bool {
 	conn, err := net.Dial(PROTOCOL, addr)
 	if err != nil {
-		delete(*self.Config.Nodes, addr)
-		fmt.Printf("\nPeers %d\n", len(*self.Config.Nodes))
+		delete(*p.Config.Nodes, addr)
+		fmt.Printf("\nPeers %d\n", len(*p.Config.Nodes))
 		return false
 	}
 	defer conn.Close()
@@ -40,16 +40,16 @@ func (self *Protocol) sendData(addr string, request []byte) bool {
 	return true
 }
 
-func (self *Protocol) SendPing(addrFrom, addrTo string) bool {
-	return self.sendData(addrTo, MakeRequest(ping{AddrFrom: addrFrom}, C_PING))
+func (p *Protocol) SendPing(addrFrom, addrTo string) bool {
+	return p.sendData(addrTo, MakeRequest(ping{AddrFrom: addrFrom}, C_PING))
 }
 
-func (self *Protocol) SendPong(addrFrom, addrTo string) bool {
-	return self.sendData(addrTo, MakeRequest(pong{AddrFrom: addrFrom}, C_PONG))
+func (p *Protocol) SendPong(addrFrom, addrTo string) bool {
+	return p.sendData(addrTo, MakeRequest(pong{AddrFrom: addrFrom}, C_PONG))
 }
 
-func (self *Protocol) SendInv(addrFrom, addrTo, kind string, items [][]byte) bool {
-	return self.sendData(addrTo, MakeRequest(
+func (p *Protocol) SendInv(addrFrom, addrTo, kind string, items [][]byte) bool {
+	return p.sendData(addrTo, MakeRequest(
 		inv{
 			AddrFrom: addrFrom,
 			Type:     kind,
@@ -59,8 +59,8 @@ func (self *Protocol) SendInv(addrFrom, addrTo, kind string, items [][]byte) boo
 	))
 }
 
-func (self *Protocol) SendBlock(addrFrom, addrTo string, newBlock types.Block) bool {
-	return self.sendData(addrTo, MakeRequest(
+func (p *Protocol) SendBlock(addrFrom, addrTo string, newBlock types.Block) bool {
+	return p.sendData(addrTo, MakeRequest(
 		block{
 			AddrFrom: addrFrom,
 			Block:    newBlock.Serialize(),
@@ -69,28 +69,28 @@ func (self *Protocol) SendBlock(addrFrom, addrTo string, newBlock types.Block) b
 	))
 }
 
-func (self *Protocol) SendAddr(addrTo string) bool {
+func (p *Protocol) SendAddr(addrTo string) bool {
 	nodes := addr{}
-	for knownNodeAddr := range *self.Config.Nodes {
+	for knownNodeAddr := range *p.Config.Nodes {
 		if knownNodeAddr != addrTo {
 			nodes.AddrList = append(nodes.AddrList, knownNodeAddr)
 		}
 	}
-	return self.sendData(addrTo, MakeRequest(nodes, C_ADDR))
+	return p.sendData(addrTo, MakeRequest(nodes, C_ADDR))
 }
 
-func (self *Protocol) SendGetBlocks(addrFrom, addrTo string) bool {
-	return self.sendData(addrTo, MakeRequest(
+func (p *Protocol) SendGetBlocks(addrFrom, addrTo string) bool {
+	return p.sendData(addrTo, MakeRequest(
 		getblocks{
 			AddrFrom:   addrFrom,
-			BestHeight: self.Config.Chain.GetBestHeight(),
+			BestHeight: p.Config.Chain.GetBestHeight(),
 		},
 		C_GETBLOCKS,
 	))
 }
 
-func (self *Protocol) SendGetData(addrFrom, addrTo, kind string, id []byte) bool {
-	return self.sendData(addrTo, MakeRequest(
+func (p *Protocol) SendGetData(addrFrom, addrTo, kind string, id []byte) bool {
+	return p.sendData(addrTo, MakeRequest(
 		getdata{
 			AddrFrom: addrFrom,
 			Type:     kind,
@@ -100,8 +100,8 @@ func (self *Protocol) SendGetData(addrFrom, addrTo, kind string, id []byte) bool
 	))
 }
 
-func (self *Protocol) SendTx(addrFrom, addrTo string, tnx types.Transaction) bool {
-	return self.sendData(addrTo, MakeRequest(
+func (p *Protocol) SendTx(addrFrom, addrTo string, tnx types.Transaction) bool {
+	return p.sendData(addrTo, MakeRequest(
 		tx{
 			AddFrom:     addrFrom,
 			Transaction: tnx.Serialize(),
@@ -110,13 +110,13 @@ func (self *Protocol) SendTx(addrFrom, addrTo string, tnx types.Transaction) boo
 	))
 }
 
-func (self *Protocol) SendVersion(addrFrom, addrTo string) bool {
-	return self.sendData(
+func (p *Protocol) SendVersion(addrFrom, addrTo string) bool {
+	return p.sendData(
 		addrTo,
 		MakeRequest(
 			version{
 				Version:    NODE_VERSION,
-				BestHeight: self.Config.Chain.GetBestHeight(),
+				BestHeight: p.Config.Chain.GetBestHeight(),
 				AddrFrom:   addrFrom,
 			},
 			C_VERSION,
@@ -124,6 +124,6 @@ func (self *Protocol) SendVersion(addrFrom, addrTo string) bool {
 	)
 }
 
-func (self *Protocol) SendMessage(addrTo, msgType string) bool {
-	return self.sendData(addrTo, MakeRequest(msg{Type: msgType}, C_MESSAGE))
+func (p *Protocol) SendMessage(addrTo, msgType string) bool {
+	return p.sendData(addrTo, MakeRequest(msg{Type: msgType}, C_MESSAGE))
 }

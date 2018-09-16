@@ -24,7 +24,7 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/types"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
+	"github.com/YuriyLisovskiy/blockchain-go/src/p2p/protocol"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 

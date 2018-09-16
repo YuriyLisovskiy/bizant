@@ -21,7 +21,7 @@ import (
 
 	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/config"
-	net "github.com/YuriyLisovskiy/blockchain-go/src/network"
+	"github.com/YuriyLisovskiy/blockchain-go/src/p2p"
 )
 
 func (cli *CLI) startNode(minerAddress string) error {
@@ -40,7 +40,7 @@ func (cli *CLI) startNode(minerAddress string) error {
 			return errors.New(fmt.Sprintf("wrong miner address %s", minerAddress))
 		}
 	}
-	server := net.Server{}
+	server := p2p.Server{}
 	server.Start(cfg, minerAddress)
 	return nil
 }

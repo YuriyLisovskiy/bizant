@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-package network
+package p2p
 
 import (
 	"fmt"
@@ -25,9 +25,9 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core/vars"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/services"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
+	"github.com/YuriyLisovskiy/blockchain-go/src/p2p/protocol"
+	"github.com/YuriyLisovskiy/blockchain-go/src/p2p/static"
+	"github.com/YuriyLisovskiy/blockchain-go/src/services"
 	"github.com/YuriyLisovskiy/blockchain-go/src/utils"
 )
 
@@ -73,7 +73,7 @@ func handleConnection(conn net.Conn, proto *protocol.Protocol) {
 	conn.Close()
 }
 
-func (self *Server) Start(cfg config.Config, minerAddress string) {
+func (s *Server) Start(cfg config.Config, minerAddress string) {
 	static.SelfNodeAddress = fmt.Sprintf("%s:%d", cfg.Ip, cfg.Port)
 	if _, ok := static.KnownNodes[static.SelfNodeAddress]; ok {
 		delete(static.KnownNodes, static.SelfNodeAddress)
@@ -85,19 +85,19 @@ func (self *Server) Start(cfg config.Config, minerAddress string) {
 	defer ln.Close()
 	bc := core.NewBlockChain(cfg)
 
-	self.protocol = protocol.Protocol{
+	s.protocol = protocol.Protocol{
 		Config: &protocol.Configuration{
 			Chain: &bc,
 			Nodes: &static.KnownNodes,
 		},
 	}
 	pingService := &services.PingService{}
-	pingService.Start(static.SelfNodeAddress, &self.protocol)
-	go self.SyncDB()
+	pingService.Start(static.SelfNodeAddress, &s.protocol)
+	go s.SyncDB()
 	go func() {
 		if len(minerAddress) > 0 {
 			miningService := &services.MiningService{MinerAddress: minerAddress}
-			miningService.Start(&self.protocol, &static.MemPool)
+			miningService.Start(&s.protocol, &static.MemPool)
 		}
 	}()
 	for {
@@ -105,15 +105,15 @@ func (self *Server) Start(cfg config.Config, minerAddress string) {
 		if err != nil {
 			log.Panic(err)
 		}
-		go handleConnection(conn, &self.protocol)
+		go handleConnection(conn, &s.protocol)
 	}
 }
 
-func (self *Server) SyncDB() {
+func (s *Server) SyncDB() {
 	atomic.StoreInt32(&vars.Syncing, 1)
 	for nodeAddr := range static.KnownNodes {
 		if nodeAddr != static.SelfNodeAddress {
-			if self.protocol.SendVersion(static.SelfNodeAddress, nodeAddr) {
+			if s.protocol.SendVersion(static.SelfNodeAddress, nodeAddr) {
 				break
 			}
 		}

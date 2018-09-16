@@ -23,8 +23,8 @@ import (
 	"github.com/YuriyLisovskiy/blockchain-go/src/accounts/wallet"
 	"github.com/YuriyLisovskiy/blockchain-go/src/config"
 	"github.com/YuriyLisovskiy/blockchain-go/src/core"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/protocol"
-	"github.com/YuriyLisovskiy/blockchain-go/src/network/static"
+	"github.com/YuriyLisovskiy/blockchain-go/src/p2p/protocol"
+	"github.com/YuriyLisovskiy/blockchain-go/src/p2p/static"
 )
 
 func (cli *CLI) send(from, to string, amount, fee float64, cfg config.Config) error {

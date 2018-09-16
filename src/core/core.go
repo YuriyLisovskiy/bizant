@@ -35,8 +35,8 @@ func NewBlock(transactions []types.Transaction, prevBlockHash []byte, height int
 		Nonce:         0,
 		Height:        height,
 	}
-	pow := NewProofOfWork(block)
-	nonce, hash, err := pow.Run()
+	worker := NewProofOfWork(block)
+	nonce, hash, err := worker.Run()
 	block.Hash = hash
 	block.Nonce = nonce
 	return block, err
