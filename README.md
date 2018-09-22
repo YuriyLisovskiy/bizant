@@ -1,6 +1,7 @@
 ## Block Chain Go
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![Language](https://img.shields.io/badge/Go-v1.10-blue.svg)](https://golang.org/)
+[![GoDoc](https://godoc.org/github.com/YuriyLisovskiy/blockchain-go/src?status.svg)](https://godoc.org/github.com/YuriyLisovskiy/blockchain-go/src)
 [![Build Status](https://travis-ci.org/YuriyLisovskiy/blockchain-go.svg?branch=master)](https://travis-ci.org/YuriyLisovskiy/blockchain-go)
 [![Coverage Status](https://coveralls.io/repos/github/YuriyLisovskiy/blockchain-go/badge.svg)](https://coveralls.io/github/YuriyLisovskiy/blockchain-go)
 

@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+// Package x11 implements X11 hash algorithm which uses eleven different
+// hashing functions, chained together, to calculate the block header.
+// The eleven algorithms are blake, bmw, groestl, jh, keccak, skein, luffa,
+// cubehash, shavite, simd and echo. Originally developed by Dash creator,
+// Evan Duffield, in 2014.
 package x11
 
 import (
