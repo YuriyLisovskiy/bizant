@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+// Package base58 implements a Base58 encoding algorithm, a group of
+// binary-to-text encoding schemes used to represent large integers as
+// alphanumeric text.
 package base58
 
 import (

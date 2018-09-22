@@ -15,6 +15,7 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+// Package simd512 implements SIMD512 hash algorithm.
 package simd512
 
 import (
@@ -98,7 +99,7 @@ func (ref *digest) Write(src []byte) (int, error) {
 // to Close with a dst that is smaller then HashSize will return an error.
 func (ref *digest) Close(dst []byte, bits uint8, bcnt uint8) error {
 	if ln := len(dst); HashSize > ln {
-		return fmt.Errorf("Simd Close: dst min length: %d, got %d", HashSize, ln)
+		return fmt.Errorf("simd Close: dst min length: %d, got %d", HashSize, ln)
 	}
 
 	if ref.ptr > 0 || bcnt > 0 {

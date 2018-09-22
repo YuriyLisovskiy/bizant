@@ -15,6 +15,8 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+// Package nist contains the plaintext messages used by National Institute of
+// Standards and Tecknology as the test vectors for the SHA-3 competitions.
 package nist
 
 // Get returns a slice that contains one of the NIST

@@ -15,6 +15,7 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+// Package utils provides AES Rounds, Digest and Hash interfaces.
 package utils
 
 type Digest interface {
