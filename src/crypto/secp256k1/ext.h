@@ -1,6 +1,8 @@
 // Copyright 2015 Jeffrey Wilcke, Felix Lange, Gustav Simonsson. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in
 // the LICENSE file.
+//
+// Copyright 2018 Yuriy Lisovskiy. All rights reserved.
 
 // secp256k1_context_create_sign_verify creates a context for signing and signature verification.
 static secp256k1_context* secp256k1_context_create_sign_verify() {

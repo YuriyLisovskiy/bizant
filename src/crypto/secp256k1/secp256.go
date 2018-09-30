@@ -1,6 +1,8 @@
 // Copyright 2015 Jeffrey Wilcke, Felix Lange, Gustav Simonsson. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in
 // the LICENSE file.
+//
+// Copyright 2018 Yuriy Lisovskiy. All rights reserved.
 
 // Package secp256k1 wraps the bitcoin secp256k1 C library.
 package secp256k1
