@@ -61,6 +61,7 @@ matrix:
             addons:
               apt:
                 packages:
+                  - gcc
                   - gcc-multilib
                   - libgmp-dev:i386
                   - libc6-dev
@@ -69,6 +70,7 @@ matrix:
             addons:
               apt:
                 packages:
+                  - gcc
                   - gcc-multilib
                   - libc6-dev
           - compiler: gcc
@@ -76,13 +78,15 @@ matrix:
             addons:
               apt:
                 packages:
-                - gcc-multilib
-                - libc6-dev
+                  - gcc
+                  - gcc-multilib
+                  - libc6-dev
           - compiler: gcc
             env: HOST=i686-linux-gnu
             addons:
               apt:
                 packages:
+                  - gcc
                   - gcc-multilib
                   - libgmp-dev:i386
                   - libc6-dev
