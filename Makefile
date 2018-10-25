@@ -7,9 +7,6 @@ all:
 	@go build -o bin/${BINARY} ${FLAGS}
 	@echo Done.
 
-dependencies:
-	@bash dependencies.sh
-
 CRYPTO = ./src/crypto
 CORE = ./src/core
 SHA3 = $(CRYPTO)/sha3
