@@ -11,7 +11,7 @@ Build requires:
 #### Install dependencies
 You can install required [Go](https://golang.org) libraries and submodules using [dependencies.sh](../dependencies.sh) script:
 ```bash
-$ make dependencies
+# there is no any dependency now
 ```
 
 Testing
