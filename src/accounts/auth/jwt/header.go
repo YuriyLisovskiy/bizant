@@ -19,13 +19,13 @@ package jwt
 // Contains important information for encrypting/decrypting.
 type Header struct {
 	// Token type.
-	Typ string
+	Typ string `json:"typ"`
 
 	// Message authentication code algorithm - the issuer can freely set an algorithm
 	// to verify the signature on the token. However, some asymmetrical algorithms
 	// pose security concerns.
-	Alg string
+	Alg string `json:"alg"`
 
 	// Content type - this always is JWT.
-	Cty string
+	Cty string `json:"cty"`
 }
